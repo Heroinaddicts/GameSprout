@@ -9,6 +9,7 @@
 [核心能力](#核心能力) · [架构设计](#架构设计) · [构建与启动](#构建与启动) · [示例项目](#示例项目) · [开发方向](#开发方向)
 
 </div>
+<img width="1710" height="1112" alt="截屏2026-11-16 14 22 07" src="https://github.com/user-attachments/assets/2f4437c9-207b-47cb-a437-26b23f27207d" />
 
 ![GameSprout Editor 在 macOS 上编辑大型三维城堡场景，展示 Scene、Hierarchy、Inspector、Project 与 Console 工作区](docs/images/gamesprout-editor.png)
 
