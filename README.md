@@ -11,7 +11,7 @@
 </div>
 <img width="1710" height="1112" alt="截屏2026-11-16 14 22 07" src="https://github.com/user-attachments/assets/2f4437c9-207b-47cb-a437-26b23f27207d" />
 
-![GameSprout Editor 在 macOS 上编辑大型三维城堡场景，展示 Scene、Hierarchy、Inspector、Project 与 Console 工作区](docs/images/gamesprout-editor.png)
+![GameSprout Editor 在 macOS 上编辑大型三维城堡场景，展示 Scene、Hierarchy、Inspector、Project 与 Console 工作区]
 
 <p align="center"><em>GameSprout Editor 实机截图：在同一工作区中组织场景、预览画面、管理资产与编辑属性。</em></p>
 
