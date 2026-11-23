@@ -20,6 +20,7 @@ public:
     uint64_t BeginImportBatch(uint64_t count) override;
     void EndImportBatch(uint64_t batch) override;
     void Invalidate(const Guid & guid) override;
+    bool PrepareBuildArtifact(const AssetBuildArtifactRequest&, AssetBuildArtifactResult&, std::string&) const override;
     std::vector<std::string> FindSourceDependents(const std::string&) const override;
 private:
     void BeforeInitialize(GameSproutModuleApi * api) override;

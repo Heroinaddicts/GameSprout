@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IAssetsPipeline.h"
+#include "../../PreparedResources/PreparedResourceFormat.h"
 #include <JsonCpp/json.hpp>
 #include <QDir>
 #include <QFile>
@@ -11,27 +12,8 @@
 #include <set>
 
 namespace AssetArtifactIO {
-// Coordinate-bearing resources use the current Unity world-space contract.
-// This is a type-specific current format, not a fallback for old RH payloads.
-inline constexpr uint32_t CurrentDataVersion(eAssetType type) {
-    switch(type) {
-    case eAssetType::Mesh:
-        return 4;
-    case eAssetType::Model:
-    case eAssetType::Skeleton:
-    case eAssetType::AnimationClip:
-    case eAssetType::Avatar:
-        return 3;
-    default:
-        return 2;
-    }
-}
-inline std::string JsonText(const Json::Value & value) {
-    Json::StreamWriterBuilder writer;
-    writer["indentation"] = "";
-    writer["emitUTF8"] = true;
-    return Json::writeString(writer, value);
-}
+using PreparedResources::CurrentDataVersion;
+using PreparedResources::JsonText;
 inline bool Parse(const std::string & text, Json::Value & value) {
     Json::CharReaderBuilder reader;
     reader["rejectDupKeys"] = true;

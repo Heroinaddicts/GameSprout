@@ -1,12 +1,11 @@
-#include "LibraryRuntimeResources.h"
-#include "LibraryResourceDecode.h"
-#include "../Shared/AnimationDefinition.h"
+#include "PreparedResourceDecode.h"
+#include "../Module/Shared/AnimationDefinition.h"
 
-bool LibraryRuntimeResources::LoadAnimatorController(const GameSproutRuntime::ResourceReference& reference,
+bool PreparedResources::ResourceProvider::LoadAnimatorController(const GameSproutRuntime::ResourceReference& reference,
     GameSproutRuntime::AnimatorControllerData& output,std::string& error) {
-    output={};Json::Value descriptor,body;QByteArray bytes;
+    output={};Json::Value descriptor,body;std::vector<std::uint8_t> bytes;
     if(!Read(reference,eAssetType::AnimatorController,descriptor,bytes,error))return false;
-    if(descriptor["Format"]!="AnimatorController3"||descriptor["Encoding"]!="BinaryValueLE1"||!AssetValueBinary::Decode(bytes,body)
+    if(descriptor["Format"]!="AnimatorController3"||descriptor["Encoding"]!="BinaryValueLE1"||!ObjectDocumentBinary::Decode(bytes,body)
         ||!AnimationDefinition::ReadController(body,true,output,error)) {
         if(error.empty())error="Invalid compiled AnimatorController";
         return false;
@@ -14,12 +13,12 @@ bool LibraryRuntimeResources::LoadAnimatorController(const GameSproutRuntime::Re
     return true;
 }
 
-#include "../Shared/AvatarMaskDefinition.h"
-bool LibraryRuntimeResources::LoadAvatarMask(const GameSproutRuntime::ResourceReference& reference,
+#include "../Module/Shared/AvatarMaskDefinition.h"
+bool PreparedResources::ResourceProvider::LoadAvatarMask(const GameSproutRuntime::ResourceReference& reference,
     GameSproutRuntime::AvatarMaskData& output,std::string& error) {
-    output={};Json::Value descriptor,body;QByteArray bytes;GameSproutRuntime::AvatarMaskData data;
+    output={};Json::Value descriptor,body;std::vector<std::uint8_t> bytes;GameSproutRuntime::AvatarMaskData data;
     if(!Read(reference,eAssetType::AvatarMask,descriptor,bytes,error))return false;
-    if(descriptor["Format"]!="AvatarMask2"||descriptor["Encoding"]!="BinaryValueLE1"||!AssetValueBinary::Decode(bytes,body)
+    if(descriptor["Format"]!="AvatarMask2"||descriptor["Encoding"]!="BinaryValueLE1"||!ObjectDocumentBinary::Decode(bytes,body)
         ||!AvatarMaskDefinition::Read(body,true,data,error)) {
         if(error.empty())error="Invalid compiled AvatarMask";return false;
     }

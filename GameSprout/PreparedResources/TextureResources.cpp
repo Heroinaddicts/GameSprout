@@ -1,6 +1,5 @@
-#include "LibraryRuntimeResources.h"
-#include "LibraryResourceDecode.h"
-using LibraryResourceDecode::Unsigned;
+#include "PreparedResourceDecode.h"
+using PreparedResourceDecode::Unsigned;
 namespace {
 using GameSproutRuntime::TexturePrefetchSource;
 bool DecodeTexture(const Json::Value& descriptor,std::uint64_t fileSize,TexturePrefetchSource& data) {
@@ -39,43 +38,40 @@ bool DecodeTexture(const Json::Value& descriptor,std::uint64_t fileSize,TextureP
 }
 }
 
-bool LibraryRuntimeResources::ResolveTexturePrefetch(const GameSproutRuntime::ResourceReference& reference,
+bool PreparedResources::ResourceProvider::ResolveTexturePrefetch(const GameSproutRuntime::ResourceReference& reference,
     TexturePrefetchSource& output) {
     output={};
-    Json::Value descriptor;
-    QFile file;
-    ResourceState* observed=nullptr;
+    Artifact artifact;
+    std::ifstream file;
     std::string error;
-    if(!OpenArtifact(reference,eAssetType::Texture,descriptor,file,observed,error))return false;
+    if(!OpenArtifact(reference,eAssetType::Texture,artifact,file,error))return false;
     TexturePrefetchSource source;
-    if(!DecodeTexture(descriptor,static_cast<std::uint64_t>(file.size()),source))return false;
-    source.ArtifactPath=file.fileName().toStdString();
+    if(!DecodeTexture(artifact.Descriptor,artifact.Size,source))return false;
+    source.ArtifactPath=artifact.Path.string();
     output=std::move(source);
     return true;
 }
 
-bool LibraryRuntimeResources::LoadTexture(const GameSproutRuntime::ResourceReference& reference,
+bool PreparedResources::ResourceProvider::LoadTexture(const GameSproutRuntime::ResourceReference& reference,
     GameSproutRuntime::TextureRenderData& output,std::string& error) {
     output={};
-    Json::Value descriptor;
-    QFile file;
-    ResourceState* observed=nullptr;
-    if(!OpenArtifact(reference,eAssetType::Texture,descriptor,file,observed,error))return false;
+    Artifact artifact;
+    std::ifstream file;
+    if(!OpenArtifact(reference,eAssetType::Texture,artifact,file,error))return false;
     TexturePrefetchSource source;
-    if(!DecodeTexture(descriptor,static_cast<std::uint64_t>(file.size()),source)) {
+    if(!DecodeTexture(artifact.Descriptor,artifact.Size,source)) {
         error="Invalid prepared RGBA8 texture layout or sampling settings";
         return false;
     }
     GameSproutRuntime::TextureRenderData data;
     data.Width=source.Width;data.Height=source.Height;data.SRGB=source.SRGB;data.Sampler=source.Sampler;
     data.Pixels.resize(std::uint64_t(data.Width)*data.Height*4);
-    const auto read=file.read(reinterpret_cast<char*>(data.Pixels.data()),static_cast<qint64>(data.Pixels.size()));
-    if(read!=static_cast<qint64>(data.Pixels.size())) {
-        if(observed)observed->ReadFailed=true;
+    if(!file.read(reinterpret_cast<char*>(data.Pixels.data()),static_cast<std::streamsize>(data.Pixels.size()))) {
+        MarkReadFailed(reference,true);
         error="Incomplete prepared texture";
         return false;
     }
-    if(observed)observed->ReadFailed=false;
+    MarkReadFailed(reference,false);
     output=std::move(data);
     return true;
 }

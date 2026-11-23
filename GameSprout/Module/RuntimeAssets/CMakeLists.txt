@@ -14,6 +14,7 @@ endif()
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../Foundation/FoundationApi.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../GameSproutRuntime/GameSproutRuntime.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../PreparedResources/PreparedResources.cmake")
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core)
@@ -38,6 +39,7 @@ target_compile_features(RuntimeAssets PRIVATE cxx_std_20)
 target_link_libraries(RuntimeAssets PRIVATE
     Foundation::FoundationApi
     GameSproutRuntime::GameSproutRuntimeApi
+    PreparedResources::PreparedResources
     Qt${QT_VERSION_MAJOR}::Core
 )
 target_include_directories(RuntimeAssets PRIVATE

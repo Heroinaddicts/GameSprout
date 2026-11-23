@@ -1,25 +1,23 @@
 #pragma once
-#include "LibraryRuntimeResources.h"
-#include "../Shared/AssetValueBinary.h"
-#include "../Shared/AssetArtifactIO.h"
-#include <QFile>
-#include <QFileInfo>
+#include "PreparedResourceProvider.h"
+#include "../ObjectDocument/ValueBinary.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <limits>
 #include <set>
-namespace LibraryResourceDecode {
-inline bool Parse(const std::string& text, Json::Value& value) {
-    return AssetArtifactIO::Parse(text,value) && value.isObject();
-}
+namespace PreparedResourceDecode {
 inline bool Unsigned(const Json::Value& value, std::uint32_t& number) {
     if (!value.isUInt64() || value.asUInt64() > std::numeric_limits<std::uint32_t>::max()) return false;
     number = static_cast<std::uint32_t>(value.asUInt64());
     return true;
 }
-inline float FloatAt(const QByteArray& bytes, std::uint64_t offset) {
-    return std::bit_cast<float>(qFromLittleEndian<std::uint32_t>(reinterpret_cast<const uchar*>(bytes.constData() + offset)));
+inline std::uint32_t UIntAt(const std::vector<std::uint8_t>& bytes, std::uint64_t offset) {
+    return std::uint32_t(bytes[offset]) | (std::uint32_t(bytes[offset+1]) << 8) |
+        (std::uint32_t(bytes[offset+2]) << 16) | (std::uint32_t(bytes[offset+3]) << 24);
+}
+inline float FloatAt(const std::vector<std::uint8_t>& bytes, std::uint64_t offset) {
+    return std::bit_cast<float>(UIntAt(bytes, offset));
 }
 inline bool ColorValue(const Json::Value& value, GameSproutRuntime::Color& color) {
     if (!value.isArray() || (value.size() != 3 && value.size() != 4)) return false;
@@ -34,9 +32,9 @@ inline bool ColorValue(const Json::Value& value, GameSproutRuntime::Color& color
 }
 inline bool ReferenceValue(const Json::Value& value, GameSproutRuntime::ResourceReference& reference) {
     if (!value.isObject() || !value["Guid"].isString() || !value["LocalID"].isUInt64()) return false;
-    const Guid guid(value["Guid"].asString());
-    if (!guid.IsValid() || value["LocalID"].asUInt64() == 0) return false;
-    reference = {guid.GetGuidString(),value["LocalID"].asUInt64()};
+    const auto guid=value["Guid"].asString();
+    if (!PreparedResources::ValidGuid(guid) || value["LocalID"].asUInt64() == 0) return false;
+    reference = {PreparedResources::CanonicalGuid(guid),value["LocalID"].asUInt64()};
     return true;
 }
 inline bool FloatArray(const Json::Value& value, float* output, unsigned count) {

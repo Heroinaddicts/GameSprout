@@ -1,7 +1,7 @@
-#include "LibraryRuntimeResources.h"
-#include "LibraryResourceDecode.h"
-using LibraryResourceDecode::Unsigned;
-using LibraryResourceDecode::FloatAt;
+#include "PreparedResourceDecode.h"
+using PreparedResourceDecode::Unsigned;
+using PreparedResourceDecode::FloatAt;
+using PreparedResourceDecode::UIntAt;
 namespace {
 struct ByteRange { std::uint64_t Offset=0, Size=0; };
 struct MeshArtifactLayout {
@@ -45,50 +45,49 @@ bool ReadCollisionRange(const Json::Value& descriptor, std::uint64_t renderSize,
 }
 }
 
-bool LibraryRuntimeResources::LoadMeshCollision(const GameSproutRuntime::ResourceReference& reference,
+bool PreparedResources::ResourceProvider::LoadMeshCollision(const GameSproutRuntime::ResourceReference& reference,
     bool convex, std::vector<std::uint8_t>& output, std::string& error) {
     output.clear();
-    Json::Value descriptor;
-    QFile file;
-    ResourceState* observed=nullptr;
-    if(!OpenArtifact(reference,eAssetType::Mesh,descriptor,file,observed,error))return false;
+    Artifact artifact;
+    std::ifstream file;
+    if(!OpenArtifact(reference,eAssetType::Mesh,artifact,file,error))return false;
     MeshArtifactLayout layout;
     ByteRange range;
-    if(!ReadRenderLayout(descriptor,file.size(),layout)||
-       !ReadCollisionRange(descriptor,layout.RenderSize,file.size(),convex,range)) {
+    if(!ReadRenderLayout(artifact.Descriptor,artifact.Size,layout)||
+       !ReadCollisionRange(artifact.Descriptor,layout.RenderSize,artifact.Size,convex,range)) {
         error="Invalid prepared mesh collision layout";
-        if(observed)observed->ReadFailed=true;
+        MarkReadFailed(reference,true);
         return false;
     }
     if(!range.Size)return true;
     output.resize(static_cast<std::size_t>(range.Size));
-    if(!file.seek(static_cast<qint64>(range.Offset))||file.read(reinterpret_cast<char*>(output.data()),
-        static_cast<qint64>(range.Size))!=static_cast<qint64>(range.Size)) {
+    if(!file.seekg(static_cast<std::streamoff>(range.Offset))||
+        !file.read(reinterpret_cast<char*>(output.data()),static_cast<std::streamsize>(range.Size))) {
         output.clear();
         error="Incomplete prepared mesh collision data";
-        if(observed)observed->ReadFailed=true;
+        MarkReadFailed(reference,true);
         return false;
     }
-    if(observed)observed->ReadFailed=false;
+    MarkReadFailed(reference,false);
     return true;
 }
 
-bool LibraryRuntimeResources::LoadMesh(const GameSproutRuntime::ResourceReference& reference,
+bool PreparedResources::ResourceProvider::LoadMesh(const GameSproutRuntime::ResourceReference& reference,
     GameSproutRuntime::MeshRenderData& output, std::string& error) {
     output = {};
-    Json::Value descriptor;
-    QFile file;
-    ResourceState* observed=nullptr;
-    if(!OpenArtifact(reference,eAssetType::Mesh,descriptor,file,observed,error))return false;
-    const auto fail = [&error,observed]() {
+    Artifact artifact;
+    std::ifstream file;
+    if(!OpenArtifact(reference,eAssetType::Mesh,artifact,file,error))return false;
+    const auto fail = [&]() {
         error = "Invalid prepared mesh layout or index range";
-        if(observed)observed->ReadFailed=true;
+        MarkReadFailed(reference,true);
         return false;
     };
+    const auto& descriptor=artifact.Descriptor;
     MeshArtifactLayout layout;
-    if(!ReadRenderLayout(descriptor,file.size(),layout)||!descriptor["VertexAttributes"].isArray())return fail();
-    const auto bytes=file.read(static_cast<qint64>(layout.RenderSize));
-    if(bytes.size()!=static_cast<qint64>(layout.RenderSize))return fail();
+    if(!ReadRenderLayout(descriptor,artifact.Size,layout)||!descriptor["VertexAttributes"].isArray())return fail();
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(layout.RenderSize));
+    if(!file.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(bytes.size())))return fail();
     GameSproutRuntime::MeshRenderData data;
     data.VertexCount=layout.VertexCount;
     data.VertexStride=layout.VertexStride;
@@ -121,7 +120,7 @@ bool LibraryRuntimeResources::LoadMesh(const GameSproutRuntime::ResourceReferenc
             GameSproutRuntime::SkinBinding binding;
             if(!value["NodePath"].isString() || value["NodePath"].asString().empty()
                 || !paths.insert(value["NodePath"].asString()).second
-                || !LibraryResourceDecode::MatrixValue(value["InverseBindMatrix"],binding.InverseBindMatrix))return fail();
+                || !PreparedResourceDecode::MatrixValue(value["InverseBindMatrix"],binding.InverseBindMatrix))return fail();
             binding.NodePath=value["NodePath"].asString();data.Bones.push_back(std::move(binding));
         }
     }
@@ -144,8 +143,7 @@ bool LibraryRuntimeResources::LoadMesh(const GameSproutRuntime::ResourceReferenc
         if(!data.Bones.empty()) {
             float sum=0;
             for(unsigned influence=0;influence<4;++influence) {
-                const auto index=qFromLittleEndian<std::uint32_t>(reinterpret_cast<const uchar*>(bytes.constData()+
-                    std::uint64_t(vertex)*data.VertexStride+data.BoneIndicesOffset+influence*4));
+                const auto index=UIntAt(bytes,std::uint64_t(vertex)*data.VertexStride+data.BoneIndicesOffset+influence*4);
                 const float weight=FloatAt(bytes,std::uint64_t(vertex)*data.VertexStride+data.BoneWeightsOffset+influence*4);
                 if(!std::isfinite(weight)||weight<0||index>=data.Bones.size())return fail();
                 sum+=weight;
@@ -156,11 +154,11 @@ bool LibraryRuntimeResources::LoadMesh(const GameSproutRuntime::ResourceReferenc
         maximum = {std::max(maximum.X,point.X),std::max(maximum.Y,point.Y),std::max(maximum.Z,point.Z)};
     }
     for (std::uint32_t index = 0; index < data.IndexCount; ++index) {
-        if (qFromLittleEndian<std::uint32_t>(reinterpret_cast<const uchar*>(bytes.constData() + data.IndexOffset + std::uint64_t(index)*4)) >= data.VertexCount) return fail();
+        if (UIntAt(bytes,data.IndexOffset+std::uint64_t(index)*4) >= data.VertexCount) return fail();
     }
     data.LocalBounds = {minimum * 0.5f + maximum * 0.5f,maximum * 0.5f - minimum * 0.5f};
-    data.Bytes.assign(reinterpret_cast<const std::uint8_t*>(bytes.constData()),reinterpret_cast<const std::uint8_t*>(bytes.constData()) + bytes.size());
+    data.Bytes=std::move(bytes);
     output = std::move(data);
-    if(observed)observed->ReadFailed=false;
+    MarkReadFailed(reference,false);
     return true;
 }

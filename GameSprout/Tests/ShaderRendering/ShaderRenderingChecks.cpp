@@ -58,6 +58,74 @@ GameSproutRuntime::ResourceReference FindResource(ILibraryManager& library,IAsse
     }
     throw std::runtime_error("Prepared resource not found: "+path);
 }
+void CheckBuildShaderVariants(IAssetsPipeline& pipeline, ILibraryManager& library,
+                             const GameSproutRuntime::ResourceReference& shader, const QDir& root) {
+    AssetImportManifest manifest;
+    Check(library.GetManifest(Guid(shader.Guid), manifest) && manifest.Assets.size() == 1,
+          "Cannot read portable shader artifact for build preparation");
+    AssetBuildArtifactRequest request;
+    request.Artifact = manifest.Assets.front();
+    const QDir libraryRoot(QString::fromStdString(library.GetLibraryRoot()));
+    request.SourceArtifactPath = libraryRoot.filePath(QString::fromStdString(manifest.Directory + "/" + request.Artifact.Path)).toStdString();
+    request.TargetCacheRoot = root.filePath("BuildArtifacts").toStdString();
+    std::string error;
+    AssetBuildArtifactResult result;
+    const auto prepare = [&](eAssetBuildProfile profile, const char* format) {
+        request.Profile = profile;
+        Check(pipeline.PrepareBuildArtifact(request, result, error), error);
+        Check(result.Artifact.LocalID == request.Artifact.LocalID && result.ArtifactPath != request.SourceArtifactPath &&
+              result.Artifact.DataSize < request.Artifact.DataSize, "Target artifact changed shader identity or retained every format");
+        Json::Value descriptor;
+        Check(AssetArtifactIO::Parse(result.Artifact.DescriptorJson, descriptor), "Cannot parse prepared shader descriptor");
+        uint64_t offset = 0;
+        for (const char* stage : {"Vertex", "Fragment"}) {
+            const auto& variants = descriptor["Passes"][0u][stage]["Variants"];
+            Check(variants.size() == 1 && variants[0u]["Format"] == format && variants[0u]["Offset"].asUInt64() == offset,
+                  "Target artifact kept an unrelated shader variant or invalid offset");
+            offset = (offset + variants[0u]["Size"].asUInt64() + 3u) & ~uint64_t{3};
+        }
+        return result.ArtifactPath;
+    };
+    const auto metal = prepare(eAssetBuildProfile::MetalMacOS, "MSL");
+    const auto vulkan = prepare(eAssetBuildProfile::Vulkan, "SPIRV");
+    Check(metal != vulkan && prepare(eAssetBuildProfile::MetalIOS, "MSL") == metal &&
+          prepare(eAssetBuildProfile::MetalMacOS, "MSL") == metal,
+          "Equivalent target variants failed to reuse the cached artifact");
+    QFile original(QString::fromStdString(request.SourceArtifactPath));
+    Check(original.open(QIODevice::ReadOnly) && AssetArtifactIO::Hash(original.readAll()) == request.Artifact.Hash,
+          "Target preparation replaced the portable shader");
+    Check(AssetArtifactIO::Write(QString::fromStdString(metal), QByteArray(qsizetype(result.Artifact.DataSize), '\0'), error), error);
+    const auto expectedHash = result.Artifact.Hash;
+    Check(prepare(eAssetBuildProfile::MetalMacOS, "MSL") == metal && result.Artifact.Hash == expectedHash,
+          "Corrupt cached shader was not rebuilt");
+    request.Profile = eAssetBuildProfile::Headless;
+    Check(pipeline.PrepareBuildArtifact(request, result, error) && result.ArtifactPath == request.SourceArtifactPath &&
+          result.Artifact.Hash == request.Artifact.Hash, "Headless preparation cooked an unused shader");
+    request.Profile = eAssetBuildProfile::Vulkan;
+    request.IsCancellationRequested = [] { return true; };
+    Check(!pipeline.PrepareBuildArtifact(request, result, error) && result.ArtifactPath.empty(),
+          "Cancelled target shader preparation returned a product");
+}
+void CheckBuildComputeVariants(IAssetsPipeline& pipeline, ILibraryManager& library,
+                              const GameSproutRuntime::ResourceReference& shader, const QDir& root) {
+    AssetImportManifest manifest;
+    Check(library.GetManifest(Guid(shader.Guid), manifest) && manifest.Assets.size() == 1,
+          "Cannot read portable compute artifact for build preparation");
+    AssetBuildArtifactRequest request;
+    request.Artifact = manifest.Assets.front();
+    const QDir libraryRoot(QString::fromStdString(library.GetLibraryRoot()));
+    request.SourceArtifactPath = libraryRoot.filePath(QString::fromStdString(manifest.Directory + "/" + request.Artifact.Path)).toStdString();
+    request.TargetCacheRoot = root.filePath("BuildArtifacts").toStdString();
+    request.Profile = eAssetBuildProfile::Vulkan;
+    AssetBuildArtifactResult result;
+    std::string error;
+    Check(pipeline.PrepareBuildArtifact(request, result, error), error);
+    Json::Value descriptor;
+    Check(AssetArtifactIO::Parse(result.Artifact.DescriptorJson, descriptor) &&
+          descriptor["Variants"].size() == 1 && descriptor["Variants"][0u]["Format"] == "SPIRV" &&
+          descriptor["ThreadGroupSize"][0u].asUInt() == 8 && result.Artifact.DataSize < request.Artifact.DataSize,
+          "Compute target artifact kept unrelated formats or lost its dispatch layout");
+}
 std::array<int,4> Pixel(GameSproutRuntime::IRuntimeViewport& viewport) {
     std::vector<std::uint8_t> bytes;std::string error;
     Check(viewport.ReadPixels(bytes,error),error);
@@ -128,6 +196,8 @@ int main(int argc,char** argv) {
         };
         GameSproutEditor::GameSproutEditorFinal::Finished(assets,api);pump(idle);
         const auto shader=FindResource(*library,*assets,"Surface.shader",eAssetType::Shader);
+        auto& pipeline=*static_cast<IAssetsPipeline*>(editor.Modules["AssetsPipeline"]);
+        CheckBuildShaderVariants(pipeline, *library, shader, root);
         Json::Value document;document["Version"]=1;document["Name"]="Actual user shader";
         document["Shader"]["Guid"]=shader.Guid;document["Shader"]["LocalID"]=Json::UInt64(shader.LocalID);
         write("Surface.mat",QByteArray::fromStdString(AssetArtifactIO::JsonText(document)));
@@ -260,8 +330,13 @@ int main(int argc,char** argv) {
         Check(foamEnergy(64)==0,"FoamAmount=0 left bright blocks in an otherwise black water material");
         std::cout<<"Water isolated foam mean RGB: near="<<nearFoam<<", far="<<farFoam<<'\n';
         Check(!resources->LoadShader(texture,compiled,error)&&compiled.Passes.empty()&&!error.empty(),"Wrong resource type accepted as Shader");
+        write("Work.compute","RWStructuredBuffer<float4> result : register(u0,space1);\n"
+            "[numthreads(8,1,1)] void main(uint3 id : SV_DispatchThreadID) {result[id.x]=float4(1,0,0,1);}\n");
+        pump([&]{return assets->GetAssetMetas().size()>=10&&idle();});
+        const auto compute=FindResource(*library,*assets,"Work.compute",eAssetType::ComputeShader);
+        CheckBuildComputeVariants(pipeline, *library, compute, root);
         Check(ide.Count==0&&ide.Loads==ide.Unloads,"Shader import left unbalanced Loading/Unloading");
-        std::cout<<"PASS actual .shader VS/FS compile -> Artifact -> Material -> Runtime/GRHI GPU; material parameters, include rebuild, water animation, shared frame constants and distant foam filtering\n";
+        std::cout<<"PASS actual .shader VS/FS compile -> Artifact -> Material -> Runtime/GRHI GPU; material parameters, include rebuild, water animation, shared frame constants, distant foam filtering, and target artifact cache\n";
         cleanup();return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';cleanup();return 1;}
 }

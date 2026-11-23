@@ -83,6 +83,21 @@ struct AssetImportResult {
     AssetImportManifest Manifest;
 };
 
+enum class eAssetBuildProfile { MetalMacOS, Vulkan, MetalIOS, Headless, MetalIOSSimulator };
+
+struct AssetBuildArtifactRequest {
+    AssetArtifact Artifact;
+    std::string SourceArtifactPath;
+    std::string TargetCacheRoot;
+    eAssetBuildProfile Profile = eAssetBuildProfile::MetalMacOS;
+    std::function<bool()> IsCancellationRequested;
+};
+
+struct AssetBuildArtifactResult {
+    AssetArtifact Artifact;
+    std::string ArtifactPath;
+};
+
 class IAssetsPipeline : public GameSproutEditor::IGameSproutModule {
 public:
     virtual ~IAssetsPipeline() {}
@@ -103,6 +118,12 @@ public:
     virtual std::vector<std::string> FindSourceDependents(const std::string&) const { return {}; }
     // Prevent an obsolete task from committing after source deletion/rename/change.
     virtual void Invalidate(const Guid & guid) = 0;
+    // Worker-safe. Consumes a value snapshot of a published artifact. Target
+    // variants use a separate cache and never replace the Editor's artifacts.
+    virtual bool PrepareBuildArtifact(const AssetBuildArtifactRequest&, AssetBuildArtifactResult&, std::string& error) const {
+        error = "Target asset preparation is unavailable";
+        return false;
+    }
 };
 
 #endif //__IAssetsPipeline_h__

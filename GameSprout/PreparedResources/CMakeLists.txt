@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 3.21)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(PreparedResources LANGUAGES CXX)
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/../ObjectDocument/ObjectDocument.cmake")
+file(GLOB prepared_resource_files CONFIGURE_DEPENDS LIST_DIRECTORIES false
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+add_library(PreparedResources STATIC ${prepared_resource_files})
+add_library(PreparedResources::PreparedResources ALIAS PreparedResources)
+target_include_directories(PreparedResources PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(PreparedResources PUBLIC ObjectDocumentJson GameSproutRuntime::GameSproutRuntimeApi)
+set_target_properties(PreparedResources PROPERTIES POSITION_INDEPENDENT_CODE ON)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${prepared_resource_files})

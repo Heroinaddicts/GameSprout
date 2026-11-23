@@ -1,19 +1,21 @@
-#include "LibraryRuntimeResources.h"
-#include "LibraryResourceDecode.h"
-#include "../Shared/ShaderDefinition.h"
+#include "PreparedResourceDecode.h"
+#include "PreparedShaderDefinition.h"
 
 namespace {
 template<typename T> bool EnumValue(const Json::Value& value,const std::initializer_list<const char*>& names,T& result) {
     if(!value.isString())return false;unsigned index=0;
     for(const auto* name:names){if(value==name){result=static_cast<T>(index);return true;}++index;}return false;
 }
-bool Program(const Json::Value& value,const Json::Value& schema,const QByteArray& bytes,bool vertex,
+bool Program(const Json::Value& value,const Json::Value& schema,const std::vector<std::uint8_t>& bytes,bool vertex,
     GameSproutRuntime::ShaderProgramData& output,std::vector<std::pair<std::uint64_t,std::uint64_t>>& ranges,std::string& error) {
     using namespace GameSproutRuntime;
     if(!value.isObject()||value["Stage"]!=(vertex?"Vertex":"Fragment")){error="Invalid prepared Shader stage";return false;}
     Json::Value layout;
     if(!ShaderDefinition::ProgramLayout(value["Reflection"],schema,vertex,layout,error))return false;
-    if(AssetArtifactIO::JsonText(value["Uniforms"])!=AssetArtifactIO::JsonText(layout["Uniforms"])||AssetArtifactIO::JsonText(value["Textures"])!=AssetArtifactIO::JsonText(layout["Textures"])){error="Prepared Shader bindings differ from reflection";return false;}
+    if(PreparedResources::JsonText(value["Uniforms"])!=PreparedResources::JsonText(layout["Uniforms"])||
+        PreparedResources::JsonText(value["Textures"])!=PreparedResources::JsonText(layout["Textures"])){
+        error="Prepared Shader bindings differ from reflection";return false;
+    }
     ShaderProgramData program;program.Stage=vertex?ShaderProgramStage::Vertex:ShaderProgramStage::Fragment;
     for(const auto& block:layout["Uniforms"]) {
         ShaderUniformBlock uniform;uniform.Slot=block["Slot"].asUInt();uniform.Size=block["Size"].asUInt();
@@ -42,21 +44,21 @@ bool Program(const Json::Value& value,const Json::Value& schema,const QByteArray
         const auto offset=variant["Offset"].asUInt64(),size=variant["Size"].asUInt64();
         if(offset%4||!size||offset>std::uint64_t(bytes.size())||size>std::uint64_t(bytes.size())-offset){error="Shader program exceeds artifact bytes";return false;}
         for(const auto& range:ranges)if(offset<range.second&&offset+size>range.first){error="Shader program ranges overlap";return false;}ranges.push_back({offset,offset+size});
-        const QByteArray payload=bytes.mid(qsizetype(offset),qsizetype(size));
-        if((code.Format==ShaderProgramFormat::SPIRV&&(payload.size()<20||payload.size()%4||!payload.startsWith(QByteArray::fromHex("03022307"))))
-            ||(code.Format==ShaderProgramFormat::MSL&&(!payload.endsWith(char(0))||payload.left(payload.size()-1).contains(char(0))))
-            ||(code.Format==ShaderProgramFormat::DXIL&&!payload.startsWith("DXBC"))
-            ||(code.Format==ShaderProgramFormat::Metallib&&!payload.startsWith("MTLB"))){error="Invalid compiled Shader program payload";return false;}
+        const std::string_view payload(reinterpret_cast<const char*>(bytes.data()+offset),static_cast<std::size_t>(size));
+        if((code.Format==ShaderProgramFormat::SPIRV&&(payload.size()<20||payload.size()%4||!payload.starts_with("\x03\x02\x23\x07")))
+            ||(code.Format==ShaderProgramFormat::MSL&&(payload.back()!=0||payload.find(char(0))!=payload.size()-1))
+            ||(code.Format==ShaderProgramFormat::DXIL&&!payload.starts_with("DXBC"))
+            ||(code.Format==ShaderProgramFormat::Metallib&&!payload.starts_with("MTLB"))){error="Invalid compiled Shader program payload";return false;}
         code.EntryPoint=variant["EntryPoint"].asString();
-        code.Bytes.assign(reinterpret_cast<const std::uint8_t*>(payload.constData()),reinterpret_cast<const std::uint8_t*>(payload.constData()+payload.size()));
+        code.Bytes.assign(bytes.data()+offset,bytes.data()+offset+size);
         program.Codes.push_back(std::move(code));
     }
     output=std::move(program);return true;
 }
 }
-bool LibraryRuntimeResources::LoadShader(const GameSproutRuntime::ResourceReference& reference,
+bool PreparedResources::ResourceProvider::LoadShader(const GameSproutRuntime::ResourceReference& reference,
     GameSproutRuntime::ShaderRenderData& output,std::string& error) {
-    output={};Json::Value descriptor;QByteArray bytes;
+    output={};Json::Value descriptor;std::vector<std::uint8_t> bytes;
     if(!Read(reference,eAssetType::Shader,descriptor,bytes,error))return false;
     if(descriptor["Format"]!="GameSproutShader"||descriptor["ShaderVersion"]!=1||descriptor["Encoding"]!="RawBytes"
         ||!descriptor["Name"].isString()||!descriptor["Passes"].isArray()||descriptor["Passes"].size()!=1

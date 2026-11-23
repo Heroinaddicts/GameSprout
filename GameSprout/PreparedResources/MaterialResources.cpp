@@ -1,11 +1,10 @@
-#include "LibraryRuntimeResources.h"
-#include "LibraryResourceDecode.h"
-#include "../Shared/MaterialDefinition.h"
-using LibraryResourceDecode::Unsigned;
-using LibraryResourceDecode::FloatAt;
-using LibraryResourceDecode::ColorValue;
-using LibraryResourceDecode::ReferenceValue;
-bool LibraryRuntimeResources::LoadMaterial(const GameSproutRuntime::ResourceReference& reference,
+#include "PreparedResourceDecode.h"
+#include "PreparedMaterialDefinition.h"
+using PreparedResourceDecode::Unsigned;
+using PreparedResourceDecode::FloatAt;
+using PreparedResourceDecode::ColorValue;
+using PreparedResourceDecode::ReferenceValue;
+bool PreparedResources::ResourceProvider::LoadMaterial(const GameSproutRuntime::ResourceReference& reference,
     GameSproutRuntime::MaterialRenderData& output, std::string& error) {
     output = {};
     ResetDependencies(reference);
@@ -23,9 +22,9 @@ bool LibraryRuntimeResources::LoadMaterial(const GameSproutRuntime::ResourceRefe
         visited.push_back(current);
         AddDependency(reference,current);
         Json::Value descriptor;
-        QByteArray bytes;
+        std::vector<std::uint8_t> bytes;
         if (!Read(current,eAssetType::Material,descriptor,bytes,error)) return false;
-        if (descriptor["Encoding"] != "BinaryValueLE1" || !AssetValueBinary::Decode(bytes,body) || !body.isObject()) return fail();
+        if (descriptor["Encoding"] != "BinaryValueLE1" || !ObjectDocumentBinary::Decode(bytes,body) || !body.isObject()) return fail();
         if (body["Format"] == "GameSproutDocument") body = Json::Value(body["Data"]);
         if (!body.isObject()) return fail();
         if (!body.isMember("ExternalMaterial")) break;
@@ -61,10 +60,10 @@ bool LibraryRuntimeResources::LoadMaterial(const GameSproutRuntime::ResourceRefe
     if(body.isMember("Shader")&&body["Shader"].isObject()) {
         if(!ReferenceValue(body["Shader"],data.Shader))return fail();
         AddDependency(reference,data.Shader);
-        auto* shader=_Library?_Library->QueryAsset(Guid(data.Shader.Guid),data.Shader.LocalID):nullptr;
-        Json::Value descriptor;
-        if(!shader||shader->GetAssetType()!=eAssetType::Shader||!AssetArtifactIO::Parse(shader->GetDataDescriptorJson(),descriptor)
-            ||descriptor["Format"]!="GameSproutShader"||descriptor["ShaderVersion"]!=1) {error="Material references an unavailable graphics Shader bundle";return false;}
+        Artifact shader;
+        if(!LocateArtifact(data.Shader,eAssetType::Shader,shader,error)
+            ||shader.Descriptor["Format"]!="GameSproutShader"||shader.Descriptor["ShaderVersion"]!=1) {error="Material references an unavailable graphics Shader bundle";return false;}
+        const auto& descriptor=shader.Descriptor;
         Json::Value normalized=body;
         if(!MaterialDefinition::NormalizeValues(descriptor["Material"],normalized,error))return false;
         std::map<std::string,GameSproutRuntime::ShaderValueType> types;
