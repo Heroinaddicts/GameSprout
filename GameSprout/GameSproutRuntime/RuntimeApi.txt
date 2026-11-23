@@ -113,10 +113,10 @@ Text::SetText 接受 UTF-8。GetFont/SetFont 绑定预处理 Font 资源的 GUID
 中文等字符使用包含对应字形的字体资产。Font 导入设置的 CustomCharacters 决定图集中烘焙的字符。
 Button::RegisterClick 返回注销用的 token。脚本可在 OnInitialized 注册，停用或销毁脚本实例时 Runtime 清理该实例的订阅。
 场景和 Prefab 保存组件配置及字体身份。点击订阅在每次运行时由游戏代码注册。
-独立宿主开启 RenderView::DrawUI，提交 Scene 后调用 SetUIInputViewport(scene, {逻辑宽, 逻辑高}, {渲染目标宽, 渲染目标高})。
+独立宿主开启 RenderView::DrawUI，使用 SetInputViewportMetrics(scene, metrics) 在提交输入和渲染前公布内容矩形、目标像素尺寸、安全区、DPI 和朝向。脚本用 ScreenPointToUILocal、UILocalPointToScreen 和 HitTestUIRect 与实际画面使用同一布局。
 继续通过 SubmitInputEvent 发送 FocusGained、MouseMove、MouseButtonDown/Up 等输入，并在 AdvanceFrame 后完成输入帧。
-点击由 Runtime 在游戏帧开始派发。失焦、目标切换或尺寸改变会释放按下状态。
-屏幕 UI 使用渲染目标大小计算布局，参考分辨率按等比缩放处理。独立根 Canvas 按创建顺序绘制，Canvas 内遵循节点顺序。
+点击由 Runtime 在游戏帧开始派发。失焦、暂停或切换目标场景会释放按下状态。同一场景的尺寸和 DPI 变化会刷新布局，并保留有效的指针捕获。
+屏幕 UI 使用渲染目标大小计算布局。CanvasScaleSettings 支持固定像素、随屏幕大小和固定物理尺寸，默认按参考分辨率等比缩放并完整显示。独立根 Canvas 按创建顺序绘制，Canvas 内遵循节点顺序。
 根 Canvas 的矩形随目标大小变化。子控件的 Transform 绕 Z 的旋转和 XY 缩放围绕 RectTransform 的 Pivot 生效，并传给子控件。
 编辑视口可设置 RenderView::UIPreviewObjectID，在当前视口内显示所选 Canvas 及边界。UIScreenPreviewLayoutSize 指定 Game 渲染目标尺寸，没有时使用 Canvas 参考宽高比。
 PickUIScreenPreview 与 GetUIScreenPreviewGeometry 使用同一套预览布局。前者返回命中节点 ID，后者提供变换后的四角、Pivot 和编辑坐标基，均不改变游戏输入或节点状态。

@@ -52,7 +52,7 @@
      </widget>
     </item>
    </layout></item>
-   <item><widget class="GameViewport" name="gameViewport"><property name="toolTip"><string>运行时点击 Game 画面接收键盘与鼠标输入；Esc 释放输入。暂停后需再次点击画面继续接收输入。</string></property><property name="focusPolicy"><enum>Qt::StrongFocus</enum></property><property name="mouseTracking"><bool>true</bool></property><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Expanding"><horstretch>1</horstretch><verstretch>1</verstretch></sizepolicy></property></widget></item>
+   <item><widget class="GameViewport" name="gameViewport"><property name="toolTip"><string>运行时点击或触摸 Game 画面接收游戏输入，Esc 释放。暂停恢复后需重新点击或触摸。</string></property><property name="focusPolicy"><enum>Qt::StrongFocus</enum></property><property name="mouseTracking"><bool>true</bool></property><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Expanding"><horstretch>1</horstretch><verstretch>1</verstretch></sizepolicy></property></widget></item>
    <item>
     <widget class="QLabel" name="statusLabel">
      <property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>

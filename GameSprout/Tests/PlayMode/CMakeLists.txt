@@ -23,6 +23,8 @@ target_include_directories(PlayModeChecks PRIVATE
     "${gamesprout_root}/GameSproutEditor/Api")
 target_link_libraries(PlayModeChecks PRIVATE RuntimeHost SceneManager AnimationPreview PlayMode ObjectEditing
     Foundation::FoundationApi GameSproutRuntime::GameSproutRuntimeApi Qt6::Core)
+include("${gamesprout_root}/Module/RuntimeHost/RuntimeHostInput.cmake")
+gamesprout_use_runtime_host_input(PlayModeChecks)
 set_target_properties(PlayModeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Products/$<0:>")
 set(PLAY_TEST_RUNTIME_DIRECTORY "${gamesprout_root}/../Bin" CACHE PATH "Independently built Runtime directory")
 enable_testing()

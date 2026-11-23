@@ -13,8 +13,12 @@ add_executable(AnimationEditorChecks AnimationEditorChecks.cpp
     ${viewport_sources}
     "${gamesprout_root}/View/SceneViewUI/SceneViewport.h"
     "${gamesprout_root}/View/SceneViewUI/SceneViewCamera.cpp"
+    "${gamesprout_root}/View/SceneViewUI/SceneToolRouter.cpp"
+    "${gamesprout_root}/View/SceneViewUI/SceneUIRectTool.cpp"
     "${gamesprout_root}/View/SceneViewUI/SceneViewUI.ui"
     "${gamesprout_root}/View/GameViewUI/GameViewport.cpp"
+    "${gamesprout_root}/View/GameViewUI/GameViewportInput.cpp"
+    "${gamesprout_root}/View/GameViewUI/GameViewportDeviceInput.cpp"
     "${gamesprout_root}/View/GameViewUI/GameViewport.h"
     "${gamesprout_root}/View/GameViewUI/GameViewUI.ui")
 target_compile_features(AnimationEditorChecks PRIVATE cxx_std_20)

@@ -1,8 +1,24 @@
 #include "GameViewport.h"
+#include <QEvent>
 #include <QGuiApplication>
 #include <QPaintEngine>
 #include <QPlatformSurfaceEvent>
+#include <QScreen>
 #include <QWindow>
+
+namespace {
+GameSproutRuntime::InputViewportOrientation InputOrientation(const QScreen& screen) {
+    using GameSproutRuntime::InputViewportOrientation;
+    const auto orientation=screen.orientation()==Qt::PrimaryOrientation ? screen.primaryOrientation() : screen.orientation();
+    switch (orientation) {
+    case Qt::LandscapeOrientation: return InputViewportOrientation::Landscape;
+    case Qt::InvertedLandscapeOrientation: return InputViewportOrientation::LandscapeFlipped;
+    case Qt::PortraitOrientation: return InputViewportOrientation::Portrait;
+    case Qt::InvertedPortraitOrientation: return InputViewportOrientation::PortraitFlipped;
+    default: return InputViewportOrientation::Unknown;
+    }
+}
+}
 
 bool GameViewport::Headless() {
     const auto platform=QGuiApplication::platformName();
@@ -22,7 +38,11 @@ QPaintEngine* GameViewport::paintEngine() const {return Headless()?QWidget::pain
 void GameViewport::Initialize(GameSproutRuntime::IGameSproutRuntime* runtime,
     GameSproutRuntime::IRuntimeResourceProvider* resources) {
     Shutdown();_Runtime=runtime;_Resources=resources;_Initialized=true;
-    if(_Runtime)_RuntimeSubscribed=_Runtime->RegisterListener(this);
+    if(_Runtime) {
+        _RuntimeSubscribed=_Runtime->RegisterListener(this);
+        _Runtime->SetInputOutputHandler(GameSproutRuntime::InputOutputTarget::Window,
+            &GameViewport::InputWindowOutput,this);
+    }
     RequestRender();
 }
 void GameViewport::Status(const std::string& text) {
@@ -36,7 +56,6 @@ void GameViewport::SetOutputSize(GameSproutRuntime::Vector2 size) {
 }
 void GameViewport::DestroyGPU() {
     auto* renderer=_Renderer;_Renderer=nullptr;
-    if(_Runtime)_Runtime->SetUIInputViewport(nullptr,{});
     _AnimatedMaterials=false;
     _Attempted=false;
     RequestRender();
@@ -48,10 +67,16 @@ void GameViewport::Shutdown(){
     _RuntimeSubscribed=false;_SceneID=0;
     ClearTransformPreview();
     _ResizeSettle.stop();
-    ReleaseGameInput();_GameplayInputEnabled=false;
+    SetGameplayInputEnabled(false);
+    if(_Runtime)_Runtime->SetInputOutputHandler(GameSproutRuntime::InputOutputTarget::Window,nullptr,nullptr);
+    if(_Runtime)_Runtime->SetInputViewportMetrics(nullptr,{});
     _Initialized=false;DestroyGPU();
     if(_NativeWindow){_NativeWindow->removeEventFilter(this);QObject::disconnect(_NativeWindow,nullptr,this,nullptr);_NativeWindow=nullptr;}
     if(_HostWindow){_HostWindow->removeEventFilter(this);QObject::disconnect(_HostWindow,nullptr,this,nullptr);_HostWindow=nullptr;}
+    QObject::disconnect(_ScreenOrientationChanged);
+    QObject::disconnect(_ScreenDpiChanged);
+    _ObservedScreen=nullptr;
+    _InputViewport={};
     _Runtime=nullptr;_Resources=nullptr;
 }
 void GameViewport::RetryRendering(){DestroyGPU();_Attempted=false;}
@@ -65,22 +90,97 @@ void GameViewport::ClearTransformPreview() {
     _TransformPreviewActive=false;
 }
 void GameViewport::OnSceneVisualChanged(std::uint64_t sceneID){if(sceneID==_SceneID)RequestRender();}
+void GameViewport::SetInputScene(GameSproutRuntime::IScene* scene) {
+    const auto sceneID=scene ? scene->GetInstanceID() : 0;
+    if(sceneID==_SceneID)return;
+    _SceneID=sceneID;
+    if(scene)UpdateInputViewportGeometry();
+    else if(_Runtime)_Runtime->SetInputViewportMetrics(nullptr,{});
+    RequestRender();
+    emit FrameStreamReset();
+}
+void GameViewport::UpdateInputViewportGeometry() {
+    if (width() <= 0 || height() <= 0) return;
+    auto& metrics=_InputViewport;
+    const GameSproutRuntime::Vector2 logicalSize{float(width()),float(height())};
+    const float ratio=float(devicePixelRatioF());
+    if (metrics.ContentRect.Size.X!=logicalSize.X || metrics.ContentRect.Size.Y!=logicalSize.Y || metrics.PixelRatio!=ratio) {
+        metrics.ContentRect.Size=logicalSize;
+        metrics.PixelRatio=ratio;
+        metrics.RenderSize={float(qRound(width()*ratio)),float(qRound(height()*ratio))};
+    }
+    const auto* display=screen();
+    metrics.Orientation=display ? InputOrientation(*display) : GameSproutRuntime::InputViewportOrientation::Unknown;
+    metrics.DisplayDpi=display ? float(display->physicalDotsPerInch()*display->devicePixelRatio()) : 0;
+    metrics.SafeArea={};
+#if QT_VERSION >= QT_VERSION_CHECK(6,9,0)
+    if (auto* host=window();host && host->windowHandle()) {
+        const auto safe=host->rect().marginsRemoved(host->windowHandle()->safeAreaMargins());
+        const auto local=QRect(mapFrom(host,safe.topLeft()),safe.size()).intersected(rect());
+        if (!local.isEmpty()) metrics.SafeArea={{float(local.x()),float(local.y())},{float(local.width()),float(local.height())}};
+    }
+#endif
+    if (_Runtime && _SceneID && isVisible()) {
+        if (auto* root=_Runtime->QueryGameObject(_SceneID)) _Runtime->SetInputViewportMetrics(root->GetScene(),metrics);
+    }
+    SetOutputSize(metrics.RenderSize);
+}
+void GameViewport::ObserveScreen() {
+    auto* display=screen();
+    if (display==_ObservedScreen) return;
+    QObject::disconnect(_ScreenOrientationChanged);
+    QObject::disconnect(_ScreenDpiChanged);
+    _ObservedScreen=display;
+    if (display) {
+        _ScreenOrientationChanged=connect(display,&QScreen::orientationChanged,this,&GameViewport::UpdateInputViewportGeometry);
+        _ScreenDpiChanged=connect(display,&QScreen::physicalDotsPerInchChanged,this,&GameViewport::UpdateInputViewportGeometry);
+    }
+}
 void GameViewport::ObserveNativeWindow() {
+    const auto observe=[this](QWindow* handle){
+        if (!handle) return;
+        handle->installEventFilter(this);
+        connect(handle,&QWindow::screenChanged,this,[this]{ObserveScreen();UpdateInputViewportGeometry();RequestRender();});
+#if QT_VERSION >= QT_VERSION_CHECK(6,9,0)
+        connect(handle,&QWindow::safeAreaMarginsChanged,this,&GameViewport::UpdateInputViewportGeometry);
+#endif
+    };
     QWindow* native=windowHandle();
     if(native!=_NativeWindow){
         if(_NativeWindow){_NativeWindow->removeEventFilter(this);QObject::disconnect(_NativeWindow,nullptr,this,nullptr);}
         _NativeWindow=native;
-        if(native){native->installEventFilter(this);QObject::connect(native,&QObject::destroyed,this,[this,native]{if(_NativeWindow==native)_NativeWindow=nullptr;});}
+        observe(native);
+        if(native)QObject::connect(native,&QObject::destroyed,this,[this,native]{if(_NativeWindow==native)_NativeWindow=nullptr;});
     }
     QWindow* host=window()?window()->windowHandle():nullptr;
     if(host==native)host=nullptr;
     if(host!=_HostWindow){
         if(_HostWindow){_HostWindow->removeEventFilter(this);QObject::disconnect(_HostWindow,nullptr,this,nullptr);}
         _HostWindow=host;
-        if(host){host->installEventFilter(this);QObject::connect(host,&QObject::destroyed,this,[this,host]{if(_HostWindow==host)_HostWindow=nullptr;});}
+        observe(host);
+        if(host)QObject::connect(host,&QObject::destroyed,this,[this,host]{if(_HostWindow==host)_HostWindow=nullptr;});
     }
+    ObserveScreen();
 }
 bool GameViewport::event(QEvent* event) {
+    switch (event->type()) {
+    case QEvent::TouchBegin:
+    case QEvent::TouchUpdate:
+    case QEvent::TouchEnd:
+    case QEvent::TouchCancel:
+        if (HandleTouchEvent(static_cast<QTouchEvent*>(event))) return true;
+        break;
+    case QEvent::TabletMove:
+    case QEvent::TabletPress:
+    case QEvent::TabletRelease:
+        if (HandleTabletEvent(static_cast<QTabletEvent*>(event))) return true;
+        break;
+    case QEvent::ShortcutOverride:
+        if (_InputCaptured) { event->accept(); return true; }
+        break;
+    default:
+        break;
+    }
     const bool sizeChanged = event->type() == QEvent::Resize || event->type() == QEvent::Show ||
         event->type() == QEvent::ScreenChangeInternal
 #if QT_VERSION >= QT_VERSION_CHECK(6,6,0)
@@ -88,7 +188,6 @@ bool GameViewport::event(QEvent* event) {
 #endif
         ;
     if(event->type()==QEvent::Resize&&_Renderer)_ResizeSettle.start();
-    if (sizeChanged && _Runtime) _Runtime->SetUIInputViewport(nullptr, {});
     if (event->type()==QEvent::WinIdChange) {RetryRendering();if(_Initialized)ObserveNativeWindow();}
     if (event->type()==QEvent::PlatformSurface) {
         const auto type=static_cast<QPlatformSurfaceEvent*>(event)->surfaceEventType();
@@ -99,13 +198,16 @@ bool GameViewport::event(QEvent* event) {
     if (sizeChanged || event->type() == QEvent::Paint || event->type() == QEvent::Expose ||
         event->type() == QEvent::WindowActivate) RequestRender();
     const bool handled = QWidget::event(event);
-    if (sizeChanged && width() > 0 && height() > 0) {
-        const qreal ratio = devicePixelRatioF();
-        SetOutputSize({float(qRound(width() * ratio)), float(qRound(height() * ratio))});
+    if (sizeChanged || event->type() == QEvent::Move) {
+        if (_Initialized && (event->type() == QEvent::Show || event->type() == QEvent::ScreenChangeInternal)) ObserveNativeWindow();
+        UpdateInputViewportGeometry();
     }
     return handled;
 }
 bool GameViewport::eventFilter(QObject* watched,QEvent* event) {
+    if (watched == QCoreApplication::instance() &&
+        (event->type() == QEvent::TabletEnterProximity || event->type() == QEvent::TabletLeaveProximity))
+        HandleTabletEvent(static_cast<QTabletEvent*>(event));
     if((watched==_NativeWindow||watched==_HostWindow)&&event->type()==QEvent::WindowDeactivate){ReleaseGameInput();clearFocus();}
     if((watched==_NativeWindow||watched==_HostWindow)&&event->type()==QEvent::PlatformSurface){
         const auto type=static_cast<QPlatformSurfaceEvent*>(event)->surfaceEventType();
@@ -151,13 +253,7 @@ bool GameViewport::EnsureRendering() {
     return true;
 }
 void GameViewport::RenderGame(GameSproutRuntime::IScene* scene,bool continuous,bool animateMaterials) {
-    const auto sceneID=scene?scene->GetInstanceID():0;
-    if(sceneID!=_SceneID){
-        _SceneID=sceneID;
-        if(_Runtime)_Runtime->SetUIInputViewport(nullptr,{});
-        RequestRender();
-        emit FrameStreamReset();
-    }
+    SetInputScene(scene);
     if(!_NeedsRender&&!continuous&&!(animateMaterials&&_AnimatedMaterials))return;
     if (!_Initialized||!isVisible()||width()<=0||height()<=0||_Rendering) return;
     if(!Headless()&&(!window()||window()->isMinimized()||!window()->windowHandle()||!window()->windowHandle()->isExposed()))return;
@@ -199,8 +295,11 @@ void GameViewport::RenderGame(GameSproutRuntime::IScene* scene,bool continuous,b
         RequestRender();
     }
     const GameSproutRuntime::Vector2 renderedSize{float(statistics.Width), float(statistics.Height)};
-    _Runtime->SetUIInputViewport(scene, {float(width()), float(height())}, renderedSize);
-    SetOutputSize(renderedSize);
+    if (renderedSize.X!=_InputViewport.RenderSize.X || renderedSize.Y!=_InputViewport.RenderSize.Y) {
+        _InputViewport.RenderSize=renderedSize;
+        if(scene)_Runtime->SetInputViewportMetrics(scene,_InputViewport);
+        SetOutputSize(renderedSize);
+    }
     emit FrameSubmitted();
     _AnimatedMaterials=statistics.RequiresContinuousRendering;
     if(!diagnostic.empty()){

@@ -31,4 +31,11 @@ bool CanvasComponent::SetPixelsPerUnit(float value) {
     NotifyComponentChanged(_GameObject, this);
     return true;
 }
+bool CanvasComponent::SetScaleSettings(const CanvasScaleSettings& value) {
+    if (!IsValidCanvasScaleSettings(value)) return false;
+    if (value == _ScaleSettings) return true;
+    _ScaleSettings = value;
+    NotifyComponentChanged(_GameObject, this);
+    return true;
+}
 }

@@ -34,6 +34,8 @@ list(FILTER module_files EXCLUDE REGEX "/(build|cmake-build-[^/]+|CMakeFiles|[^/
 list(APPEND module_files "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt")
 
 add_library(RuntimeHost SHARED ${module_files})
+include("${CMAKE_CURRENT_SOURCE_DIR}/RuntimeHostInput.cmake")
+gamesprout_attach_runtime_host_input(RuntimeHost)
 target_compile_features(RuntimeHost PRIVATE cxx_std_20)
 target_link_libraries(RuntimeHost PRIVATE
     Foundation::FoundationApi
@@ -46,6 +48,11 @@ target_include_directories(RuntimeHost PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../../GameSproutEditor/Api"
 )
 set_target_properties(RuntimeHost PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+if(APPLE)
+    set_property(TARGET RuntimeHost APPEND PROPERTY BUILD_RPATH "@loader_path/../..")
+elseif(UNIX)
+    set_property(TARGET RuntimeHost APPEND PROPERTY BUILD_RPATH "$ORIGIN/../..")
+endif()
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${module_files}

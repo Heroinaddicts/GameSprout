@@ -90,6 +90,7 @@ void GameViewUI::OnActiveSceneChanged() {
     _ActiveScene=_Scenes?_Scenes->GetMainScene():nullptr;
     if(_Viewport) {
         _Viewport->ClearTransformPreview();
+        _Viewport->SetInputScene(_ActiveScene);
         _Viewport->RequestRender();
     }
 }

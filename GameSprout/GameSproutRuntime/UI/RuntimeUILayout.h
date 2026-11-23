@@ -26,6 +26,8 @@ struct UIElement {
 // Returns a transient back-to-front snapshot of active ScreenSpace Canvas
 // elements. Its object pointers are borrowed only for immediate layout consumers.
 std::vector<UIElement> BuildUIFrame(const Runtime&, IScene&, Vector2 viewportSize);
+bool BuildGameplayUIElement(IGameObject&, const RuntimeInputViewportMetrics&, UIElement&);
+Vector2 InputPointToRender(const RuntimeInputViewportMetrics&, Vector2);
 
 struct UIPreviewFrame {
     Rect Canvas;

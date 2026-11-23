@@ -3,6 +3,7 @@
 #include "Internal/RuntimeScriptBindings.h"
 #include <QCoreApplication>
 #include <QThread>
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
@@ -68,6 +69,67 @@ void CheckFrameTail(const Frames& first,const LaterView& later,GameSproutRuntime
     Check(first.TemporaryID&&later.SawTemporaryAlive,"Temporary object was reclaimed between two viewport frame listeners");
     Check(!runtime.QueryGameObject(first.TemporaryID),"RuntimeHost did not collect the temporary object after all viewport listeners returned");
 }
+
+void CheckControllerRouting(RuntimeHost& host, GameSproutEditor::GameSproutModuleApi& api,
+                            GameSproutRuntime::IGameSproutRuntime& runtime) {
+    using namespace GameSproutRuntime;
+    struct Controller final {
+        SDL_JoystickID Id=0;
+        SDL_Joystick* Joystick=nullptr;
+        Uint16 Rumble=0;
+        ~Controller() {
+            if (Joystick) SDL_CloseJoystick(Joystick);
+            if (Id) SDL_DetachVirtualJoystick(Id);
+        }
+    } controller;
+
+    std::string error;
+    Check(host.BeginGameplay(error),error);
+    SDL_VirtualJoystickDesc description;
+    SDL_INIT_INTERFACE(&description);
+    description.type=SDL_JOYSTICK_TYPE_GAMEPAD;
+    description.naxes=SDL_GAMEPAD_AXIS_COUNT;
+    description.nbuttons=SDL_GAMEPAD_BUTTON_COUNT;
+    description.name="Editor virtual gamepad";
+    description.userdata=&controller;
+    description.Rumble=[](void* self, Uint16 low, Uint16 high) {
+        static_cast<Controller*>(self)->Rumble=std::max(low,high);
+        return true;
+    };
+    controller.Id=SDL_AttachVirtualJoystick(&description);
+    Check(controller.Id!=0,"SDL virtual gamepad was not available");
+    controller.Joystick=SDL_OpenJoystick(controller.Id);
+    Check(controller.Joystick,"Could not open SDL virtual gamepad");
+    const auto tick=[&] { GameSproutEditor::GameSproutEditorFinal::Tick(host,api); };
+    const auto pad=[&] { return runtime.GetInputState().GetGamepad(controller.Id); };
+    const auto setSouth=[&](bool pressed) {
+        Check(SDL_SetJoystickVirtualButton(controller.Joystick,SDL_GAMEPAD_BUTTON_SOUTH,pressed),
+              "Could not send virtual gamepad button");
+        tick();
+    };
+
+    setSouth(true);
+    Check(pad()&&!pad()->GetButton(InputGamepadButton::South).Held,
+          "Editor Game View leaked a controller press before capture");
+    setSouth(false);
+    Check(runtime.SubmitInputEvent({InputEventType::FocusGained}),"Could not capture controller input from Game View");
+    tick();
+    setSouth(true);
+    Check(pad()&&pad()->GetButton(InputGamepadButton::South).Held,"Captured controller button was lost");
+    Check(runtime.RumbleGamepad(controller.Id,.4f,.8f,1000)&&controller.Rumble>0,
+          "Gamepad output did not reach SDL");
+    host.SetGameplayPaused(true);
+    Check(controller.Rumble==0&&!runtime.GetInputState().Focused,"Pause retained controller rumble or focus");
+    SDL_CloseJoystick(controller.Joystick);
+    controller.Joystick=nullptr;
+    Check(SDL_DetachVirtualJoystick(controller.Id),"Could not detach SDL virtual gamepad");
+    const auto detachedId=controller.Id;
+    controller.Id=0;
+    host.SetGameplayPaused(false);
+    tick();
+    Check(!runtime.GetInputState().GetGamepad(detachedId),"Gamepad connection survived a detached controller");
+    host.EndGameplay();
+}
 }
 int main(int argc,char** argv){
     QCoreApplication application(argc,argv);if(argc!=2)return 2;
@@ -115,6 +177,7 @@ int main(int argc,char** argv){
         Check(Updated==oldUpdated+2&&Created==1,"Resume recreated native instances");
         host.EndGameplay();Check(!host.IsGameplayActive()&&!runtime->IsScriptExecutionEnabled()&&Released==1,"Stop leaked native session");
         Check(host.BeginGameplay(error)&&Created==2,"Second Play did not create fresh native instances");host.EndGameplay();Check(Released==2,"Second stop leaked native session");
+        CheckControllerRouting(host,api,*runtime);
         host.UnregisterFrameListener(&later);host.UnregisterFrameListener(&frames);GameSproutEditor::GameSproutEditorFinal::Stop(host,api);delete runtime;runtime=nullptr;
         std::cout<<"PASS RuntimeHost: unique full-frame clock, Early/fixed/Update/Late order, complete viewport notification, pause, queued step, input and two sessions\n";return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';delete runtime;return 1;}

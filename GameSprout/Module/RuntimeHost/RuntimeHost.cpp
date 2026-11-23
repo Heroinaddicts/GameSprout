@@ -41,6 +41,11 @@ bool RuntimeHost::BeginGameplay(std::string& error){
     if(!_Runtime||_Gameplay||IsFrameActive()||_Runtime->IsExecuting()) {error="Runtime host is busy or gameplay is already active";return false;}
     HostTransition transition(_Changing);
     if(!_Runtime->BeginExecution(error))return false;
+    _InputDevicesReady = _InputDevices.Initialize(true);
+    if (_InputDevicesReady) {
+        _Runtime->SetInputOutputHandler(GameSproutRuntime::InputOutputTarget::Device,
+            &GameSproutPlatform::SdlInputDevices::Output, &_InputDevices);
+    } else qWarning().noquote() << "无法初始化 SDL 输入设备:" << SDL_GetError();
     _Gameplay=true;_Paused=false;_StepPending=false;_FixedAccumulator=0;
     _Playing=true;ResetClock();NotifyPlayingChanged();return true;
 }
@@ -49,6 +54,7 @@ void RuntimeHost::EndGameplay(){
     HostTransition transition(_Changing);
     std::string error;
     if(!_Runtime->EndExecution(error)){qWarning().noquote()<<QString::fromStdString(error);return;}
+    StopInputDevices();
     _Gameplay=false;_Paused=false;_StepPending=false;_FixedAccumulator=0;
     _Playing=false;ResetClock();NotifyPlayingChanged();
 }
@@ -78,6 +84,7 @@ void RuntimeHost::Update(GameSproutEditor::GameSproutModuleApi*){
             delta=static_cast<float>(fixedSeconds);
             _Runtime->AdvanceFrame(delta,1,delta);
         }else if(!_Paused){
+            if (_InputDevicesReady) _InputDevices.PumpDeviceEvents(*_Runtime);
             // Bound debugger stalls/import delays and avoid an unbounded catch-up loop.
             delta=static_cast<float>(std::clamp(elapsed,0.0,0.1));
             _FixedAccumulator+=delta;
@@ -130,9 +137,17 @@ void RuntimeHost::NotifyPlayingChanged(){
 }
 void RuntimeHost::Release(GameSproutEditor::GameSproutModuleApi*){
     EndGameplay();
+    StopInputDevices();
     _Listeners.clear();_FrameNumber=0;
     _Playing=false;_Timer.invalidate();
     _Gameplay=false;_Paused=false;_StepPending=false;_FixedAccumulator=0;
     if(_Runtime)_Runtime->SetResourceProvider(nullptr);
     _Runtime=nullptr;_Resources=nullptr;
+}
+
+void RuntimeHost::StopInputDevices() {
+    if (!_InputDevicesReady) return;
+    if (_Runtime) _Runtime->SetInputOutputHandler(GameSproutRuntime::InputOutputTarget::Device, nullptr, nullptr);
+    _InputDevices.Shutdown();
+    _InputDevicesReady = false;
 }

@@ -5,21 +5,6 @@
 #include <cmath>
 
 namespace GameSproutRuntime {
-void Runtime::SetUIInputViewport(IScene* scene, Vector2 size, Vector2 renderedSize) {
-    std::uint64_t id = 0;
-    if (auto* node = Find(scene); IsInScene(node) && node->IsSceneRoot() &&
-        std::isfinite(size.X) && std::isfinite(size.Y) && size.X > 0 && size.Y > 0) id = node->ID;
-    if (!id) size = {};
-    if (!id || !std::isfinite(renderedSize.X) || !std::isfinite(renderedSize.Y) ||
-        renderedSize.X <= 0 || renderedSize.Y <= 0) renderedSize = size;
-    if (id == _UIInputSceneID && size.X == _UIInputSize.X && size.Y == _UIInputSize.Y &&
-        renderedSize.X == _UIRenderSize.X && renderedSize.Y == _UIRenderSize.Y) return;
-    ResetUIPointer();
-    _UIInputSceneID = id;
-    _UIInputSize = size;
-    _UIRenderSize = renderedSize;
-}
-
 ButtonComponent* Runtime::FindUIButton(std::uint64_t objectID, std::uint64_t componentID) const {
     auto* node = Find(objectID);
     if (!IsUsable(node)) return nullptr;
@@ -35,13 +20,26 @@ void Runtime::DropUISubscriptions(std::uint64_t objectID, std::uint64_t componen
 
 void Runtime::ResetUIPointer() {
     _UIPointerEdges.clear();
+    _UIPointerSource = UIInputPointer::None;
+    _UIPointerDevice = _UIPointerContact = 0;
     if (auto* button = FindUIButton(_UIPressedObjectID, _UIPressedComponentID)) button->SetPressed(false);
     _UIPressedObjectID = _UIPressedComponentID = 0;
 }
 
-void Runtime::QueueUIPointer(bool down) {
-    if (!_UIInputSceneID || !_Input.HasMousePosition) return;
-    _UIPointerEdges.push_back({_Input.MousePosition, down});
+void Runtime::QueueUIPointer(UIInputPointer source, InputDeviceId device, InputContactId contact,
+                             Vector2 position, bool down, bool canceled) {
+    if (!_UIInputSceneID) return;
+    if (down) {
+        if (_UIPointerSource != UIInputPointer::None) return;
+        _UIPointerSource = source;
+        _UIPointerDevice = device;
+        _UIPointerContact = contact;
+    } else {
+        if (_UIPointerSource != source || _UIPointerDevice != device || _UIPointerContact != contact) return;
+        _UIPointerSource = UIInputPointer::None;
+        _UIPointerDevice = _UIPointerContact = 0;
+    }
+    _UIPointerEdges.push_back({position, down, canceled});
 }
 
 void Runtime::DispatchUIPointer() {
@@ -66,10 +64,9 @@ void Runtime::DispatchUIPointer() {
         }
 
         ButtonComponent* hit = nullptr;
-        if (!_UIButtons.empty() && ContainsUIPoint({{}, _UIInputSize}, edge.Position)) {
-            const Vector2 pixel{(edge.Position.X / _UIInputSize.X) * _UIRenderSize.X,
-                                (edge.Position.Y / _UIInputSize.Y) * _UIRenderSize.Y};
-            const auto layout = BuildUIFrame(*this, *root->SceneOwner, _UIRenderSize);
+        if (!edge.Canceled && !_UIButtons.empty() && ContainsUIPoint(_InputViewport.ContentRect, edge.Position)) {
+            const auto pixel = InputPointToRender(_InputViewport,edge.Position);
+            const auto layout = BuildUIFrame(*this, *root->SceneOwner, _InputViewport.RenderSize);
             for (auto element = layout.rbegin(); element != layout.rend(); ++element) {
                 auto* button = element->Object->GetComponent<IButtonComponent>();
                 if (button && HitUIElement(*element, pixel)) {

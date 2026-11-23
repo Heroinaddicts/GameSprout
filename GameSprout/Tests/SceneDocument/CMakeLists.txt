@@ -90,3 +90,5 @@ target_sources(SceneManagerChecks PRIVATE
 target_sources(SceneManagerChecks PRIVATE
     "${gamesprout_root}/Module/RuntimeHost/RuntimeHost.cpp"
     "${gamesprout_root}/Module/AnimationPreview/AnimationPreview.cpp")
+include("${gamesprout_root}/Module/RuntimeHost/RuntimeHostInput.cmake")
+gamesprout_attach_runtime_host_input(SceneManagerChecks)

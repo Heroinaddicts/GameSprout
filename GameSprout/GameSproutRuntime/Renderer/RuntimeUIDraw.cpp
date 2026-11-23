@@ -232,7 +232,9 @@ bool Renderer::PrepareUI(IScene& scene,std::uint32_t width,std::uint32_t height,
     const auto sceneID=scene.GetInstanceID();
     const auto revision=static_cast<Scene&>(scene).GetUIRevision();
     const auto resources=_Resources.GetRevision();
-    if(sceneID==_UISceneID&&revision==_UISceneRevision&&resources==_UIResourceRevision&&width==_UIWidth&&height==_UIHeight&&
+    const auto viewportRevision=_Runtime.InputViewportForScene(scene).Revision;
+    if(sceneID==_UISceneID&&revision==_UISceneRevision&&resources==_UIResourceRevision&&
+       viewportRevision==_UIViewportRevision&&width==_UIWidth&&height==_UIHeight&&
        previewObjectID==_UIPreviewObjectID && gameViewportSize.X==_UIPreviewGameSize.X && gameViewportSize.Y==_UIPreviewGameSize.Y) {
         Diagnostic(_UIDiagnostic);
         return true;
@@ -321,7 +323,7 @@ bool Renderer::PrepareUI(IScene& scene,std::uint32_t width,std::uint32_t height,
     }
     _UIDiagnostic=_Error.substr(diagnosticBefore);
     if(!_UIDiagnostic.empty()&&_UIDiagnostic.front()=='\n')_UIDiagnostic.erase(0,1);
-    _UISceneID=sceneID;_UISceneRevision=revision;_UIResourceRevision=resources;
+    _UISceneID=sceneID;_UISceneRevision=revision;_UIResourceRevision=resources;_UIViewportRevision=viewportRevision;
     _UIPreviewObjectID=previewObjectID;
     _UIPreviewGameSize=gameViewportSize;
     _UIWidth=width;_UIHeight=height;

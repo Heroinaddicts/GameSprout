@@ -341,6 +341,25 @@ namespace GameSproutRuntime {
     };
 
     enum class CanvasRenderMode { ScreenSpace, WorldSpace };
+    enum class CanvasScaleMode { ConstantPixelSize,ScaleWithScreenSize,ConstantPhysicalSize };
+    enum class CanvasScreenMatchMode { MatchWidthOrHeight,Expand,Shrink };
+    enum class CanvasPhysicalUnit { Centimeters,Millimeters,Inches,Points,Picas };
+    struct CanvasScaleSettings {
+        CanvasScaleMode Mode=CanvasScaleMode::ScaleWithScreenSize;
+        CanvasScreenMatchMode MatchMode=CanvasScreenMatchMode::Expand;
+        float ScaleFactor=1.0f,WidthHeightMatch=0.5f,FallbackDpi=96.0f;
+        CanvasPhysicalUnit PhysicalUnit=CanvasPhysicalUnit::Points;
+        bool UseSafeArea=false;
+        bool operator==(const CanvasScaleSettings&) const = default;
+    };
+    inline bool IsValidCanvasScaleSettings(const CanvasScaleSettings& value) {
+        return value.Mode >= CanvasScaleMode::ConstantPixelSize && value.Mode <= CanvasScaleMode::ConstantPhysicalSize &&
+            value.MatchMode >= CanvasScreenMatchMode::MatchWidthOrHeight && value.MatchMode <= CanvasScreenMatchMode::Shrink &&
+            value.PhysicalUnit >= CanvasPhysicalUnit::Centimeters && value.PhysicalUnit <= CanvasPhysicalUnit::Picas &&
+            std::isfinite(value.ScaleFactor) && value.ScaleFactor > 0.0f &&
+            std::isfinite(value.WidthHeightMatch) && value.WidthHeightMatch >= 0.0f && value.WidthHeightMatch <= 1.0f &&
+            std::isfinite(value.FallbackDpi) && value.FallbackDpi > 0.0f;
+    }
     class GAMESPROUT_RUNTIME_PUBLIC_TYPE ICanvasComponent : public IComponent {
     public:
         virtual CanvasRenderMode GetRenderMode() const = 0;
@@ -351,6 +370,8 @@ namespace GameSproutRuntime {
         virtual bool SetPixelsPerUnit(float value) = 0; // 有限且为正，仅用于世界空间 Canvas。
         // 屏幕空间 Canvas 由视图提供输出像素矩形；世界空间 Canvas 使用自身 Transform。
         // 布局坐标 X 右/Y 上，转屏幕坐标时由 UI 系统统一翻转 Y。
+        virtual CanvasScaleSettings GetScaleSettings() const { return {}; }
+        virtual bool SetScaleSettings(const CanvasScaleSettings&) { return false; }
     protected:
         using IComponent::IComponent;
     };
@@ -553,8 +574,8 @@ namespace GameSproutRuntime {
         // Host thread. Borrowed state is stable until the next input/Host-frame
         // operation; gameplay scripts query it during their FixedUpdate/Update.
         virtual const RuntimeInputState& GetInputState() const {static const RuntimeInputState empty;return empty;}
-        // Only focused, unpaused gameplay accepts key/mouse input. Repeat keydown
-        // keeps Held without repeating Pressed; FocusLost releases all held keys.
+        // Focused, unpaused gameplay accepts device state changes. Device discovery
+        // remains available while unfocused. Repeat keydown does not repeat Pressed.
         virtual bool SubmitInputEvent(const RuntimeInputEvent&) {return false;}
         virtual void ResetInput() {}
         // Host only: call once after the complete fixed+variable gameplay frame,
@@ -667,6 +688,69 @@ namespace GameSproutRuntime {
 
     private:
         virtual void WriteLog(RuntimeLogLevel, std::string_view, const char*, std::uint_least32_t) noexcept {}
+
+    public:
+        // Host only. Detach the handler before destroying its context. Null detaches.
+        virtual void SetInputOutputHandler(InputOutputTarget, InputOutputHandler, void*) {}
+        // Owner thread. Returns false if unavailable, unfocused, or rejected by the device.
+        virtual bool SendInputOutput(const InputOutputCommand&) { return false; }
+        // Logical pixels in the same coordinate space as MousePosition and Touches.
+        // Both dimensions are zero while no gameplay viewport is bound.
+        virtual Vector2 GetInputViewportSize() const { return {}; }
+        // Host only. Submit actual presented content geometry; a null scene detaches it.
+        virtual void SetInputViewportMetrics(IScene*,const RuntimeInputViewportMetrics&) {}
+        virtual RuntimeInputViewportMetrics GetInputViewportMetrics() const { return {}; }
+        // Main-thread registration. Unregister the borrowed listener before destruction.
+        virtual bool RegisterInputViewportListener(IRuntimeInputViewportListener*) { return false; }
+        virtual void UnregisterInputViewportListener(IRuntimeInputViewportListener*) {}
+        // Gameplay view only. Local positions use Canvas units about the object's pivot, X right/Y up.
+        // A valid inverse can return a position outside the rectangle during a drag.
+        virtual bool ScreenPointToUILocal(std::uint64_t,Vector2,Vector2&) const { return false; }
+        virtual bool UILocalPointToScreen(std::uint64_t,Vector2,Vector2&) const { return false; }
+        virtual bool GetUIRectLocalBounds(std::uint64_t,Rect&) const { return false; }
+        virtual bool HitTestUIRect(std::uint64_t,Vector2) const { return false; }
+        // Claim a pointer on its Down event. The owner must be an active object in the gameplay UI.
+        // Release when reading Up/Cancel. Runtime also drops ended and invalid captures at frame end.
+        virtual bool CaptureUIPointer(RuntimePointerId,std::uint64_t) { return false; }
+        virtual bool ReleaseUIPointer(RuntimePointerId,std::uint64_t) { return false; }
+        virtual std::uint64_t GetUIPointerCapture(RuntimePointerId) const { return 0; }
+        bool SetCursorMode(InputCursorMode mode) {
+            InputOutputCommand command{InputOutputType::SetCursorMode};
+            command.CursorMode=mode;
+            return SendInputOutput(command);
+        }
+        bool WarpCursor(Vector2 position) {
+            InputOutputCommand command{InputOutputType::WarpCursor};
+            command.X=position.X; command.Y=position.Y;
+            return SendInputOutput(command);
+        }
+        bool StartTextInput() { return SendInputOutput({InputOutputType::StartTextInput}); }
+        bool StopTextInput() { return SendInputOutput({InputOutputType::StopTextInput}); }
+        bool SetTextInputArea(Vector2 position, Vector2 size, std::int32_t cursor=0) {
+            InputOutputCommand command{InputOutputType::SetTextInputArea};
+            command.X=position.X; command.Y=position.Y; command.Width=size.X; command.Height=size.Y; command.Cursor=cursor;
+            return SendInputOutput(command);
+        }
+        bool RumbleGamepad(InputDeviceId id, float low, float high, std::uint32_t durationMs) {
+            InputOutputCommand command{InputOutputType::Rumble,id};
+            command.Low=low; command.High=high; command.DurationMs=durationMs;
+            return SendInputOutput(command);
+        }
+        bool RumbleGamepadTriggers(InputDeviceId id, float left, float right, std::uint32_t durationMs) {
+            InputOutputCommand command{InputOutputType::RumbleTriggers,id};
+            command.Low=left; command.High=right; command.DurationMs=durationMs;
+            return SendInputOutput(command);
+        }
+        bool SetGamepadLed(InputDeviceId id, std::uint8_t red, std::uint8_t green, std::uint8_t blue) {
+            InputOutputCommand command{InputOutputType::SetLed,id};
+            command.Red=red; command.Green=green; command.Blue=blue;
+            return SendInputOutput(command);
+        }
+        bool EnableInputSensor(InputDeviceId id, bool enabled=true) {
+            InputOutputCommand command{InputOutputType::EnableSensor,id};
+            command.Enabled=enabled;
+            return SendInputOutput(command);
+        }
     };
 
 }

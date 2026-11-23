@@ -1,5 +1,6 @@
 #pragma once
 #include "IRuntimeHost.h"
+#include "SdlInputDevices.h"
 #include <QElapsedTimer>
 #include <map>
 class IRuntimeAssets;
@@ -27,8 +28,11 @@ private:
     void Release(GameSproutEditor::GameSproutModuleApi*) override;
     void NotifyFrame(const RuntimeFrameEvent&);
     void NotifyPlayingChanged();
+    void StopInputDevices();
     GameSproutRuntime::IGameSproutRuntime* _Runtime=nullptr; // Borrowed from EditorApi.
     IRuntimeAssets* _Resources=nullptr;
+    GameSproutPlatform::SdlInputDevices _InputDevices;
+    bool _InputDevicesReady=false;
     QElapsedTimer _Timer;
     bool _Playing=false;
     bool _Gameplay=false,_Paused=false,_StepPending=false,_Ticking=false,_Changing=false;

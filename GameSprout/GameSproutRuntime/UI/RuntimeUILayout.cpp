@@ -72,17 +72,54 @@ bool LayoutElement(const LayoutNode& node, const IGameObject& root, float scale,
     return Finite(element.Transform.X) && Finite(element.Transform.Y) && Finite(element.Transform.Offset);
 }
 
-float CanvasScale(const ICanvasComponent& canvas, const Rect& viewport) {
+struct CanvasLayout {
+    Rect Bounds;
+    float Scale = 0;
+};
+
+float CanvasScale(const ICanvasComponent& canvas, Vector2 size, float displayDpi) {
+    const auto settings = canvas.GetScaleSettings();
+    if (settings.Mode == CanvasScaleMode::ConstantPixelSize) return settings.ScaleFactor;
+    if (settings.Mode == CanvasScaleMode::ConstantPhysicalSize) {
+        constexpr float unitsPerInch[]{2.54f, 25.4f, 1.0f, 72.0f, 6.0f};
+        const float dpi = displayDpi > 0 ? displayDpi : settings.FallbackDpi;
+        return dpi / unitsPerInch[static_cast<std::size_t>(settings.PhysicalUnit)];
+    }
     const auto reference = canvas.GetReferenceResolution();
-    return std::min(viewport.Size.X / reference.X, viewport.Size.Y / reference.Y);
+    const float width = size.X / reference.X;
+    const float height = size.Y / reference.Y;
+    if (settings.MatchMode == CanvasScreenMatchMode::Expand) return std::min(width, height);
+    if (settings.MatchMode == CanvasScreenMatchMode::Shrink) return std::max(width, height);
+    return std::exp(std::lerp(std::log(width), std::log(height), settings.WidthHeightMatch));
 }
 
-void AppendCanvas(IGameObject& root, const ICanvasComponent& canvas, const Rect& viewport,
-                  std::vector<UIElement>& elements, bool includeCanvas = false) {
+CanvasLayout LayoutCanvas(const ICanvasComponent& canvas, Vector2 size, RuntimeInputViewportMetrics metrics) {
+    if (!ValidRect({{},size}) || size.X <= 0 || size.Y <= 0) return {};
+    CanvasLayout layout{{{},size}, CanvasScale(canvas,size,metrics.DisplayDpi)};
+    if (canvas.GetScaleSettings().UseSafeArea && metrics.SafeArea.Size.X > 0 && metrics.SafeArea.Size.Y > 0) {
+        metrics.RenderSize = size;
+        const auto start = InputPointToRender(metrics,metrics.SafeArea.Position);
+        const auto end = InputPointToRender(metrics,metrics.SafeArea.Position+metrics.SafeArea.Size);
+        layout.Bounds = {start,end-start};
+    }
+    return layout;
+}
+
+bool LayoutInCanvas(IGameObject& object, IGameObject& root, const CanvasLayout& layout, UIElement& element) {
+    if (!std::isfinite(layout.Scale) || layout.Scale <= 0 || !object.IsActiveInHierarchy()) return false;
+    std::vector<IGameObject*> chain;
+    for (auto* node = &object; node != &root; node = node->Parent()) chain.push_back(node);
+    if (!LayoutElement({&root,layout.Bounds,{}},root,layout.Scale,element)) return false;
+    for (auto node = chain.rbegin(); node != chain.rend(); ++node)
+        if (!LayoutElement({*node,element.Rectangle,element.Transform},root,layout.Scale,element)) return false;
+    return true;
+}
+
+void AppendCanvas(IGameObject& root, const CanvasLayout& layout, std::vector<UIElement>& elements, bool includeCanvas = false) {
     if (!root.IsActiveInHierarchy()) return;
-    const float scale = CanvasScale(canvas, viewport);
+    const float scale = layout.Scale;
     if (!std::isfinite(scale) || scale <= 0.0f) return;
-    std::vector<LayoutNode> pending{{&root, viewport, {}}};
+    std::vector<LayoutNode> pending{{&root, layout.Bounds, {}}};
     while (!pending.empty()) {
         const auto node = pending.back();
         pending.pop_back();
@@ -99,14 +136,18 @@ void AppendCanvas(IGameObject& root, const ICanvasComponent& canvas, const Rect&
     }
 }
 
-Rect PreviewCanvasBounds(const ICanvasComponent& canvas, Vector2 viewportSize, Vector2 gameViewportSize) {
+CanvasLayout LayoutCanvasPreview(const ICanvasComponent& canvas, Vector2 viewportSize, Vector2 gameViewportSize,
+                                 const RuntimeInputViewportMetrics& metrics) {
     if (!ValidRect({{}, viewportSize}) || viewportSize.X <= 0 || viewportSize.Y <= 0) return {};
+    if (!Finite(gameViewportSize) || gameViewportSize.X <= 0 || gameViewportSize.Y <= 0)
+        gameViewportSize = metrics.RenderSize;
     if (!Finite(gameViewportSize) || gameViewportSize.X <= 0 || gameViewportSize.Y <= 0)
         gameViewportSize = canvas.GetReferenceResolution();
     // Preserve the Game target's aspect and leave the canvas outline visible.
-    const auto scale = 0.84 * std::min(double(viewportSize.X) / gameViewportSize.X, double(viewportSize.Y) / gameViewportSize.Y);
-    const Vector2 size{float(gameViewportSize.X * scale), float(gameViewportSize.Y * scale)};
-    return {(viewportSize - size) * 0.5f, size};
+    const float projection = 0.84f * std::min(viewportSize.X / gameViewportSize.X, viewportSize.Y / gameViewportSize.Y);
+    const auto content = (viewportSize-gameViewportSize*projection)*0.5f;
+    const auto layout = LayoutCanvas(canvas,gameViewportSize,metrics);
+    return {{content+layout.Bounds.Position*projection,layout.Bounds.Size*projection},layout.Scale*projection};
 }
 }
 
@@ -124,6 +165,19 @@ bool HitUIElement(const UIElement& element, Vector2 point) {
     return element.Transform.TryInversePoint(point, local) && ContainsUIPoint(element.Rectangle, local);
 }
 
+Vector2 InputPointToRender(const RuntimeInputViewportMetrics& metrics, Vector2 position) {
+    const auto offset = position-metrics.ContentRect.Position;
+    const auto size = metrics.ContentRect.Size;
+    return {offset.X/size.X*metrics.RenderSize.X,offset.Y/size.Y*metrics.RenderSize.Y};
+}
+
+bool BuildGameplayUIElement(IGameObject& object, const RuntimeInputViewportMetrics& metrics, UIElement& element) {
+    auto* root = FindUIScreenCanvasRoot(object);
+    if (!root) return false;
+    const auto& canvas = *root->GetComponent<ICanvasComponent>();
+    return LayoutInCanvas(object,*root,LayoutCanvas(canvas,metrics.RenderSize,metrics),element);
+}
+
 std::vector<UIElement> BuildUIFrame(const Runtime& runtime, IScene& scene, Vector2 viewportSize) {
     std::vector<UIElement> elements;
     const Rect viewport{{}, viewportSize};
@@ -131,6 +185,7 @@ std::vector<UIElement> BuildUIFrame(const Runtime& runtime, IScene& scene, Vecto
 
     // Visit registered canvases and their subtrees. Large 3D-only parts of a
     // scene never enter UI layout. Separate roots use stable creation order.
+    const auto metrics = runtime.InputViewportForScene(scene);
     for (const auto id : runtime.UICanvasObjects()) {
         auto* root = runtime.QueryGameObject(id);
         if (!root || root->GetScene() != &scene) continue;
@@ -139,7 +194,7 @@ std::vector<UIElement> BuildUIFrame(const Runtime& runtime, IScene& scene, Vecto
         const auto* parentCanvas = ParentCanvas(*root);
         if (parentCanvas && parentCanvas->GetRenderMode() == CanvasRenderMode::ScreenSpace) continue;
 
-        AppendCanvas(*root, *canvas, viewport, elements);
+        AppendCanvas(*root,LayoutCanvas(*canvas,viewportSize,metrics),elements);
     }
     return elements;
 }
@@ -152,9 +207,10 @@ UIPreviewFrame BuildUIPreview(const Runtime& runtime, IScene& scene, std::uint64
     if (!root) return preview;
 
     const auto& canvas = *root->GetComponent<ICanvasComponent>();
-    preview.Canvas = PreviewCanvasBounds(canvas, viewportSize, gameViewportSize);
+    const auto layout = LayoutCanvasPreview(canvas,viewportSize,gameViewportSize,runtime.InputViewportForScene(scene));
+    preview.Canvas = layout.Bounds;
     preview.IsCanvasSelected = object == root;
-    AppendCanvas(*root, canvas, preview.Canvas, preview.Elements, true);
+    AppendCanvas(*root,layout,preview.Elements,true);
     return preview;
 }
 
@@ -176,23 +232,16 @@ bool Runtime::GetUIScreenPreviewGeometry(IScene* scene, std::uint64_t objectID, 
     auto* root = object && object->GetScene() == scene ? FindUIScreenCanvasRoot(*object) : nullptr;
     if (!root || !object->IsActiveInHierarchy()) return false;
     const auto& canvas = *root->GetComponent<ICanvasComponent>();
-    const Rect bounds = PreviewCanvasBounds(canvas, size, gameViewportSize);
-    const float scale = CanvasScale(canvas, bounds);
-    if (!std::isfinite(scale) || scale <= 0.0f) return false;
-
-    std::vector<IGameObject*> chain;
-    for (auto* node = object; node != root; node = node->Parent()) chain.push_back(node);
+    const auto layout = LayoutCanvasPreview(canvas,size,gameViewportSize,InputViewportForScene(*scene));
+    const float scale = layout.Scale;
     UIElement element;
-    if (!LayoutElement({root, bounds, {}}, *root, scale, element)) return false;
-    for (auto node = chain.rbegin(); node != chain.rend(); ++node) {
-        if (!LayoutElement({*node, element.Rectangle, element.Transform}, *root, scale, element)) return false;
-    }
+    if (!LayoutInCanvas(*object,*root,layout,element)) return false;
 
     const auto topLeft = element.Rectangle.Position;
     const auto rectangleSize = element.Rectangle.Size;
     const auto topRight = topLeft + Vector2{rectangleSize.X, 0};
     const auto bottomLeft = topLeft + Vector2{0, rectangleSize.Y};
-    output.CanvasBounds = bounds;
+    output.CanvasBounds = layout.Bounds;
     output.Corners = {element.Transform.Point(topLeft), element.Transform.Point(topRight),
         element.Transform.Point(topLeft + rectangleSize), element.Transform.Point(bottomLeft)};
     output.Pivot = element.Transform.Point(element.Pivot);

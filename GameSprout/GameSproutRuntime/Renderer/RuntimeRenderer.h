@@ -392,7 +392,7 @@ private:
     std::map<std::pair<GRHI::TextureFormat,GRHI::TextureFormat>,GRHI::IGraphicsPipeline*> _UIPipelines;
     GRHI::IBuffer* _UIBuffer=nullptr;
     std::vector<UIBatch> _UIBatches;
-    std::uint64_t _UISceneID=0,_UISceneRevision=0,_UIResourceRevision=0;
+    std::uint64_t _UISceneID=0,_UISceneRevision=0,_UIResourceRevision=0,_UIViewportRevision=0;
     std::uint64_t _UIPreviewObjectID=0;
     Vector2 _UIPreviewGameSize;
     std::uint32_t _UIWidth=0,_UIHeight=0;

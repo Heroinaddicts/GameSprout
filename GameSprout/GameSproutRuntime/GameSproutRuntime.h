@@ -134,6 +134,23 @@ public:
     void ResetInput() override;
     void CompleteInputFrame() override;
     void SetInputEnabled(bool) override;
+    void SetInputOutputHandler(InputOutputTarget,InputOutputHandler,void*) override;
+    bool SendInputOutput(const InputOutputCommand&) override;
+    Vector2 GetInputViewportSize() const override { return _InputViewport.ContentRect.Size; }
+    RuntimeInputViewportMetrics GetInputViewportMetrics() const override { return _InputViewport; }
+    void SetInputViewportMetrics(IScene*,const RuntimeInputViewportMetrics&) override;
+    bool RegisterInputViewportListener(IRuntimeInputViewportListener*) override;
+    void UnregisterInputViewportListener(IRuntimeInputViewportListener*) override;
+    bool ScreenPointToUILocal(std::uint64_t,Vector2,Vector2&) const override;
+    bool UILocalPointToScreen(std::uint64_t,Vector2,Vector2&) const override;
+    bool GetUIRectLocalBounds(std::uint64_t,Rect&) const override;
+    bool HitTestUIRect(std::uint64_t,Vector2) const override;
+    bool CaptureUIPointer(RuntimePointerId,std::uint64_t) override;
+    bool ReleaseUIPointer(RuntimePointerId,std::uint64_t) override;
+    std::uint64_t GetUIPointerCapture(RuntimePointerId) const override;
+    RuntimeInputViewportMetrics InputViewportForScene(const IScene& scene) const {
+        return scene.GetInstanceID() == _UIInputSceneID ? _InputViewport : RuntimeInputViewportMetrics{};
+    }
     void SetUIInputViewport(IScene*, Vector2, Vector2) override;
     std::uint64_t PickUIScreenPreview(IScene*, std::uint64_t, Vector2, Vector2, Vector2) const override;
     bool GetUIScreenPreviewGeometry(IScene*, std::uint64_t, Vector2, UIScreenPreviewGeometry&, Vector2) const override;
@@ -227,7 +244,19 @@ private:
     bool QueueAnimationRecord(AnimatorComponent&,AnimationRecord);
     void RenderWorld();
     void ResetUIPointer();
-    void QueueUIPointer(bool down);
+    enum class UIInputPointer { None,Mouse,Touch,Pen };
+    void QueueUIPointer(UIInputPointer,InputDeviceId,InputContactId,Vector2,bool down,bool canceled=false);
+    void PublishInputPointer(RuntimePointerId,InputPointerPhase,Vector2,std::uint64_t);
+    void CancelInputPointers();
+    void CompleteInputPointers();
+    bool IsInputUIOwner(std::uint64_t) const;
+    bool SubmitDeviceInput(const RuntimeInputEvent&);
+    bool SubmitTouchInput(const RuntimeInputEvent&);
+    bool SubmitPenInput(const RuntimeInputEvent&);
+    void ClearDeviceInputOnFocusLoss();
+    void CompleteDeviceInputFrame();
+    void ResetInputOutputs();
+    void LoseInputFocus();
     void DispatchUIPointer();
     struct FrameComponent {
         std::uint64_t ObjectID=0,Serial=0;
@@ -308,13 +337,25 @@ private:
     bool _EndingFrame = false;
     bool _InputEnabled = false;
     RuntimeInputState _Input;
+    std::array<bool,static_cast<std::size_t>(InputKey::Count)> _InputHeldKeys{};
+    struct InputOutputBinding { InputOutputHandler Handler=nullptr; void* Context=nullptr; };
+    InputOutputBinding _InputWindowOutput, _InputDeviceOutput;
     std::set<std::uint64_t> _UICanvasObjects;
     std::set<ButtonComponent*> _UIButtons;
-    struct UIPointerEdge { Vector2 Position; bool Down; };
+    struct UIPointerEdge { Vector2 Position; bool Down; bool Canceled; };
     std::vector<UIPointerEdge> _UIPointerEdges;
+    UIInputPointer _UIPointerSource=UIInputPointer::None;
+    InputDeviceId _UIPointerDevice=0;
+    InputContactId _UIPointerContact=0;
     std::uint64_t _UIInputSceneID = 0;
-    Vector2 _UIInputSize;
-    Vector2 _UIRenderSize;
+    RuntimeInputViewportMetrics _InputViewport;
+    std::map<std::uint64_t,IRuntimeInputViewportListener*> _InputViewportListeners;
+    std::uint64_t _NextInputViewportListener=0;
+    bool _NotifyingInputViewport=false;
+    struct LiveInputPointer { RuntimePointerId Id; Vector2 Position; };
+    struct InputPointerCapture { RuntimePointerId Id; std::uint64_t Owner; };
+    std::vector<LiveInputPointer> _LiveInputPointers;
+    std::vector<InputPointerCapture> _InputPointerCaptures;
     std::uint64_t _UIPressedObjectID = 0, _UIPressedComponentID = 0;
     std::map<std::string,ScriptTypeRegistration> _ScriptTypes;
     std::map<std::string,GameModuleRegistration> _GameModuleTypes;

@@ -1,5 +1,6 @@
 #include "PlayerInput.h"
 #include "PlayerPackage.h"
+#include "PlatformInput/SdlInputDevices.h"
 #include "GameSproutRuntimeExport.h"
 #include "RuntimeRenderApi.h"
 #include "RuntimeScriptApi.h"
@@ -25,6 +26,8 @@ bool MobilePaths(std::filesystem::path& binary, std::filesystem::path& directory
 
 namespace {
 using GameSproutRuntime::IGameSproutRuntime;
+using GameSproutRuntime::InputViewportOrientation;
+using GameSproutRuntime::IScene;
 volatile std::sig_atomic_t Interrupted = 0;
 void OnSignal(int) { Interrupted = 1; }
 
@@ -47,6 +50,10 @@ struct PlayerSession {
     IGameSproutRuntime* Runtime = nullptr;
     GameSproutRuntime::IRuntimeViewport* Viewport = nullptr;
     SDL_Window* Window = nullptr;
+    GameSproutPlayer::PlayerInput WindowInput;
+    GameSproutPlatform::SdlInputDevices InputDevices;
+    GameSproutRuntime::RuntimeInputViewportMetrics InputViewport;
+    std::uint64_t InputViewportSceneID = 0;
     void* GameLogic = nullptr;
     std::string RenderDiagnostic;
     bool Executing = false;
@@ -56,6 +63,11 @@ struct PlayerSession {
             std::string error;
             if (!Runtime->EndExecution(error)) std::cerr << "Cannot stop gameplay: " << error << '\n';
         }
+        if (Runtime && Window) {
+            Runtime->SetInputOutputHandler(GameSproutRuntime::InputOutputTarget::Window, nullptr, nullptr);
+            Runtime->SetInputOutputHandler(GameSproutRuntime::InputOutputTarget::Device, nullptr, nullptr);
+        }
+        InputDevices.Shutdown();
         delete Viewport;
         if (Runtime) Runtime->UnregisterLogListener(&Log);
         delete Runtime;
@@ -136,6 +148,73 @@ bool ParseLaunchOptions(int argc, char** argv, LaunchOptions& options, std::stri
     return true;
 }
 
+InputViewportOrientation GetInputOrientation(SDL_DisplayID display) {
+    if (!display) return InputViewportOrientation::Unknown;
+    switch (SDL_GetCurrentDisplayOrientation(display)) {
+    case SDL_ORIENTATION_LANDSCAPE: return InputViewportOrientation::Landscape;
+    case SDL_ORIENTATION_LANDSCAPE_FLIPPED: return InputViewportOrientation::LandscapeFlipped;
+    case SDL_ORIENTATION_PORTRAIT: return InputViewportOrientation::Portrait;
+    case SDL_ORIENTATION_PORTRAIT_FLIPPED: return InputViewportOrientation::PortraitFlipped;
+    default: return InputViewportOrientation::Unknown;
+    }
+}
+
+bool IsViewportChange(const SDL_Event& event, SDL_Window* window) {
+    switch (event.type) {
+    case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+    case SDL_EVENT_WINDOW_METAL_VIEW_RESIZED:
+    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+    case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
+    case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+    case SDL_EVENT_WINDOW_SHOWN:
+    case SDL_EVENT_WINDOW_RESTORED:
+        return event.window.windowID == SDL_GetWindowID(window);
+    case SDL_EVENT_DISPLAY_ORIENTATION:
+        return event.display.displayID == SDL_GetDisplayForWindow(window);
+    case SDL_EVENT_DID_ENTER_FOREGROUND:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void PublishInputViewport(PlayerSession& player, IScene* scene) {
+    player.InputViewportSceneID = scene ? scene->GetInstanceID() : 0;
+    player.Runtime->SetInputViewportMetrics(scene, player.InputViewport);
+}
+
+void RefreshInputViewport(PlayerSession& player, IScene* scene) {
+    int logicalWidth = 0, logicalHeight = 0, pixelWidth = 0, pixelHeight = 0;
+    if (SDL_GetWindowSize(player.Window, &logicalWidth, &logicalHeight) && logicalWidth > 0 && logicalHeight > 0 &&
+        SDL_GetWindowSizeInPixels(player.Window, &pixelWidth, &pixelHeight) && pixelWidth > 0 && pixelHeight > 0) {
+        auto& metrics = player.InputViewport;
+        metrics.ContentRect.Size = {float(logicalWidth), float(logicalHeight)};
+        metrics.RenderSize = {float(pixelWidth), float(pixelHeight)};
+        metrics.PixelRatio = float(pixelWidth) / float(logicalWidth);
+        metrics.Orientation = GetInputOrientation(SDL_GetDisplayForWindow(player.Window));
+        metrics.SafeArea = {};
+#if !defined(GAMESPROUT_PLAYER_HARMONYOS)
+        SDL_Rect bounds{0, 0, logicalWidth, logicalHeight}, safeArea{}, intersection{};
+        if (SDL_GetWindowSafeArea(player.Window, &safeArea) && SDL_GetRectIntersection(&bounds, &safeArea, &intersection))
+            metrics.SafeArea = {{float(intersection.x), float(intersection.y)}, {float(intersection.w), float(intersection.h)}};
+#endif
+        // SDL supplies pixel density separately. It does not report physical display DPI.
+    }
+    PublishInputViewport(player, scene);
+}
+
+IScene* FindActiveScene(const PlayerSession& player, std::uint64_t startupSceneID) {
+    auto* startupRoot = player.Runtime->QueryGameObject(startupSceneID);
+    return startupRoot ? startupRoot->GetScene() : player.Runtime->GetScene(0);
+}
+
+void BindInputScene(PlayerSession& player, IScene* scene) {
+    if (player.InputViewportSceneID != (scene ? scene->GetInstanceID() : 0)) PublishInputViewport(player, scene);
+}
+
 bool RenderFrame(PlayerSession& player, GameSproutRuntime::IScene* scene, bool& presented, std::string& error) {
     GameSproutRuntime::RenderView view;
     view.Scene = scene;
@@ -165,9 +244,10 @@ bool RenderFrame(PlayerSession& player, GameSproutRuntime::IScene* scene, bool& 
         if (!presented) std::cout << "Presented first frame: " << stats.Width << 'x' << stats.Height
             << " (" << stats.DrawCalls << " draws)" << std::endl;
         presented = true;
-        int width = 0, height = 0;
-        if (SDL_GetWindowSize(player.Window, &width, &height)) {
-            player.Runtime->SetUIInputViewport(scene, {float(width), float(height)}, {float(stats.Width), float(stats.Height)});
+        const GameSproutRuntime::Vector2 renderedSize{float(stats.Width), float(stats.Height)};
+        if (player.InputViewport.RenderSize.X != renderedSize.X || player.InputViewport.RenderSize.Y != renderedSize.Y) {
+            player.InputViewport.RenderSize = renderedSize;
+            PublishInputViewport(player, scene);
         }
     }
     return true;
@@ -221,6 +301,13 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
             GameSproutRuntime::NativeWindowSystem::SDL, reinterpret_cast<std::uintptr_t>(player.Window)};
         player.Viewport = player.Runtime->CreateViewport(nativeWindow, &player.Package, error);
         if (!player.Viewport) return false;
+        player.WindowInput.SetWindow(player.Window);
+        player.InputDevices.Initialize();
+        player.Runtime->SetInputOutputHandler(GameSproutRuntime::InputOutputTarget::Window, &GameSproutPlayer::PlayerInput::Output,
+            &player.WindowInput);
+        player.Runtime->SetInputOutputHandler(GameSproutRuntime::InputOutputTarget::Device, &GameSproutPlatform::SdlInputDevices::Output,
+            &player.InputDevices);
+        RefreshInputViewport(player, scene);
     }
     scene->SetSimulationEnabled(true);
     if (!player.Runtime->BeginExecution(error)) return false;
@@ -228,6 +315,7 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
     player.Runtime->SetInputEnabled(!headless);
     if (player.Window && (SDL_GetWindowFlags(player.Window) & SDL_WINDOW_INPUT_FOCUS))
         player.Runtime->SubmitInputEvent({GameSproutRuntime::InputEventType::FocusGained});
+    if (player.Window) player.InputDevices.BeginFrame(*player.Runtime);
     std::cout << "Opened startup scene: " << startupSceneName << (headless ? " (headless)" : "") << std::endl;
 
     using Clock = std::chrono::steady_clock;
@@ -238,6 +326,7 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
     auto previous = Clock::now();
     unsigned frame = 0;
     while (!Interrupted && (!options.Frames || frame < options.Frames)) {
+        if (player.Window) BindInputScene(player, FindActiveScene(player, startupSceneID));
         SDL_Event event;
         bool close = false;
         while (SDL_PollEvent(&event)) {
@@ -245,14 +334,18 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
                 event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) close = true;
             if (event.type == SDL_EVENT_WILL_ENTER_BACKGROUND || event.type == SDL_EVENT_DID_ENTER_BACKGROUND) {
                 backgrounded = true;
-                player.Runtime->SubmitInputEvent({GameSproutRuntime::InputEventType::FocusLost});
             }
             if (event.type == SDL_EVENT_DID_ENTER_FOREGROUND) {
                 backgrounded = false;
                 if (player.Window && (SDL_GetWindowFlags(player.Window) & SDL_WINDOW_INPUT_FOCUS))
                     player.Runtime->SubmitInputEvent({GameSproutRuntime::InputEventType::FocusGained});
             }
-            if (player.Window) GameSproutPlayer::HandleInput(*player.Runtime, event);
+            if (player.Window) {
+                if (IsViewportChange(event, player.Window)) RefreshInputViewport(player, FindActiveScene(player, startupSceneID));
+                if (!player.InputDevices.HandleEvent(*player.Runtime, event)) player.WindowInput.HandleEvent(*player.Runtime, event);
+                if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED || event.type == SDL_EVENT_DID_ENTER_FOREGROUND)
+                    player.InputDevices.BeginFrame(*player.Runtime);
+            }
         }
         if (close) break;
         if (backgrounded) {
@@ -261,6 +354,7 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
             SDL_Delay(16);
             continue;
         }
+        if (player.Window) player.InputDevices.BeginFrame(*player.Runtime);
         const auto now = Clock::now();
         const double elapsed = std::clamp(std::chrono::duration<double>(now - previous).count(), 0.0, 0.1);
         previous = now;
@@ -270,8 +364,8 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
         player.Runtime->AdvanceFrame(static_cast<float>(elapsed), steps, static_cast<float>(fixedSeconds));
         player.Runtime->CompleteInputFrame();
         if (player.Viewport) {
-            auto* startupRoot = player.Runtime->QueryGameObject(startupSceneID);
-            auto* activeScene = startupRoot ? startupRoot->GetScene() : player.Runtime->GetScene(0);
+            auto* activeScene = FindActiveScene(player, startupSceneID);
+            BindInputScene(player, activeScene);
             if (!RenderFrame(player, activeScene, presented, error)) return false;
         }
         if (!player.Runtime->EndFrame(error)) return false;

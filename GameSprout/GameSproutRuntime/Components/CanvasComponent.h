@@ -11,6 +11,8 @@ public:
     bool SetReferenceResolution(Vector2 value) override;
     float GetPixelsPerUnit() const override { return _PixelsPerUnit; }
     bool SetPixelsPerUnit(float value) override;
+    CanvasScaleSettings GetScaleSettings() const override { return _ScaleSettings; }
+    bool SetScaleSettings(const CanvasScaleSettings& value) override;
 
 protected:
     void OnCreate(IGameSproutRuntime*) override;
@@ -19,5 +21,6 @@ private:
     CanvasRenderMode _Mode = CanvasRenderMode::ScreenSpace;
     Vector2 _Resolution{1920.0f, 1080.0f};
     float _PixelsPerUnit = 100.0f;
+    CanvasScaleSettings _ScaleSettings;
 };
 }
