@@ -1,6 +1,7 @@
 #pragma once
 #include "SceneGizmo.h"
 #include "SceneUIRectTool.h"
+#include "IObjectEditing.h"
 #include "ISceneManager.h"
 #include "ISelectionManager.h"
 #include <functional>
@@ -13,7 +14,7 @@ enum class SceneEditingTool { View, Move, Rotate, Scale, Rect };
 class SceneViewportEditing final : public ISceneListener, public ISelectionListener {
 public:
     explicit SceneViewportEditing(SceneViewport& viewport):_Viewport(viewport) {}
-    void Bind(ISceneManager* scenes,ISelectionManager* selection,IUIAuthoring* uiAuthoring=nullptr);
+    void Bind(ISceneManager* scenes,ISelectionManager* selection,IUIAuthoring* uiAuthoring,IObjectEditing* objectEditing);
     void OnActiveSceneChanged() override;
     void OnSceneStateChanged() override;
     void OnAssetSelectionChanged(const std::vector<ProjectAssetSelection>&) override;
@@ -25,12 +26,12 @@ public:
     std::uint64_t UIScreenPreviewObjectID() const;
     bool Press(GameSproutRuntime::Vector2 logicalPixel,bool alt=false);
     bool Move(GameSproutRuntime::Vector2 logicalPixel,bool snap,bool shift=false,bool alt=false);
-    void ApplyPendingDrag();
+    void ApplyPendingAuthoringDrag();
     bool Release(GameSproutRuntime::Vector2 logicalPixel,bool snap,std::uint64_t& shadowPreviewID,bool shift=false,bool alt=false);
     void Cancel();
     void CancelUIDrag();
     void ClearHover();
-    void SetReadOnly(bool value);
+    void SetInteractionMode(bool authoring,bool live);
     bool DeleteSelection();
     bool IsDragging() const {return _Gizmo.IsDragging()||_UIRectTool.IsDragging();}
     bool IsDraggingUI() const {return _UIRectTool.IsDragging();}
@@ -58,10 +59,15 @@ private:
     void ApplyPendingUIDrag();
     void UpdateUICursor();
     void Report(const std::string& error);
+    bool BeginLiveDrag(GameSproutRuntime::IGameObject& object,const char* label,std::string& error);
+    void QueueLiveDragPreview();
+    void ApplyPendingLiveDrag();
+    void FinishLiveDrag(bool commit);
     SceneViewport& _Viewport;
     ISceneManager* _Scenes=nullptr;
     ISelectionManager* _Selection=nullptr;
     IUIAuthoring* _UIAuthoring=nullptr;
+    IObjectEditing* _ObjectEditing=nullptr;
     GameSproutRuntime::IScene* _ActiveScene=nullptr;
     SceneObjectSelection _SelectionSnapshot;
     bool _SceneSubscribed=false,_SelectionSubscribed=false,_TransformEditActive=false;
@@ -72,12 +78,15 @@ private:
     SceneUIRectTool _UIRectTool;
     SceneGizmoView _DragView;
     std::optional<SceneTransformState> _PendingDrag;
+    ObjectEditTarget _LiveDragTarget;
+    SceneTransformState _LiveDragLast;
     std::optional<UIRectAuthoringValues> _PendingUIDrag;
     bool _DragChanged=false;
     bool _UIDragPreviewQueued=false;
+    bool _LiveDragPreviewQueued=false;
     GameSproutRuntime::Vector2 _HoverPixel;
     bool _HasHover=false;
-    bool _Ready=false,_Snap=false,_ReadOnly=false;
+    bool _Ready=false,_Snap=false,_ReadOnly=false,_LiveEditing=false;
     bool _ShowAllColliders=false;
     bool _ShowChildColliders=false;
     bool _ExternalToolActive=false;

@@ -4,6 +4,7 @@
 #include "SceneToolRouter.h"
 #include "SceneViewChrome.h"
 #include "ISceneManager.h"
+#include "IObjectEditing.h"
 #include "ISelectionManager.h"
 #include "IUIAuthoring.h"
 #include "IRuntimeAssets.h"
@@ -39,7 +40,8 @@ bool SceneViewUI::Initialize(GameSproutEditor::GameSproutViewApi* editor) {
     _Viewport->StatusChanged=[this](const std::string& message){if(_Chrome&&_Viewport)_Chrome->SetStatus(message,_Viewport->GetRenderError());};
     _Viewport->FocusRequested=[this]{return FocusSelection();};
     _Viewport->Initialize(_Runtime,_RuntimeAssets?_RuntimeAssets->GetResourceProvider():nullptr);
-    _Viewport->BindEditingServices(_Scenes,_Selection,editor?editor->GetGameSproutModule<IUIAuthoring>("UIAuthoring"):nullptr);
+    _Viewport->BindEditingServices(_Scenes,_Selection,editor?editor->GetGameSproutModule<IUIAuthoring>("UIAuthoring"):nullptr,
+        editor?editor->GetGameSproutModule<IObjectEditing>("ObjectEditing"):nullptr);
     _Viewport->Editing().ToolChanged=[this](SceneEditingTool tool){
         if(!_Ui||!_Window)return;
         switch(tool) {
@@ -116,7 +118,7 @@ void SceneViewUI::Release(GameSproutEditor::GameSproutViewApi*) {
     if(_DockerVisibilitySubscribed && _Docker)_Docker->UnregisterContentVisibilityCallback(this);
     _DockerVisibilitySubscribed=false;_DockerContentVisible=false;
     if(_PlaySubscribed&&_PlayMode)_PlayMode->UnregisterPlayModeListener(this);
-    _PlaySubscribed=false;_PlayMode=nullptr;_CanEdit=true;
+    _PlaySubscribed=false;_PlayMode=nullptr;_ToolPlayStateKnown=false;
     if(_FrameSubscribed && _Host)_Host->UnregisterFrameListener(this);
     if(_SceneSubscribed && _Scenes)_Scenes->UnregisterSceneListener(this);
     _FrameSubscribed=false;_SceneSubscribed=false;_ActiveScene=nullptr;_Host=nullptr;
@@ -213,10 +215,11 @@ void SceneViewUI::OnPlayModeStateChanged(const PlayModeState& state) {
     if(_Viewport)_Viewport->RequestRender();
     if(_Viewport&&_ToolPlayStateKnown&&_ToolPlayState!=state.State)_Viewport->Tools().Deactivate();
     _ToolPlayStateKnown=true;_ToolPlayState=state.State;
-    _CanEdit=state.State==EditorPlayState::Edit;
     if(!_Window||!_Ui)return;
-    if(_Viewport)_Viewport->Editing().SetReadOnly(!_CanEdit);
-    if(_Chrome)_Chrome->SetEditingEnabled(_CanEdit);
+    const bool authoring=state.State==EditorPlayState::Edit;
+    const bool live=state.State==EditorPlayState::Playing||state.State==EditorPlayState::Paused;
+    if(_Viewport)_Viewport->Editing().SetInteractionMode(authoring,live);
+    if(_Chrome)_Chrome->SetEditingEnabled(authoring,live);
     QWidget* controls[]={_Ui->moveToolButton,_Ui->rotateToolButton,_Ui->scaleToolButton,_Ui->rectToolButton,_Ui->spaceCombo,_Ui->pivotCombo};
-    for(QWidget* control:controls)control->setEnabled(_CanEdit);
+    for(QWidget* control:controls)control->setEnabled(authoring||live);
 }

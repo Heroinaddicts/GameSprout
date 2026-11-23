@@ -33,7 +33,8 @@ class RuntimePhysicsSystem {
         std::map<uint64_t, BodyRecord> Bodies;
         std::vector<uint64_t> DynamicObjects;
         std::vector<uint64_t> DynamicBodies;
-        std::set<uint64_t> StaticTransforms;
+        std::map<uint64_t, std::vector<uint64_t>> StaticBodiesByTransform;
+        std::set<uint64_t> DirtyStaticTransforms;
         std::map<uint64_t, std::vector<uint64_t>> CollidersByObject;
         bool SnapshotKnown = false;
         bool BackendNeedsStep = false;
@@ -78,7 +79,8 @@ class RuntimePhysicsSystem {
     void SyncResources();
     IComponent *ResolveComponent(uint64_t object, uint64_t component) const;
     PhysicsColliderState *ResolveCollider(const ColliderIdentity &) const;
-    bool BuildRequests(IScene *, SceneWorld &, bool reuseStatic, std::map<uint64_t, BodyRequest> &, std::string &);
+    bool BuildRequests(IScene *, SceneWorld &, bool reuseStatic, const std::set<uint64_t> &affectedStaticBodies,
+                       std::map<uint64_t, BodyRequest> &, std::string &);
     bool Synchronize(IScene *, SceneWorld &, float, std::string &);
     bool AppendCollider(BodyRequest &, PhysicsColliderState &, std::string &);
     bool PublishTransforms(SceneWorld &, std::string &);

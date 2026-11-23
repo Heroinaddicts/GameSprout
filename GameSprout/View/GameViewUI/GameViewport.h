@@ -20,6 +20,8 @@ public:
     void Shutdown();
     void RetryRendering();
     void SetGameplayInputEnabled(bool enabled);
+    void SetTransformPreview(std::uint64_t objectID,bool active);
+    void ClearTransformPreview();
     void ReleaseGameInput();
     bool IsRenderingAvailable() const {return _Renderer!=nullptr;}
     GameSproutRuntime::Vector2 GetOutputSize() const {return _OutputSize;}
@@ -63,6 +65,8 @@ private:
     bool _NeedsRender=true,_RuntimeSubscribed=false;
     bool _AnimatedMaterials=false;
     std::uint64_t _SceneID=0;
+    std::uint64_t _TransformPreviewID=0;
+    bool _TransformPreviewActive=false;
     GameSproutRuntime::Vector2 _OutputSize;
     std::string _Status;
 };

@@ -49,10 +49,12 @@ public:
     bool SkipNextFrame=false;
     bool ReuseShadowsWhileNavigating=false;
     bool DrawScene=false,DrawUI=false;
+    std::uint64_t TransformPreviewObjectID=0;
     bool Render(const GameSproutRuntime::RenderView& view) override {
         Check(!view.WaitForSurface,"Editor view requested a blocking surface acquisition");
         ++Count;
         ReuseShadowsWhileNavigating=view.ReuseShadowsWhileNavigating;
+        TransformPreviewObjectID=view.TransformPreviewObjectID;
         DrawScene=view.DrawScene;
         DrawUI=view.DrawUI;
         Camera={};
@@ -217,6 +219,19 @@ int main(int argc,char** argv) {
             tick();
             Check(counts[sceneHandle]==settledScene&&counts[gameHandle]==settledGame,
                 "Resize settle kept drawing after the exact fit");
+            const auto previewObject=model->GetInstanceID();
+            game.SetTransformPreview(previewObject,true);tick();
+            Check(gameRenderer->TransformPreviewObjectID==previewObject&&!gameRenderer->ReuseShadowsWhileNavigating,
+                "Game did not render the live transform preview with its own camera policy");
+            gameRenderer->SkipNextFrame=true;
+            game.SetTransformPreview(previewObject,false);tick();
+            Check(gameRenderer->TransformPreviewObjectID==previewObject,"Game dropped the final preview before submission");
+            tick();
+            Check(gameRenderer->TransformPreviewObjectID==previewObject,"Game did not retry the final preview on a free surface");
+            tick();
+            Check(gameRenderer->TransformPreviewObjectID==0,"Game did not return to its normal shadow policy");
+            const auto finishedGame=counts[gameHandle];tick();
+            Check(counts[gameHandle]==finishedGame,"Completed transform preview kept requesting Game frames");
             scene.SetShadowReuseWhileNavigatingEnabled(false);tick();
             scroll(-120);
             checkFinalShadowDraw("Wheel navigation reused shadows with reuse disabled");

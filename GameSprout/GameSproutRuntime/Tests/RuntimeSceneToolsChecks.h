@@ -58,6 +58,9 @@ static void CheckSceneTools(GameSproutRuntime::IGameSproutRuntime& runtime,GameS
     near->AddComponent<GameSproutRuntime::IMeshComponent>()->SetMesh(object.GetComponent<GameSproutRuntime::IMeshComponent>()->GetMesh());
     near->AddComponent<GameSproutRuntime::IMeshRendererComponent>();
     Check(renderer.Raycast(&scene,ray,hit) && hit.ObjectID==near->GetInstanceID() && std::fabs(hit.Distance-2.5f)<1e-5f,"Raycast returned traversal-first instead of closest triangle");
+    Check(near->SetLayer(31),"Cannot configure foreground picking layer");
+    Check(renderer.Raycast(&scene,ray,hit,1u) && hit.ObjectID==object.GetInstanceID(),"A nearer object on an excluded layer intercepted picking");
+    Check(renderer.Raycast(&scene,ray,hit,std::uint32_t{1}<<31) && hit.ObjectID==near->GetInstanceID(),"Raycast required the Default layer in the mask");
     Check(scene.DestroyGameObject(near),"Cannot clean nearest pick fixture");
     bool rejected=false;scene.ForeachChild([&](GameSproutRuntime::IGameObject*) {rejected=!renderer.Raycast(&scene,ray,hit);});
     Check(rejected,"Raycast ran inside Runtime traversal callback");

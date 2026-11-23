@@ -3,6 +3,7 @@
 #include "SceneViewport.h"
 #include "SceneGizmo.h"
 #include "IHierarchyUI.h"
+#include "IPlayMode.h"
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QMouseEvent>
@@ -35,26 +36,48 @@ public:
     bool LoadTexture(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::TextureRenderData& output,std::string& error) override{output={};error="No textures in interaction fixture";return false;}
     bool LoadMaterial(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::MaterialRenderData& output,std::string& error) override{output={};output.DoubleSided=true;error.clear();return true;}
 };
+class SceneInteractionEditMode final : public IPlayMode {
+public:
+    PlayModeState GetState() const override{return {};}
+    bool Play(std::string&) override{return false;}
+    bool Pause(std::string&) override{return false;}
+    bool Resume(std::string&) override{return false;}
+    bool Step(std::string&) override{return false;}
+    bool Stop(std::string&) override{return false;}
+    bool RegisterPlayModeListener(IPlayModeListener* listener) override{return listener!=nullptr;}
+    void UnregisterPlayModeListener(IPlayModeListener*) override{}
+    bool Initialize(GameSproutEditor::GameSproutModuleApi*) override{return true;}
+    bool Launch(GameSproutEditor::GameSproutModuleApi*) override{return true;}
+    void Release(GameSproutEditor::GameSproutModuleApi*) override{}
+};
 class SceneInteractionFixture final {
 public:
     SceneInteractionFixture()=default;
     ~SceneInteractionFixture(){Shutdown();}
     void Initialize() {
         Services.Initialize();auto& editor=Services.Editor;
+        editor.Modules["PlayMode"]=&EditMode;
+        auto* editing=LoadModule("ObjectEditing");editor.Modules["ObjectEditing"]=editing;
+        GameSproutEditor::GameSproutEditorFinal::Before(editing,&Services.ModuleAPI);
+        Check(GameSproutEditor::GameSproutEditorFinal::Initialize(editing,&Services.ModuleAPI),"ObjectEditing initialization failed");
+        Editing=editing;
+        Check(GameSproutEditor::GameSproutEditorFinal::Launch(editing,&Services.ModuleAPI),"ObjectEditing launch failed");
         IDE=static_cast<IIDEWindow*>(LoadView("IDEWindow"));editor.IDE=IDE;
         Check(GameSproutEditor::GameSproutEditorFinal::Initialize(IDE,&editor)&&GameSproutEditor::GameSproutEditorFinal::Launch(IDE,&editor),"Scene editing IDE startup failed");
-        for(const std::string& name:{"SceneViewUI","InspectorUI","HierarchyUI"}) {
+        for(const std::string& name:{"SceneViewUI","InspectorUI","SceneObjectUI","HierarchyUI"}) {
             auto* view=LoadView(name);editor.Views[name]=view;Views.push_back(view);
         }
         for(auto* view:Views)GameSproutEditor::GameSproutEditorFinal::Before(view,&editor);
         for(auto* view:Views)Check(GameSproutEditor::GameSproutEditorFinal::Initialize(view,&editor),"Scene editing view initialization failed");
         for(auto* view:Views)Check(GameSproutEditor::GameSproutEditorFinal::Launch(view,&editor),"Scene editing view launch failed");
+        for(auto* view:Views)GameSproutEditor::GameSproutEditorFinal::Finished(view,&editor);
         SceneView=static_cast<ISceneViewUI*>(editor.Views["SceneViewUI"]);IDE->Show();SceneView->Show();QCoreApplication::processEvents();
         for(QWidget* window:QApplication::topLevelWidgets())if(auto* host=qobject_cast<QMainWindow*>(window))if(auto* dock=host->findChild<QDockWidget*>("Scene")) {
             Host=host;SceneDock=dock;Viewport=dock->findChild<SceneViewport*>("sceneViewport");if(Viewport)break;
         }
         Check(Host&&Viewport,"Real Scene editing native viewport missing");InspectorDock=Host->findChild<QDockWidget*>("Inspector");Check(InspectorDock,"Inspector missing");
         Viewport->Initialize(Services.Editor._Runtime,&Geometry);
+        Viewport->BindEditingServices(Services.Scenes,Services.Selection);
         Host->resize(1440,900);Host->show();Host->raise();Host->activateWindow();
         IDE->QueryDocker("Inspector")->Layout(eDockerLayout::Right);
         Check(IDE->QueryDocker("Hierarchy")->Split(IDE->QueryDocker("Scene"),Qt::Horizontal),"Cannot lay out interactive Scene");
@@ -79,6 +102,7 @@ public:
         for(auto iterator=Views.rbegin();iterator!=Views.rend();++iterator)GameSproutEditor::GameSproutEditorFinal::Release(*iterator,&Services.Editor);
         Views.clear();Services.Editor.Views.clear();SceneView=nullptr;
         if(IDE){GameSproutEditor::GameSproutEditorFinal::Release(IDE,&Services.Editor);IDE=nullptr;}
+        if(Editing){GameSproutEditor::GameSproutEditorFinal::Release(Editing,&Services.ModuleAPI);Editing=nullptr;}
         Host=nullptr;Viewport=nullptr;SceneDock=nullptr;InspectorDock=nullptr;
         Services.Shutdown();
     }
@@ -106,7 +130,9 @@ public:
         auto image=screen->grabWindow(Host->winId(),origin.x(),origin.y(),Viewport->width(),Viewport->height()).toImage();Check(!image.isNull(),"Native Metal capture failed");return image;
     }
     SceneInteractionGeometry Geometry;
+    SceneInteractionEditMode EditMode;
     SceneEditingServices Services;
+    GameSproutEditor::IGameSproutModule* Editing=nullptr;
     IIDEWindow* IDE=nullptr;
     ISceneViewUI* SceneView=nullptr;
     std::vector<GameSproutEditor::IGameSproutView*> Views;

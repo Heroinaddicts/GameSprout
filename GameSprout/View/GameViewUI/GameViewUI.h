@@ -7,6 +7,7 @@
 #include "ISceneManager.h"
 #include "IAnimationPreview.h"
 #include "IRuntimeAssets.h"
+#include "IObjectEditing.h"
 #include <QMetaObject>
 #include <map>
 
@@ -24,7 +25,7 @@ class IRuntimeAssets;
 class IAnimationPreview;
 class GameViewport;
 
-class GameViewUI : public IGameViewUI, public IRuntimeFrameListener, public ISceneListener, public IAnimationPreviewListener, public IPlayModeListener,public IRuntimeAssetsListener {
+class GameViewUI : public IGameViewUI, public IRuntimeFrameListener, public ISceneListener, public IAnimationPreviewListener, public IPlayModeListener,public IRuntimeAssetsListener,public IObjectEditingListener {
 public:
     ~GameViewUI() override;
 
@@ -37,6 +38,7 @@ public:
     void OnAnimationPreviewReset() override;
     void OnClipPreviewStateChanged(std::uint64_t,const GameSproutRuntime::AnimationClipPlaybackState&) override;
     void OnRuntimeResourcesChanged(std::uint64_t) override;
+    void OnObjectPropertiesChanged(const ObjectEditEvent&) override;
     GameSproutRuntime::Vector2 GetViewportSize() const override;
     bool RegisterViewportSizeCallback(const void*, const fViewportSizeCallback&) override;
     void UnregisterViewportSizeCallback(const void*) override;
@@ -68,6 +70,8 @@ private:
     GameSproutRuntime::IGameSproutRuntime* _Runtime=nullptr;
     IAnimationPreview* _Preview=nullptr;
     IRuntimeAssets* _Resources=nullptr;
+    IObjectEditing* _Editing=nullptr;
+    bool _EditingSubscribed=false;
     bool _Attached=false;
 };
 #endif //__GameViewUI_h__

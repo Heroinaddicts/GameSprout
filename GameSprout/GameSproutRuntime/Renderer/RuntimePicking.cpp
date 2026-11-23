@@ -40,7 +40,7 @@ bool Renderer::Raycast(IScene* scene,const Ray& worldRay,SceneRaycastHit& hit,st
     QueryScope query(_Rendering);RuntimeOperation operation(_Runtime);
     try {
         SyncRevision();
-        if(!(cullingMask&1u)) return false;
+        if(!cullingMask) return false;
         const PickingMath::Vector origin(worldRay.Origin),worldDirection(direction);
         const bool useDrawGeometry=_ObjectSnapshotKnown&&_ObjectSceneID==scene->GetInstanceID()&&
             _ObjectSceneRevision==static_cast<const Scene&>(*scene).GetRenderRevision();
@@ -50,6 +50,7 @@ bool Renderer::Raycast(IScene* scene,const Ray& worldRay,SceneRaycastHit& hit,st
         while(!pending.empty()) {
             auto* object=pending.back();pending.pop_back();
             for(std::size_t index=object->GetChildCount();index>0;--index) pending.push_back(object->GetChild(index-1));
+            if(!(cullingMask&(std::uint32_t{1}<<object->GetLayer())))continue;
             auto* renderer=object->GetComponent<IMeshRendererComponent>();
             auto* component=object->GetComponent<IMeshComponent>();
             if(!renderer || !component || !object->IsActiveInHierarchy() || !renderer->IsVisible() ||

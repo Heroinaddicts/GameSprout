@@ -162,7 +162,7 @@ public:
     // 蒙皮对象使用当前已求值姿态；Render 和查询均不推进动画时间。
     // 精确、双面的最近 Mesh 三角形拾取；跳过非激活/不可见/缺失资源及奇异变换。
     // 无命中返回 false 且输出清空；非法参数也返回 false，GetLastError 给出原因。
-    // 当前对象统一位于第 0 层，cullingMask 的最低位控制 Mesh 查询。
+    // cullingMask 根据每个对象的 Layer 筛选可拾取的 Mesh。
     virtual bool Raycast(IScene* scene, const Ray& worldRay, SceneRaycastHit& hit,
                          std::uint32_t cullingMask = ~0u) = 0;
     // 从Mesh引用顶点（蒙皮对象为当前变形顶点）的本地AABB变换得到保守世界AABB；其中心=M*localCenter。

@@ -75,8 +75,9 @@ public:
     IObjectEditing* Editing=nullptr;
     int Count=0;
     bool ReentryRejected=false;
+    ObjectEditEvent Last;
     void OnObjectPropertiesChanged(const ObjectEditEvent& event)override{
-        ++Count;std::string error;ReentryRejected=!Editing->CanEdit(event.Target,error);
+        Last=event;++Count;std::string error;ReentryRejected=!Editing->CanEdit(event.Target,error);
     }
 };
 int main(int argc,char** argv) {
@@ -98,6 +99,19 @@ int main(int argc,char** argv) {
         Check(editing.SetLayer(target,3,true,error)&&scenes.LayerWrites==1,"Edit Layer did not delegate");
         scenes.Playing=true;mode.State.State=EditorPlayState::Playing;
         Check(editing.EditObject(target,"Play",position(2),position(1),error)&&scenes.AuthorWrites==1&&object->GetTransform()->GetLocalPosition().X==2,error);
+        Check(completion.Last.EditPhase==ObjectEditEvent::Phase::Changed,"One-shot play edit opened a transform preview");
+        Check(editing.BeginContinuousEdit(target,"Play transform",position(2),error)&&
+            editing.PreviewContinuousEdit(position(3),position(2),error),error);
+        Check(completion.Last.EditPhase==ObjectEditEvent::Phase::TransformPreview&&completion.Last.Playing&&
+            completion.Last.Target==target,"Play transform preview did not publish its target");
+        Check(editing.CommitContinuousEdit(position(3),error)&&
+            completion.Last.EditPhase==ObjectEditEvent::Phase::TransformPreviewFinished&&
+            object->GetTransform()->GetLocalPosition().X==3,"Committing a play transform did not finish its preview");
+        Check(editing.BeginContinuousEdit(target,"Cancel play transform",position(3),error)&&
+            editing.PreviewContinuousEdit(position(4),position(3),error)&&editing.CancelContinuousEdit(error)&&
+            completion.Last.EditPhase==ObjectEditEvent::Phase::TransformPreviewFinished&&
+            object->GetTransform()->GetLocalPosition().X==3,"Cancelling a play transform did not finish and restore its preview");
+        Check(editing.EditObject(target,"Reset play transform",position(2),position(3),error),error);
         const auto failed=[](GameSproutRuntime::IGameObject& object,std::string& reason){object.GetTransform()->SetLocalPosition({7,0,0});reason="rejected";return false;};
         Check(!editing.EditObject(target,"Failure",failed,position(2),error)&&object->GetTransform()->GetLocalPosition().X==2,"Failed setter did not roll back");
         const auto throwing=[](GameSproutRuntime::IGameObject& object,std::string&)->bool{object.GetTransform()->SetLocalPosition({9,0,0});throw std::runtime_error("setter exception");};

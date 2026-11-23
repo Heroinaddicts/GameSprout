@@ -625,6 +625,35 @@ void CheckLayeredShadows(IGameSproutRuntime& runtime,IRuntimeViewport& viewport,
     other->GetTransform()->SetLocalPosition({2.7f,1.9f,2});
     checkRepair(Render(viewport,view),"Changing the preview caster");
     view.TransformPreviewObjectID=0;
+
+    // Both Play viewports can see unrelated gameplay transforms in the same
+    // frame as a drag. They must still repair only the affected static region.
+    for(auto* object:background)Check(object->SetStaticFlags(StaticFlags::ShadowCasterStatic),"Cannot mark repair fixture casters static");
+    auto* playingCaster=MeshObject(*scene,"Moving gameplay caster",2);
+    playingCaster->GetTransform()->SetLocalPosition({2.7f,-1.2f,2});
+    groupTransform->SetLocalPosition({});
+    settings.Shadows.CacheStaticCasters=true;
+    Check(sun->SetSettings(settings),"Cannot warm the layered Play repair reference");
+    Render(viewport,view);
+    groupTransform->SetLocalPosition({0,-.95f,0});
+    playingCaster->GetTransform()->SetLocalPosition({2.7f,-1.6f,2});
+    view.TransformPreviewObjectID=group->GetInstanceID();
+    checkRepair(Render(viewport,view),"First Play preview with a moving gameplay caster");
+
+    view.Camera.Position={.2f,0,5};
+    Check(TryMakeLookAt(view.Camera.Position,{.2f,0,0},{0,1,0},view.Camera.View),"Cannot shift Play preview camera");
+    groupTransform->SetLocalPosition({0,-.65f,0});
+    playingCaster->GetTransform()->SetLocalPosition({2.7f,-1.45f,2});
+    const auto playingPreview=Render(viewport,view);
+    Check(playingPreview.Statistics.StaticShadowMapUpdates==0&&playingPreview.Statistics.DynamicShadowDrawCalls>0,
+        "Covered gameplay camera motion redrew the static atlas during a drag");
+
+    view.Camera=fixedCamera;
+    view.TransformPreviewObjectID=0;
+    playingCaster->GetTransform()->SetLocalPosition({2.7f,-1.3f,2});
+    checkRepair(Render(viewport,view),"Play preview release with a moving gameplay caster");
+    Check(scene->DestroyGameObject(playingCaster),"Cannot remove the Play repair fixture caster");
+
     view.EnableGPUInstancing=true;
     for(auto* object:background)Check(scene->DestroyGameObject(object),"Cannot remove repair fixture caster");
 

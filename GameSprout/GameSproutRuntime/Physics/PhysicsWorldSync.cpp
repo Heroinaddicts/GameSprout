@@ -151,16 +151,19 @@ bool RuntimePhysicsSystem::AppendCollider(BodyRequest &request, PhysicsColliderS
     return true;
 }
 bool RuntimePhysicsSystem::BuildRequests(IScene *scene, SceneWorld &world, bool reuseStatic,
+                                         const std::set<uint64_t> &affectedStaticBodies,
                                          std::map<uint64_t, BodyRequest> &requests, std::string &error) {
     std::vector<IGameObject *> objects;
     if (reuseStatic) {
-        objects.reserve(world.DynamicObjects.size());
+        objects.reserve(world.DynamicObjects.size() + affectedStaticBodies.size());
         for (const auto id : world.DynamicObjects)
+            if (auto *object = _Runtime.QueryGameObject(id))
+                objects.push_back(object);
+        for (const auto id : affectedStaticBodies)
             if (auto *object = _Runtime.QueryGameObject(id))
                 objects.push_back(object);
     } else {
         world.DynamicObjects.clear();
-        world.StaticTransforms.clear();
         for (std::size_t i = 0; i < scene->GetChildCount(); ++i)
             objects.push_back(scene->GetChild(i));
         for (std::size_t i = 0; i < objects.size(); ++i) {
@@ -243,13 +246,8 @@ bool RuntimePhysicsSystem::BuildRequests(IScene *scene, SceneWorld &world, bool 
                         }
             }
             if (!attached) {
-                if (reuseStatic)
+                if (reuseStatic && !affectedStaticBodies.contains(node->ID))
                     continue;
-                // The collider's world pose also depends on all ancestors,
-                // including a Rigidbody above a disabled-body boundary.
-                for (auto *ancestor = node; ancestor; ancestor = ancestor->Parent)
-                    if (!world.StaticTransforms.insert(ancestor->ID).second)
-                        break;
             } else {
                 dynamic = true;
             }
@@ -269,12 +267,28 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
     const bool reuseStatic = world.SnapshotKnown && world.SnapshotRevision == revision &&
         world.Provider == _Provider && world.ResourceGeneration == _ResourceGeneration &&
         world.CollisionMatrix == matrix;
-    if (reuseStatic && world.DynamicBodies.empty())
+    if (reuseStatic && world.DynamicBodies.empty() && world.DirtyStaticTransforms.empty())
         return true;
-    world.SnapshotKnown = false;
+    std::set<uint64_t> dirtyTransforms;
+    dirtyTransforms.swap(world.DirtyStaticTransforms);
+    std::set<uint64_t> affectedStaticBodies;
+    if (reuseStatic)
+        for (const auto transform : dirtyTransforms) {
+            const auto found = world.StaticBodiesByTransform.find(transform);
+            if (found != world.StaticBodiesByTransform.end())
+                affectedStaticBodies.insert(found->second.begin(), found->second.end());
+        }
     std::map<uint64_t, BodyRequest> requests;
-    if (!BuildRequests(scene, world, reuseStatic, requests, error))
+    if (!BuildRequests(scene, world, reuseStatic, affectedStaticBodies, requests, error)) {
+        // A rejected preview has not touched the backend. Retry these
+        // transforms after the caller restores the previous values.
+        if (reuseStatic)
+            world.DirtyStaticTransforms.merge(dirtyTransforms);
+        else
+            world.SnapshotKnown = false;
         return false;
+    }
+    world.SnapshotKnown = false;
     if (!reuseStatic) {
         for (auto it = world.Bodies.begin(); it != world.Bodies.end();)
             if (!requests.count(it->first)) {
@@ -286,6 +300,7 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
             } else
                 ++it;
         world.DynamicBodies.clear();
+        world.StaticBodiesByTransform.clear();
         world.CollidersByObject.clear();
         world.BackendNeedsStep = true;
     }
@@ -293,6 +308,11 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
         if (!reuseStatic) {
             if (request.Rigidbody)
                 world.DynamicBodies.push_back(key);
+            else
+                // A static body's world pose depends on all ancestors, including
+                // a Rigidbody above a disabled Rigidbody boundary.
+                for (auto *ancestor = _Runtime.Find(request.Object); ancestor; ancestor = ancestor->Parent)
+                    world.StaticBodiesByTransform[ancestor->ID].push_back(key);
             for (const auto &shape : request.Description.Shapes) {
                 world.CollidersByObject[key].push_back(shape.Collider);
                 const auto owner = _Identities.at(shape.Collider).ObjectID;
@@ -314,6 +334,18 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
             }
             if (!world.Backend.PutBody(request.Description, error))
                 return false;
+            if (reuseStatic && !request.Rigidbody) {
+                // A moved mesh can switch between a prepared shape and an
+                // empty fallback. Keep raycast exclusions in sync.
+                if (request.Description.Shapes.empty()) {
+                    world.CollidersByObject.erase(key);
+                } else {
+                    auto &colliders = world.CollidersByObject[key];
+                    colliders.clear();
+                    for (const auto &shape : request.Description.Shapes)
+                        colliders.push_back(shape.Collider);
+                }
+            }
             BodyRecord record;
             record.Description = request.Description;
             for(auto &shape:record.Description.Shapes) {
@@ -333,9 +365,15 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
         }
         BodyRecord &record = found->second;
         if (request.Description.Motion == GPhysics::MotionType::Static) {
-            if (!PhysicsNear(record.LastWorld, request.World))
-                world.Backend.SetPose(key, request.Description.Transform, false, delta);
-            record.LastWorld = request.World;
+            if (!PhysicsNear(record.LastWorld, request.World)) {
+                if (!world.Backend.SetPose(key, request.Description.Transform, false, delta)) {
+                    error = "Cannot update static physics body pose";
+                    return false;
+                }
+                record.LastWorld = request.World;
+                world.BackendNeedsStep = true;
+            }
+            world.BackendNeedsStep |= rebuild;
             continue;
         }
         auto &rigid = *request.Rigidbody;

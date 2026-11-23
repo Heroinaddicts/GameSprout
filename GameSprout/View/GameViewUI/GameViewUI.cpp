@@ -19,6 +19,7 @@ void GameViewUI::BeforeInitialize(GameSproutEditor::GameSproutViewApi* editor) {
     _Runtime=editor?editor->_Runtime:nullptr;
     GetGameSproutModule(editor,_Preview,AnimationPreview);
     GetGameSproutModule(editor,_Resources,RuntimeAssets);
+    GetGameSproutModule(editor,_Editing,ObjectEditing);
 }
 bool GameViewUI::Initialize(GameSproutEditor::GameSproutViewApi* editor) {
     if(_Window)return true;
@@ -68,10 +69,12 @@ bool GameViewUI::Launch(GameSproutEditor::GameSproutViewApi*) {
     if(_Scenes)_SceneSubscribed=_Scenes->RegisterSceneListener(this);
     if(_Host)_FrameSubscribed=_Host->RegisterFrameListener(this);
     if(_Resources)_ResourcesSubscribed=_Resources->RegisterResourceListener(this);
+    if(_Editing)_EditingSubscribed=_Editing->RegisterEditingListener(this);
     if(_Preview)_PreviewSubscribed=_Preview->RegisterPreviewListener(this);
     if(_PlayMode){_PlaySubscribed=_PlayMode->RegisterPlayModeListener(this);OnPlayModeStateChanged(_PlayMode->GetState());}
     OnActiveSceneChanged();OnAnimationPreviewStateChanged(_Preview && _Preview->IsAnimationPreviewPlaying());
-    return _DockerVisibilitySubscribed && (!_Scenes || _SceneSubscribed) && _Host && _FrameSubscribed && (!_Preview || _PreviewSubscribed);
+    return _DockerVisibilitySubscribed && (!_Scenes || _SceneSubscribed) && _Host && _FrameSubscribed &&
+        (!_Preview || _PreviewSubscribed) && (!_Editing || _EditingSubscribed);
 }
 void GameViewUI::LaunchFinished(GameSproutEditor::GameSproutViewApi*){}
 void GameViewUI::Show(){if(_Window)_Window->show();if(_Docker)_Docker->Activate();}
@@ -85,7 +88,17 @@ void GameViewUI::OnRuntimeFrame(const RuntimeFrameEvent& event) {
 }
 void GameViewUI::OnActiveSceneChanged() {
     _ActiveScene=_Scenes?_Scenes->GetMainScene():nullptr;
-    if(_Viewport)_Viewport->RequestRender();
+    if(_Viewport) {
+        _Viewport->ClearTransformPreview();
+        _Viewport->RequestRender();
+    }
+}
+void GameViewUI::OnObjectPropertiesChanged(const ObjectEditEvent& event) {
+    if(!_Viewport||!_ActiveScene||event.Target.SceneID!=_ActiveScene->GetInstanceID())return;
+    if(event.EditPhase==ObjectEditEvent::Phase::TransformPreview)
+        _Viewport->SetTransformPreview(event.Target.ObjectID,true);
+    else if(event.EditPhase==ObjectEditEvent::Phase::TransformPreviewFinished)
+        _Viewport->SetTransformPreview(event.Target.ObjectID,false);
 }
 void GameViewUI::OnAnimationPreviewStateChanged(bool scenePlaying) {
     if(_Viewport)_Viewport->RequestRender();
@@ -113,6 +126,8 @@ void GameViewUI::UnregisterViewportSizeCallback(const void* owner) {
     _ViewportSizeConnections.erase(found);
 }
 void GameViewUI::Release(GameSproutEditor::GameSproutViewApi*) {
+    if(_EditingSubscribed&&_Editing)_Editing->UnregisterEditingListener(this);
+    _EditingSubscribed=false;_Editing=nullptr;
     for (const auto& [owner, connection] : _ViewportSizeConnections) QObject::disconnect(connection);
     _ViewportSizeConnections.clear();
     if(_ResourcesSubscribed&&_Resources)_Resources->UnregisterResourceListener(this);

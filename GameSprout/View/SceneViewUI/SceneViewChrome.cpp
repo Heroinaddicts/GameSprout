@@ -104,11 +104,11 @@ float SceneViewChrome::ScaleSnap()const{return float(_SnapUi->scaleSnapSpin->val
 bool SceneViewChrome::MaterialPreviewEnabled()const{return _OverflowUi->materialPreviewCheck->isChecked();}
 bool SceneViewChrome::ShadowReuseEnabled()const{return _OverflowUi->reuseNavigationShadowsCheck->isChecked();}
 void SceneViewChrome::SetShadowReuseEnabled(bool enabled){_OverflowUi->reuseNavigationShadowsCheck->setChecked(enabled);}
-void SceneViewChrome::SetEditingEnabled(bool enabled) {
-    if(_Snap)_Snap->setEnabled(enabled);
-    _Window.snapSettingsButton->setEnabled(enabled);
-    _OverflowUi->snapMenuButton->setEnabled(enabled);
-    _OverflowUi->materialPreviewCheck->setEnabled(enabled);
+void SceneViewChrome::SetEditingEnabled(bool authoring,bool live) {
+    if(_Snap)_Snap->setEnabled(authoring||live);
+    _Window.snapSettingsButton->setEnabled(authoring||live);
+    _OverflowUi->snapMenuButton->setEnabled(authoring||live);
+    _OverflowUi->materialPreviewCheck->setEnabled(authoring);
 }
 void SceneViewChrome::SetStatus(const std::string& status,const std::string& diagnostic) {
     _Status=QString::fromStdString(status);

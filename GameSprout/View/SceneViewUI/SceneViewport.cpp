@@ -29,7 +29,8 @@ SceneViewport::SceneViewport(QWidget* parent):QWidget(parent) {
     }
 }
 SceneViewport::~SceneViewport(){Shutdown();delete _Tools;_Tools=nullptr;delete _Editing;_Editing=nullptr;}
-void SceneViewport::BindEditingServices(ISceneManager* scenes,ISelectionManager* selection,IUIAuthoring* uiAuthoring){_Editing->Bind(scenes,selection,uiAuthoring);_Tools->Bind(scenes,selection);}
+void SceneViewport::BindEditingServices(ISceneManager* scenes,ISelectionManager* selection,IUIAuthoring* uiAuthoring,
+    IObjectEditing* objectEditing){_Editing->Bind(scenes,selection,uiAuthoring,objectEditing);_Tools->Bind(scenes,selection);}
 QPaintEngine* SceneViewport::paintEngine() const{return IsHeadless()?QWidget::paintEngine():nullptr;}
 void SceneViewport::Initialize(GameSproutRuntime::IGameSproutRuntime* runtime,GameSproutRuntime::IRuntimeResourceProvider* resources) {
     Shutdown();_Runtime=runtime;_Initialized=true;_Resources=resources;
@@ -197,7 +198,7 @@ void SceneViewport::RenderScene(GameSproutRuntime::IScene* scene,bool grid,float
     if(!EnsureRendering())return;
     _Rendering=true;
     struct Guard{bool& Value;~Guard(){Value=false;}} guard{_Rendering};
-    _Editing->ApplyPendingDrag();
+    _Editing->ApplyPendingAuthoringDrag();
     GameSproutRuntime::RenderView view;
     view.Scene=scene;view.DrawGrid=grid;
     view.WaitForSurface=false;

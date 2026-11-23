@@ -24,11 +24,11 @@ static std::size_t SceneObjectCount(GameSproutRuntime::IGameObject* object) {
     std::size_t result=1;for(std::size_t index=0;index<object->GetChildCount();++index)result+=SceneObjectCount(object->GetChild(index));return result;
 }
 static void CheckInspectorPosition(SceneInteractionFixture& fixture,GameSproutRuntime::IGameObject& object) {
-    auto* id=fixture.InspectorDock->findChild<QLineEdit*>("localIDEdit");
+    auto* name=fixture.InspectorDock->findChild<QLineEdit*>("objectNameEdit");
     auto* x=fixture.InspectorDock->findChild<QLineEdit*>("transformPositionXEdit");
     auto* y=fixture.InspectorDock->findChild<QLineEdit*>("transformPositionYEdit");
     auto* z=fixture.InspectorDock->findChild<QLineEdit*>("transformPositionZEdit");
-    Check(id&&id->text().toULongLong()==object.GetInstanceID()&&x&&y&&z,"Picked object was not bound to the real Inspector");
+    Check(name&&name->isVisible()&&name->text()==QString::fromStdString(object.GetName())&&x&&y&&z,"Picked object was not bound to the real Inspector");
     Check(CloseVector({x->text().toFloat(),y->text().toFloat(),z->text().toFloat()},object.GetTransform()->GetLocalPosition(),.001f),"Inspector did not update the current Runtime preview");
 }
 static void SetMode(SceneInteractionFixture& fixture,const char* name,int index) {
@@ -96,21 +96,24 @@ static int RedPixels(const QImage& image,const QPointF& logical,QSize logicalSiz
     return result;
 }
 static void CheckPickingAndOverlay(SceneInteractionFixture& fixture) {
-    auto* scenes=fixture.Services.Scenes;auto* back=fixture.Mesh("Back",{0,0,-2});auto* front=fixture.Mesh("Front",{0,0,1});
-    auto* miss=fixture.Mesh("AABB is not a triangle hit",{0,0,2},3);fixture.Settle();
-    fixture.Select(nullptr);fixture.Click({-.3f,.25f,1});
+    // The camera is at z=-8 and faces +Z. Insert the rear mesh first so
+    // selecting the first triangle encountered in the tree fails the check.
+    auto* scenes=fixture.Services.Scenes;auto* back=fixture.Mesh("Back",{0,0,2});auto* front=fixture.Mesh("Front",{0,0,-1});
+    auto* miss=fixture.Mesh("AABB is not a triangle hit",{0,0,-2},3);fixture.Settle();
+    const GameSproutRuntime::Vector3 clickPoint{-.3f,.25f,-1};
+    fixture.Select(nullptr);fixture.Click(clickPoint);
     Check(fixture.Services.Selection->GetSceneObjectSelection().ObjectID==front->GetInstanceID(),"Scene click did not select the nearest actual triangle");
     CheckInspectorPosition(fixture,*front);
     auto* hierarchy=static_cast<IHierarchyUI*>(fixture.Services.Editor.Views["HierarchyUI"]);
     Check(hierarchy->GetSelectedObjectID()==front->GetInstanceID(),"Viewport pick did not synchronize the real Hierarchy");
-    front->SetActive(false);fixture.Select(nullptr);fixture.Click({-.3f,.25f,1});
+    front->SetActive(false);fixture.Select(nullptr);fixture.Click(clickPoint);
     Check(fixture.Services.Selection->GetSceneObjectSelection().ObjectID==back->GetInstanceID(),"Inactive foreground pick expected Back="+std::to_string(back->GetInstanceID())+" got="+std::to_string(fixture.Services.Selection->GetSceneObjectSelection().ObjectID));
-    front->SetActive(true);front->GetComponent<GameSproutRuntime::IMeshRendererComponent>()->SetVisible(false);fixture.Select(nullptr);fixture.Click({-.3f,.25f,1});
+    front->SetActive(true);front->GetComponent<GameSproutRuntime::IMeshRendererComponent>()->SetVisible(false);fixture.Select(nullptr);fixture.Click(clickPoint);
     Check(fixture.Services.Selection->GetSceneObjectSelection().ObjectID==back->GetInstanceID(),"Invisible foreground mesh intercepted selection");
     front->GetComponent<GameSproutRuntime::IMeshRendererComponent>()->SetVisible(true);
-    auto* clipped=fixture.Mesh("Before near clip",{0,0,7.99f});fixture.Select(nullptr);fixture.Click({-.3f,.25f,1});
+    auto* clipped=fixture.Mesh("Before near clip",{0,0,-7.99f});fixture.Select(nullptr);fixture.Click(clickPoint);
     Check(fixture.Services.Selection->GetSceneObjectSelection().ObjectID==front->GetInstanceID(),"Geometry before the camera near plane intercepted a visible mesh pick");
-    clipped->SetActive(false);const auto camera=fixture.SceneView->GetCameraState();const auto pickPixel=fixture.Project({-.3f,.25f,1});
+    clipped->SetActive(false);const auto camera=fixture.SceneView->GetCameraState();const auto pickPixel=fixture.Project(clickPoint);
     auto farCamera=camera;farCamera.FarPlane=5;Check(fixture.SceneView->SetCameraState(farCamera),"Cannot shorten Scene camera far plane");fixture.Select(nullptr);fixture.Settle();fixture.ClickPixel(pickPixel);
     Check(fixture.Services.Selection->GetSceneObjectSelection().ObjectID==0,"Geometry beyond the camera far plane intercepted selection");
     Check(fixture.SceneView->SetCameraState(camera),"Cannot restore Scene camera far plane");

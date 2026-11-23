@@ -30,6 +30,10 @@ int main(int argc,char** argv){
         Check(runtime->BeginConstruction(error),error);
         auto* parent=scene->CreateGameObject("Parent");auto* ground=scene->CreateGameObject("Ground",parent);
         auto* collider=ground->AddComponent<IBoxColliderComponent>();
+        auto* nested=scene->CreateGameObject("Nested",parent);
+        auto* secondGround=scene->CreateGameObject("Second ground",nested);
+        secondGround->GetTransform()->SetLocalPosition({3,0,0});
+        Check(secondGround->AddComponent<IBoxColliderComponent>(),"Cannot create nested static collider");
         ColliderSettings settings=collider->GetColliderSettings();
         settings.Material={"0123456789abcdef0123456789abcdef",1};Check(collider->SetColliderSettings(settings),"Material binding failed");
         for(unsigned index=0;index<1000;++index){
@@ -47,6 +51,30 @@ int main(int argc,char** argv){
         Check(provider.MaterialLoads==1,"Unchanged static scene reloaded its material");
         parent->GetTransform()->SetLocalPosition({0,2,0});
         Check(ray()&&hit.Distance>2.4f&&hit.Distance<2.6f,"Static parent transform remained stale");
+        const auto secondRay=[&](float x){
+            return runtime->Raycast(scene,{{x,5,0},{0,-1,0}},20,hit,query,error);
+        };
+        Check(secondRay(3)&&hit.Collider.ObjectID==secondGround->GetInstanceID()&&
+              hit.Distance>2.4f&&hit.Distance<2.6f,"Static parent update missed a second collider");
+        nested->GetTransform()->SetLocalPosition({1,0,0});
+        secondGround->GetTransform()->SetLocalScale({2,2,2});
+        Check(!secondRay(2.75f)&&secondRay(4)&&hit.Distance>1.9f&&hit.Distance<2.1f,
+              "Batched static changes did not update both position and collider dimensions");
+        query.IgnoredObjectIDs={secondGround->GetInstanceID()};
+        Check(!secondRay(4),"Moving a static collider lost its raycast ignore mapping");
+        query.IgnoredObjectIDs.clear();
+        Check(nested->SetParent(scene,false),"Cannot reparent static collider subtree");
+        parent->GetTransform()->SetLocalPosition({0,3,0});
+        Check(secondRay(4)&&hit.Distance>3.9f&&hit.Distance<4.1f,
+              "Reparented collider retained its former parent transform");
+        nested->GetTransform()->SetLocalPosition({1,1,0});
+        Check(secondRay(4)&&hit.Distance>2.9f&&hit.Distance<3.1f,
+              "Reparented collider lost its transform dependency");
+        secondGround->GetTransform()->SetLocalScale({0,2,2});
+        Check(!runtime->SynchronizePhysics(error),"Static collider accepted singular scale");
+        secondGround->GetTransform()->SetLocalScale({2,2,2});
+        Check(secondRay(4)&&hit.Distance>2.9f&&hit.Distance<3.1f,
+              "Rejected static transform prevented synchronizing the restored collider");
         settings.Enabled=false;Check(collider->SetColliderSettings(settings),"Collider disable rejected");
         Check(!ray(),"Disabled static collider remained in the backend");
         settings.Enabled=true;Check(collider->SetColliderSettings(settings),"Collider enable rejected");
@@ -75,6 +103,6 @@ int main(int argc,char** argv){
                                      "Reactivated parent did not restore static collision in a mixed world");
         Check(runtime->EndExecution(error),error);runtime->SetResourceProvider(nullptr);
         delete runtime;runtime=nullptr;
-        std::cout<<"PASS static physics: 1001 colliders/200 fixed steps="<<elapsed<<"ms; transform/active/collider/provider revisions and dynamic transition\n";return 0;
+        std::cout<<"PASS static physics: 1002 colliders/200 fixed steps="<<elapsed<<"ms; transform/active/collider/provider revisions and dynamic transition\n";return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';delete runtime;return 1;}
 }

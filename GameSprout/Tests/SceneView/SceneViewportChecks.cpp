@@ -5,6 +5,7 @@
 #include "IUIAuthoring.h"
 #include "ISelectionManager.h"
 #include "IHierarchyUI.h"
+#include "IPlayMode.h"
 #include "GameSproutRuntimeExport.h"
 #include "IRuntimeHost.h"
 #include "../Shared/ViewportRuntimeSpy.h"
@@ -112,6 +113,66 @@ public:
     bool Launch(GameSproutEditor::GameSproutModuleApi*)override{return true;}
     void Release(GameSproutEditor::GameSproutModuleApi*)override{}
 };
+class PlayFixture final : public IPlayMode {
+public:
+    PlayModeState State;
+    std::vector<IPlayModeListener*> Listeners;
+    void SetState(EditorPlayState state) {State.State=state;for(auto* listener:Listeners)listener->OnPlayModeStateChanged(State);}
+    PlayModeState GetState() const override{return State;}
+    bool Play(std::string&) override{return false;}
+    bool Pause(std::string&) override{return false;}
+    bool Resume(std::string&) override{return false;}
+    bool Step(std::string&) override{return false;}
+    bool Stop(std::string&) override{return false;}
+    bool RegisterPlayModeListener(IPlayModeListener* listener) override {Listeners.push_back(listener);return true;}
+    void UnregisterPlayModeListener(IPlayModeListener* listener) override {std::erase(Listeners,listener);}
+    bool Initialize(GameSproutEditor::GameSproutModuleApi*) override{return true;}
+    bool Launch(GameSproutEditor::GameSproutModuleApi*) override{return true;}
+    void Release(GameSproutEditor::GameSproutModuleApi*) override{}
+};
+class LiveEditingFixture final : public IObjectEditing {
+public:
+    LiveEditingFixture(GameSproutRuntime::IGameSproutRuntime* runtime,const HostFixture& host):Runtime(runtime),Host(host){}
+    unsigned Previews=0,Commits=0;
+    ObjectEditTarget Target;
+    ISceneManager::fSceneEditOperation Restore;
+    bool CanEdit(const ObjectEditTarget& target,std::string&) const override {
+        auto* object=Runtime->QueryGameObject(target.ObjectID);
+        return !Host.IsFrameActive()&&object&&object->GetScene()->GetInstanceID()==target.SceneID&&
+            object->GetTransform()->GetComponentInstanceID()==target.ComponentID;
+    }
+    bool BeginContinuousEdit(const ObjectEditTarget& target,const std::string&,const ISceneManager::fSceneEditOperation& restore,
+        std::string& error) override {
+        if(Target.ObjectID||!CanEdit(target,error))return false;
+        Target=target;Restore=restore;return true;
+    }
+    bool PreviewContinuousEdit(const ISceneManager::fSceneEditOperation& apply,const ISceneManager::fSceneEditOperation&,
+        std::string& error) override {
+        if(!CanEdit(Target,error))return false;
+        ++Previews;
+        return apply(*Runtime->QueryGameObject(Target.ObjectID),error);
+    }
+    bool CommitContinuousEdit(const ISceneManager::fSceneEditOperation&,std::string& error) override {
+        if(!CanEdit(Target,error))return false;
+        ++Commits;Target={};Restore={};return true;
+    }
+    bool CancelContinuousEdit(std::string& error) override {
+        const bool restored=!Target.ObjectID||(CanEdit(Target,error)&&Restore(*Runtime->QueryGameObject(Target.ObjectID),error));
+        Target={};Restore={};return restored;
+    }
+    bool IsContinuousEditFor(const ObjectEditTarget& target) const override{return Target.ObjectID&&Target==target;}
+    bool EditObject(const ObjectEditTarget&,const std::string&,const ISceneManager::fSceneEditOperation&,
+        const ISceneManager::fSceneEditOperation&,std::string&) override{return false;}
+    bool SetLayer(const ObjectEditTarget&,std::uint8_t,bool,std::string&) override{return false;}
+    bool RegisterEditingListener(IObjectEditingListener*) override{return false;}
+    void UnregisterEditingListener(IObjectEditingListener*) override{}
+    bool Initialize(GameSproutEditor::GameSproutModuleApi*) override{return true;}
+    bool Launch(GameSproutEditor::GameSproutModuleApi*) override{return true;}
+    void Release(GameSproutEditor::GameSproutModuleApi*) override{}
+private:
+    GameSproutRuntime::IGameSproutRuntime* Runtime;
+    const HostFixture& Host;
+};
 class RectAuthoringFixture final : public IUIAuthoring {
 public:
     GameSproutRuntime::IGameSproutRuntime* Runtime=nullptr;
@@ -154,9 +215,11 @@ private:
 };
 class WindowEditor final : public GameSproutEditor::GameSproutViewApi {
 public:
-    explicit WindowEditor(GameSproutRuntime::IGameSproutRuntime* runtime):GameSproutViewApi(runtime){UIAuthoring.Runtime=runtime;UIAuthoring.Host=&Host;}
+    explicit WindowEditor(GameSproutRuntime::IGameSproutRuntime* runtime):GameSproutViewApi(runtime),LiveEditing(runtime,Host){UIAuthoring.Runtime=runtime;UIAuthoring.Host=&Host;}
     SceneFixture Scenes;
     HostFixture Host;
+    PlayFixture Play;
+    LiveEditingFixture LiveEditing;
     SelectionFixture Selection;
     RectAuthoringFixture UIAuthoring;
     IIDEWindow* IDE=nullptr;
@@ -166,6 +229,8 @@ public:
         if(name=="SceneManager")return const_cast<SceneFixture*>(&Scenes);
         if(name=="SelectionManager")return const_cast<SelectionFixture*>(&Selection);
         if(name=="UIAuthoring")return const_cast<RectAuthoringFixture*>(&UIAuthoring);
+        if(name=="PlayMode")return const_cast<PlayFixture*>(&Play);
+        if(name=="ObjectEditing")return const_cast<LiveEditingFixture*>(&LiveEditing);
         return nullptr;
     }
     GameSproutEditor::IGameSproutView* FindGameSproutView(const std::string& name) const override {
@@ -271,7 +336,7 @@ int main(int argc,char** argv) {
         SceneViewport* viewport=nullptr;
         for(QWidget* window:QApplication::topLevelWidgets())if(auto* dock=window->findChild<QDockWidget*>("Scene")){viewport=dock->findChild<SceneViewport*>("sceneViewport");if(viewport)break;}
         Check(viewport,"Promoted native sceneViewport missing");
-        if(runtime){viewport->Initialize(runtime,&resources);viewport->BindEditingServices(&editor->Scenes,&editor->Selection,&editor->UIAuthoring);}
+        if(runtime){viewport->Initialize(runtime,&resources);viewport->BindEditingServices(&editor->Scenes,&editor->Selection,&editor->UIAuthoring,&editor->LiveEditing);}
         QObject::connect(viewport,&QObject::destroyed,&app,[&]{viewportDestroyed=true;});
         auto* host=viewport->window();host->resize(880,650);host->raise();host->activateWindow();QApplication::setActiveWindow(host);viewport->setFocus();QCoreApplication::processEvents();
         auto* sceneDock=host->findChild<QDockWidget*>("Scene");Check(sceneDock,"Scene dock missing for compact UI checks");
@@ -408,6 +473,43 @@ int main(int argc,char** argv) {
             QCoreApplication::sendEvent(viewport,&cancelDrag);tick();
             Check(editor->Scenes.DragPreviews==2&&editor->Scenes.DragCommits==1&&
                 Same(mesh->GetTransform()->GetLocalPosition(),{}),"Cancel applied a queued preview after restoring the original transform");
+
+            auto* moveTool=content->findChild<QToolButton*>("moveToolButton");
+            auto* rotateTool=content->findChild<QToolButton*>("rotateToolButton");
+            auto* scaleTool=content->findChild<QToolButton*>("scaleToolButton");
+            Check(moveTool&&rotateTool&&scaleTool,"Missing Scene transform toolbar");
+            editor->Play.SetState(EditorPlayState::EnteringPlay);
+            Check(!moveTool->isEnabled(),"Scene transform allowed during Play transition");
+            editor->Play.SetState(EditorPlayState::Playing);tick();
+            Check(moveTool->isEnabled()&&rotateTool->isEnabled()&&scaleTool->isEnabled(),"Play disabled Scene transform controls");
+            Mouse(viewport,QEvent::MouseButtonPress,pivot,Qt::LeftButton,Qt::LeftButton);
+            Check(editor->LiveEditing.Target.ObjectID==mesh->GetInstanceID()&&!editor->Scenes.HasTransformEdit(),
+                "Play Scene handle did not open a live transform edit");
+            moveDrag(14);moveDrag(26);
+            Check(editor->LiveEditing.Previews==0,"Play pointer events did not coalesce before the owner-loop preview");
+            tick();
+            Check(editor->LiveEditing.Previews==1&&std::fabs(mesh->GetTransform()->GetLocalPosition().X)>.01f,
+                "Play Scene preview did not apply outside the frame callback");
+            QCoreApplication::sendEvent(viewport,&cancelDrag);tick();
+            Check(!editor->LiveEditing.Target.ObjectID&&Same(mesh->GetTransform()->GetLocalPosition(),{}),
+                "Esc did not restore the original live transform");
+            editor->Play.SetState(EditorPlayState::Paused);tick();
+            GameSproutRuntime::DebugDrawList moveGizmo,rotateGizmo,scaleGizmo;
+            viewport->Editing().BuildDraw(editor->Scenes.Scene,moveGizmo);
+            rotateTool->click();tick();
+            viewport->Editing().BuildDraw(editor->Scenes.Scene,rotateGizmo);
+            scaleTool->click();tick();
+            viewport->Editing().BuildDraw(editor->Scenes.Scene,scaleGizmo);
+            Check(rotateGizmo.Lines.size()>moveGizmo.Lines.size()&&!scaleGizmo.Triangles.empty(),
+                "Paused Scene did not draw rotation rings and scale handles");
+            moveTool->click();tick();
+            Mouse(viewport,QEvent::MouseButtonPress,pivot,Qt::LeftButton,Qt::LeftButton);
+            Mouse(viewport,QEvent::MouseButtonRelease,pivot+QPoint(40,0),Qt::LeftButton,Qt::NoButton);
+            Check(editor->LiveEditing.Commits==1&&std::fabs(mesh->GetTransform()->GetLocalPosition().X)>.01f&&
+                editor->Scenes.DragCommits==1,"Paused Scene drag did not commit to the live transform only");
+            editor->Play.SetState(EditorPlayState::Edit);
+            mesh->GetTransform()->SetLocalPosition({});tick();
+
             auto* uiScene=editor->Scenes.Scene;
             auto* canvas=uiScene->CreateGameObject("Screen Canvas");
             Check(canvas&&canvas->AddComponent<GameSproutRuntime::ICanvasComponent>()&&

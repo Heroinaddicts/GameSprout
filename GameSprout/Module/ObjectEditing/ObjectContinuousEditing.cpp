@@ -32,6 +32,10 @@ bool ObjectEditing::BeginContinuousEdit(const ObjectEditTarget& target,const std
     if(!restore){error="连续属性编辑需要原值恢复操作。";return false;}
     ContinuousEdit candidate;candidate.Active=true;candidate.Target=target;candidate.Label=label;
     candidate.Playing=_Scenes->IsPlaySessionActive();candidate.Restore=restore;
+    if(candidate.Playing&&target.ComponentID) {
+        const auto* transform=Resolve(target)->GetTransform();
+        candidate.Transform=transform&&transform->GetComponentInstanceID()==target.ComponentID;
+    }
     if(!candidate.Playing&&!_Scenes->BeginPropertyPreview(error))return false;
     _Continuous=std::move(candidate);return true;
 }
@@ -55,14 +59,23 @@ bool ObjectEditing::PreviewContinuousEdit(const ISceneManager::fSceneEditOperati
         }
     }
     if(!_Continuous.Playing)_Scenes->PublishPropertyPreview();
-    if(accepted)Notify(target,_Continuous.Playing);
+    if(accepted) {
+        _Continuous.TransformPreviewed=_Continuous.Transform;
+        Notify(target,_Continuous.Playing,_Continuous.TransformPreviewed
+            ? ObjectEditEvent::Phase::TransformPreview : ObjectEditEvent::Phase::Changed);
+    }
     return accepted;
 }
 bool ObjectEditing::CommitContinuousEdit(const ISceneManager::fSceneEditOperation& apply,std::string& error) {
     if(!ContinuousReady(error))return false;
     if(!apply){error="连续属性提交缺少最终操作。";return false;}
     auto completed=std::move(_Continuous);_Continuous={};
-    if(completed.Playing) {ContinuousScope scope(_Busy);Notify(completed.Target,true);return true;}
+    if(completed.Playing) {
+        ContinuousScope scope(_Busy);
+        Notify(completed.Target,true,completed.TransformPreviewed
+            ? ObjectEditEvent::Phase::TransformPreviewFinished : ObjectEditEvent::Phase::Changed);
+        return true;
+    }
     _Scenes->EndPropertyPreview();
     bool restored=false;
     try {ContinuousScope scope(_Busy);if(auto* object=Resolve(completed.Target))restored=completed.Restore(*object,error);}
@@ -102,7 +115,12 @@ bool ObjectEditing::CancelContinuousEdit(std::string& error) {
     if(!cancelled.Playing) {
         _Scenes->PublishPropertyPreview();_Scenes->EndPropertyPreview();
     }
-    {ContinuousScope scope(_Busy);Notify(cancelled.Target,cancelled.Playing);}return restored;
+    {
+        ContinuousScope scope(_Busy);
+        Notify(cancelled.Target,cancelled.Playing,cancelled.TransformPreviewed
+            ? ObjectEditEvent::Phase::TransformPreviewFinished : ObjectEditEvent::Phase::Changed);
+    }
+    return restored;
 }
 void ObjectEditing::OnPlayModeStateChanged(const PlayModeState& state) {
     if(state.State==EditorPlayState::EnteringPlay||state.State==EditorPlayState::ExitingPlay) {

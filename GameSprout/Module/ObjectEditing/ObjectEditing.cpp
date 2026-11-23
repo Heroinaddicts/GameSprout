@@ -106,8 +106,8 @@ void ObjectEditing::UnregisterEditingListener(IObjectEditingListener* listener) 
     for(auto current=_Listeners.begin();current!=_Listeners.end();)
         if(current->second==listener)current=_Listeners.erase(current);else ++current;
 }
-void ObjectEditing::Notify(const ObjectEditTarget& target,bool playing) {
-    const ObjectEditEvent event{target,playing};const auto last=_NextListener;
+void ObjectEditing::Notify(const ObjectEditTarget& target,bool playing,ObjectEditEvent::Phase phase) {
+    const ObjectEditEvent event{target,playing,phase};const auto last=_NextListener;
     auto current=_Listeners.begin();
     while(current!=_Listeners.end()&&current->first<=last) {
         const auto id=current->first;

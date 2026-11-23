@@ -46,6 +46,7 @@ void GameViewport::DestroyGPU() {
 void GameViewport::Shutdown(){
     if(_RuntimeSubscribed&&_Runtime)_Runtime->UnregisterListener(this);
     _RuntimeSubscribed=false;_SceneID=0;
+    ClearTransformPreview();
     _ResizeSettle.stop();
     ReleaseGameInput();_GameplayInputEnabled=false;
     _Initialized=false;DestroyGPU();
@@ -54,6 +55,15 @@ void GameViewport::Shutdown(){
     _Runtime=nullptr;_Resources=nullptr;
 }
 void GameViewport::RetryRendering(){DestroyGPU();_Attempted=false;}
+void GameViewport::SetTransformPreview(std::uint64_t objectID,bool active) {
+    _TransformPreviewID=objectID;
+    _TransformPreviewActive=active;
+    RequestRender();
+}
+void GameViewport::ClearTransformPreview() {
+    _TransformPreviewID=0;
+    _TransformPreviewActive=false;
+}
 void GameViewport::OnSceneVisualChanged(std::uint64_t sceneID){if(sceneID==_SceneID)RequestRender();}
 void GameViewport::ObserveNativeWindow() {
     QWindow* native=windowHandle();
@@ -156,6 +166,7 @@ void GameViewport::RenderGame(GameSproutRuntime::IScene* scene,bool continuous,b
     view.Scene=scene;view.DrawGrid=false;
     view.DrawUI=scene!=nullptr;
     view.WaitForSurface=false;
+    view.TransformPreviewObjectID=_TransformPreviewID;
     view.ReuseShadowsWhileNavigating=_ResizeSettle.isActive();
     view.EnableTexturePrefetch=true;
     std::string diagnostic;
@@ -180,6 +191,12 @@ void GameViewport::RenderGame(GameSproutRuntime::IScene* scene,bool continuous,b
     if(!statistics.Width||!statistics.Height) {
         RequestRender();
         return;
+    }
+    if(_TransformPreviewID&&!_TransformPreviewActive) {
+        // Keep the final edited pose in the preview layer for one presented frame.
+        // The follow-up frame returns to the authored shadow policy even when paused.
+        _TransformPreviewID=0;
+        RequestRender();
     }
     const GameSproutRuntime::Vector2 renderedSize{float(statistics.Width), float(statistics.Height)};
     _Runtime->SetUIInputViewport(scene, {float(width()), float(height())}, renderedSize);

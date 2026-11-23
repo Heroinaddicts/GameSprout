@@ -48,7 +48,6 @@ public:
 private:
     IPlayMode* _PlayMode=nullptr;
     bool _PlaySubscribed=false;
-    bool _CanEdit=true;
     bool _ToolPlayStateKnown=false;
     EditorPlayState _ToolPlayState=EditorPlayState::Edit;
     void BeforeInitialize(GameSproutEditor::GameSproutViewApi * const editor) override;

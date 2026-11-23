@@ -14,8 +14,8 @@ void RuntimePhysicsSystem::InvalidateScene(uint64_t scene) {
 }
 void RuntimePhysicsSystem::InvalidateTransform(uint64_t scene, uint64_t object) {
     const auto found = _Worlds.find(scene);
-    if (found != _Worlds.end() && found->second && found->second->StaticTransforms.contains(object))
-        ++found->second->Revision;
+    if (found != _Worlds.end() && found->second && found->second->StaticBodiesByTransform.contains(object))
+        found->second->DirtyStaticTransforms.insert(object);
 }
 void RuntimePhysicsSystem::ForgetMissingScenes() {
     std::set<uint64_t> live;

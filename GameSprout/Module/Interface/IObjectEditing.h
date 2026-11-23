@@ -10,8 +10,11 @@ struct ObjectEditTarget {
 };
 
 struct ObjectEditEvent {
+    enum class Phase { Changed, TransformPreview, TransformPreviewFinished };
     ObjectEditTarget Target;
     bool Playing = false;
+    // Live continuous Transform edits identify the moving subtree for viewport shadows.
+    Phase EditPhase = Phase::Changed;
 };
 
 class IObjectEditingListener {

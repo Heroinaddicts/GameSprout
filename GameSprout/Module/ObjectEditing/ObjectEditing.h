@@ -39,10 +39,10 @@ private:
     bool TransientEdit(const ObjectEditTarget&,const ISceneManager::fSceneEditOperation&,
         const ISceneManager::fSceneEditOperation&,std::string&);
     bool OwnerThread() const;
-    void Notify(const ObjectEditTarget&,bool);
+    void Notify(const ObjectEditTarget&,bool,ObjectEditEvent::Phase=ObjectEditEvent::Phase::Changed);
     bool ContinuousReady(std::string&) const;
     struct ContinuousEdit {
-        bool Active=false,Playing=false;
+        bool Active=false,Playing=false,Transform=false,TransformPreviewed=false;
         ObjectEditTarget Target;
         std::string Label;
         ISceneManager::fSceneEditOperation Restore;

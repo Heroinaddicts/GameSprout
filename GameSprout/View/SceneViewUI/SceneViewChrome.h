@@ -21,7 +21,7 @@ public:
     void Detach();
     ViewportFrameRateLabel* FrameRateLabel() const;
     void SetStatus(const std::string& status,const std::string& diagnostic);
-    void SetEditingEnabled(bool enabled);
+    void SetEditingEnabled(bool authoring,bool live);
     bool SnapEnabled() const;
     float MoveSnap() const;
     float RotateSnap() const;

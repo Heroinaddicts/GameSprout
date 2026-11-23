@@ -241,7 +241,7 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
     const float splits[]{_ShadowUniform.Splits.X,_ShadowUniform.Splits.Y,_ShadowUniform.Splits.Z,_ShadowUniform.Splits.W};
     std::uint32_t coveredCascades=0;
     const bool checkCoverage=!sameView&&!navigationReuse&&!_ShadowNavigationApproximate&&sameFitSettings&&
-        settings.CacheStaticCasters&&!previewID&&!_ShadowPreviewObjectID;
+        settings.CacheStaticCasters;
     if(checkCoverage) {
         coveredCascades=RuntimeShadowMath::CoveredCascades(view.Camera,aspect,_ShadowUniform.WorldToShadow,splits,
             settings.CascadeCount,tile,settings.NormalBias,filterRadius);
@@ -300,14 +300,18 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
         }
     }
     std::vector<std::uint64_t> moved;
-    // The journal can prove that no cached caster moved during this drag.
-    // Structural/material changes and edits outside the subtree still compare keys.
-    const bool previewChangesOnly=preview&&reuseFit&&scene.GetRenderTransformChanges(_ShadowSceneRevision,moved)&&
+    // Read the transform journal once. Play can move the player, camera and
+    // bones in the same interval as the editor's transform preview.
+    const bool transformsKnown=(settings.CacheStaticCasters||(preview&&reuseFit))&&sameFitSettings&&!_Statistics.SceneSnapshotRebuilds&&
+        scene.GetRenderTransformChanges(_ShadowSceneRevision,moved);
+    const bool previewChangesOnly=preview&&reuseFit&&transformsKnown&&
         std::all_of(moved.begin(),moved.end(),[&](auto id){return previewSubtree.contains(id);});
     const bool onlyPreviewMoved=previewChangesOnly&&samePreview;
-    const bool unchangedStatic=settings.CacheStaticCasters&&sameFitSettings&&samePreview&&!_Statistics.SceneSnapshotRebuilds&&
-        scene.GetRenderTransformChanges(_ShadowSceneRevision,moved)&&
-        std::none_of(moved.begin(),moved.end(),[&](auto id){return _StaticShadowTransformObjects.contains(id);});
+    const bool cachedStaticUntouched=settings.CacheStaticCasters&&transformsKnown&&
+        std::none_of(moved.begin(),moved.end(),[&](auto id){
+            return _StaticShadowTransformObjects.contains(id)&&!previewSubtree.contains(id);
+        });
+    const bool unchangedStatic=cachedStaticUntouched&&samePreview;
     const bool skipStatic=onlyPreviewMoved||unchangedStatic;
     const auto collectCaster=[&](DrawObject& object,bool dynamic) {
         if(object.ShadowMode==ShadowCastingMode::Off||!(light.CullingMask&(std::uint32_t{1}<<object.Layer))||!object.Geometry||
@@ -370,7 +374,7 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
     const bool reuseStatic=reuseFit&&(onlyPreviewMoved||sameCasters);
     std::vector<ShadowRegion> repair;
     bool repairStatic=false;
-    if(incremental&&!reuseStatic&&previewChangesOnly&&!samePreview) {
+    if(incremental&&!reuseStatic&&reuseFit&&!samePreview&&(previewChangesOnly||cachedStaticUntouched)) {
         // A change of the dragged subtree affects the primary atlas only where
         // a caster entered or left it. Retain the previous depth normalization.
         std::unordered_map<std::uint64_t,Bounds> previous;

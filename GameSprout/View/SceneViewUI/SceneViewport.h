@@ -10,6 +10,7 @@ class QWindow;
 class ISceneManager;
 class ISelectionManager;
 class IUIAuthoring;
+class IObjectEditing;
 class SceneViewportEditing;
 class SceneToolRouter;
 
@@ -34,7 +35,8 @@ public:
     const SceneViewCamera& Camera() const{return _Camera;}
     SceneViewportEditing& Editing(){return *_Editing;}
     SceneToolRouter& Tools(){return *_Tools;}
-    void BindEditingServices(ISceneManager* scenes,ISelectionManager* selection,IUIAuthoring* uiAuthoring=nullptr);
+    void BindEditingServices(ISceneManager* scenes,ISelectionManager* selection,IUIAuthoring* uiAuthoring=nullptr,
+        IObjectEditing* objectEditing=nullptr);
     GameSproutRuntime::IRuntimeRenderer* Renderer() const{return _Renderer;}
     bool GetRenderedCamera(GameSproutRuntime::RenderedCamera& camera) const;
     std::uint64_t GetPresentedUIPreviewObjectID() const { return _PresentedUIPreviewObjectID; }
