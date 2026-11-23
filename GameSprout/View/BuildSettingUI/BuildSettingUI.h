@@ -9,6 +9,8 @@ class QDialog;
 class QFileDialog;
 class QTreeWidgetItem;
 namespace Ui {
+class BuildProfileNameDialog;
+class BuildProjectOutputDialog;
 class BuildSettingUIWindow;
 }
 QT_END_NAMESPACE
@@ -30,11 +32,34 @@ private:
     void OnBuildSettingsChanged(const BuildSettingsState& state) override;
 
     static void ShowMenu();
+    static QString Translate(const char* source);
+    const BuildProfile* SelectedProfile() const;
+    void RefreshProfiles();
     void RefreshScenes();
     void RefreshAvailableScenes();
     void RefreshActions();
+    void InitializeHarmonyForm();
+    void RefreshHarmonyControls(bool harmony, bool hasProjectEdits, bool hasLocalEdits);
+    void RefreshHarmonyProject();
+    void RefreshHarmonyLocal();
+    void RefreshHarmonyDevices(const std::string& device);
+    void RefreshHarmonyStatus();
+    HarmonyBuildSettings HarmonyProjectDraft() const;
+    HarmonyLocalBuildSettings HarmonyLocalDraft() const;
+    bool HasHarmonyProjectEdits() const;
+    bool HasHarmonyLocalEdits() const;
+    bool ConfirmDiscardHarmonyEdits();
+    void SaveHarmonyProject();
+    void SaveHarmonyLocal();
+    void BrowseHarmonyTools();
+    void BrowseHarmonySigning();
     void ShowError(const std::string& error);
     void SelectPlatform(QTreeWidgetItem* item);
+    void SelectProfile(int index);
+    void OpenProfileNameDialog(bool rename);
+    void SaveProfileName();
+    void RemoveProfile();
+    void SetSceneOverride(bool enabled);
     void ChangeSceneEnabled(QTreeWidgetItem* item, int column);
     void AddScene();
     void RemoveScene();
@@ -42,7 +67,9 @@ private:
     void ApplyScenes(const std::vector<BuildScene>& scenes, int selectedRow);
     void SwitchPlatform();
     void PickOutput(bool run);
-    void Build();
+    void PickProjectOutput();
+    void BuildProject();
+    bool Build(const QString& path);
 
     static BuildSettingUI* _Self;
     IIDEWindow* _IDE = nullptr;
@@ -50,9 +77,16 @@ private:
     IIDEMenu* _Menu = nullptr;
     QDialog* _Window = nullptr;
     QFileDialog* _OutputDialog = nullptr;
+    QDialog* _ProfileDialog = nullptr;
+    QDialog* _ProjectOutputDialog = nullptr;
+    Ui::BuildProfileNameDialog* _ProfileUi = nullptr;
+    Ui::BuildProjectOutputDialog* _ProjectOutputUi = nullptr;
     Ui::BuildSettingUIWindow* _Ui = nullptr;
     BuildSettingsState _State;
     bool _Subscribed = false;
     bool _RunAfterBuild = false;
+    bool _RenameProfile = false;
+    bool _RefreshingHarmonyForm = false;
+    std::string _OutputProfile;
 };
 #endif //__BuildSettingUI_h__

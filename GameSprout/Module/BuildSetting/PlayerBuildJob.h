@@ -16,6 +16,8 @@ struct PlayerBuildArtifact {
 struct PlayerBuildJob {
     BuildOperation Operation = BuildOperation::Idle;
     BuildPlatform Platform = BuildPlatform::MacOS;
+    BuildProfile Profile;
+    HarmonyLocalBuildSettings HarmonyLocal;
     std::uint64_t ShaderRevision = 0;
     bool Run = false;
     bool IOSSimulator = false;

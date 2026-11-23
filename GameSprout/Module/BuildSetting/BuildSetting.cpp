@@ -64,6 +64,7 @@ void BuildSetting::Release(GameSproutModuleApi*) {
     if (_Owner != Foundation::InvalidTaskOwnerId) _Tasks->UnregisterTaskOwner(_Owner);
     _Owner = Foundation::InvalidTaskOwnerId;
     _Task = Foundation::InvalidTaskId;
+    _HarmonyTask = Foundation::InvalidTaskId;
     if (_Loading) _IDE->Unloading();
     _Loading = false;
     delete _Dispatch;
@@ -128,23 +129,7 @@ void BuildSetting::RefreshScenePaths() {
     for (const auto& [guid, path] : _ScenePaths) _State.AvailableScenes.push_back({guid, path});
     std::sort(_State.AvailableScenes.begin(), _State.AvailableScenes.end(),
         [](const auto& a, const auto& b) { return a.Path < b.Path; });
-    for (auto& scene : _State.Scenes) {
-        const auto found = _ScenePaths.find(scene.Guid);
-        scene.Path = found == _ScenePaths.end() ? std::string{} : found->second;
-    }
-}
-
-bool BuildSetting::SelectPlatform(BuildPlatform platform, std::string& error) {
-    error.clear();
-    if (_State.Operation != BuildOperation::Idle) { error = "请等待当前构建操作完成。"; return false; }
-    if (!*BuildPlatformName(platform)) { error = "未知构建平台。"; return false; }
-    if (platform == _State.Selected) return true;
-    if (!SaveUserSettings(platform, _State.Active, error)) return false;
-    _State.Selected = platform;
-    _State.Message.clear();
-    _State.Error.clear();
-    Notify();
-    return true;
+    UpdateEffectiveScenes();
 }
 
 bool BuildSetting::SetScenes(const std::vector<BuildScene>& scenes, std::string& error) {
@@ -167,8 +152,19 @@ bool BuildSetting::SetScenes(const std::vector<BuildScene>& scenes, std::string&
         candidate.push_back({guid.GetGuidString(), path == _ScenePaths.end() ? std::string{} : path->second, scene.Enabled});
     }
     if (candidate == _State.Scenes) return true;
-    if (!SaveScenes(candidate, error)) return false;
-    _State.Scenes = std::move(candidate);
+    const auto* selected = FindProfile(_State.SelectedProfileId);
+    if (!selected) { error = "找不到构建配置。"; return false; }
+    if (selected->OverrideScenes) {
+        auto profiles = _State.Profiles;
+        const auto index = static_cast<std::size_t>(selected - _State.Profiles.data());
+        profiles[index].Scenes = std::move(candidate);
+        if (!SaveProjectSettings(_GlobalScenes, profiles, error)) return false;
+        _State.Profiles = std::move(profiles);
+    } else {
+        if (!SaveProjectSettings(candidate, _State.Profiles, error)) return false;
+        _GlobalScenes = std::move(candidate);
+    }
+    UpdateEffectiveScenes();
     _State.Message.clear();
     _State.Error.clear();
     Notify();
@@ -192,11 +188,22 @@ bool BuildSetting::CanStart(std::string& error) {
 bool BuildSetting::SwitchPlatform(std::string& error) {
     error.clear();
     if (_State.Operation != BuildOperation::Idle) { error = "请等待当前构建操作完成。"; return false; }
-    if (_State.Selected == _State.Active) return true;
+    if (_State.SelectedProfileId == _State.ActiveProfileId) return true;
+    const auto* profile = FindProfile(_State.SelectedProfileId);
+    if (!profile) { error = "找不到构建配置。"; return false; }
+    if (_State.Selected == _State.Active) {
+        if (!SaveUserSettings(*profile, *profile, _HarmonyLocals, error)) return false;
+        _State.ActiveProfileId = profile->Id;
+        _State.Error.clear();
+        _State.Message = "已激活 " + profile->Name;
+        Notify();
+        return true;
+    }
     if (!CanStart(error)) return false;
     PlayerBuildJob job;
     job.Operation = BuildOperation::Switching;
     job.Platform = _State.Selected;
+    job.Profile = *profile;
     job.IOSSimulator = qgetenv("GAMESPROUT_IOS_SDK") == "iphonesimulator";
     if (!CollectSwitch(job, error)) return false;
     return Submit(std::move(job), error);
@@ -204,14 +211,22 @@ bool BuildSetting::SwitchPlatform(std::string& error) {
 
 bool BuildSetting::Build(const std::string& output, bool run, std::string& error) {
     error.clear();
-    if (_State.Selected != _State.Active) { error = "请先切换到选中的目标平台。"; return false; }
+    if (_State.SelectedProfileId != _State.ActiveProfileId) { error = "请先激活选中的构建配置。"; return false; }
     if (!CanBuildPlatform(_State.Active)) { error = "当前目标的打包工具尚未接入。"; return false; }
     if (output.empty()) { error = "请选择 Player 输出路径。"; return false; }
+    const auto* profile = FindProfile(_State.ActiveProfileId);
+    if (!profile) { error = "找不到构建配置。"; return false; }
+    if (profile->Platform == BuildPlatform::HarmonyOS && run && profile->Harmony.Output == HarmonyBuildOutput::DevEcoProject) {
+        error = "请在 DevEco Studio 中打开导出的工程，再构建和运行。";
+        return false;
+    }
     if (!CanStart(error)) return false;
     if (_Scenes->HasUnsavedChanges()) { error = "请先保存当前场景的修改。"; return false; }
     PlayerBuildJob job;
     job.Operation = BuildOperation::Building;
     job.Platform = _State.Active;
+    job.Profile = *profile;
+    job.HarmonyLocal = _State.HarmonyLocal;
     job.ProjectRoot = _Root;
     job.ProjectSettings = _ProjectSettings->GetSettings();
     job.Output = output;
@@ -272,9 +287,10 @@ void BuildSetting::Finish(bool success, const PlayerBuildJob* job) {
     _State.Error = success ? std::string{} : job && !job->Error.empty() ? job->Error : "操作已取消或未完成。";
     if (success && job && job->Operation == BuildOperation::Switching) {
         if (job->ShaderRevision != _ShaderRevision) _State.Error = "准备期间 Shader 资源发生变化，请重新切换。";
-        else if (SaveUserSettings(_State.Selected, job->Platform, _State.Error)) {
+        else if (SaveUserSettings(job->Profile, job->Profile, _HarmonyLocals, _State.Error)) {
             _State.Active = job->Platform;
-            _State.Message = "已切换到 " + std::string(BuildPlatformName(job->Platform));
+            _State.ActiveProfileId = job->Profile.Id;
+            _State.Message = "已激活 " + job->Profile.Name;
         }
     }
     if (success && job && job->Operation == BuildOperation::Building) {
@@ -297,6 +313,10 @@ void BuildSetting::Finish(bool success, const PlayerBuildJob* job) {
         } else if (job->Platform == BuildPlatform::IOS && !job->IOSSimulator &&
                    qEnvironmentVariableIsEmpty("GAMESPROUT_IOS_TEAM_ID")) {
             _State.Message = "已导出 iOS .app。该构建需要签名后才能安装到真机。";
+        } else if (job->Platform == BuildPlatform::HarmonyOS) {
+            _State.Message = job->Profile.Harmony.Output == HarmonyBuildOutput::DevEcoProject
+                ? "已导出 DevEco 工程，可在 DevEco Studio 中配置签名并运行。"
+                : job->HarmonyLocal.SigningConfig.empty() ? "已构建未签名 HAP。" : "已构建签名 HAP。";
         }
     }
     _State.Operation = BuildOperation::Idle;

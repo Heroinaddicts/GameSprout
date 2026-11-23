@@ -1,4 +1,5 @@
 #include "PlayerBuildJob.h"
+#include "HarmonyBuildEnvironment.h"
 #include "../Shared/AssetArtifactIO.h"
 #include "../../PreparedResources/PreparedProjectSettings.h"
 #include <QDirIterator>
@@ -37,9 +38,22 @@ bool Cancelled(PlayerBuildJob& job, const std::function<bool()>& cancelled) {
     return true;
 }
 
-bool IsBuildOutput(BuildPlatform platform, const QString& path) {
+bool IsDevEcoProject(const PlayerBuildJob& job) {
+    return job.Platform == BuildPlatform::HarmonyOS && job.Profile.Harmony.Output == HarmonyBuildOutput::DevEcoProject;
+}
+
+bool IsBuildOutput(const PlayerBuildJob& job, const QString& path) {
     const QFileInfo info(path);
     if (info.isSymLink()) return false;
+    if (IsDevEcoProject(job)) {
+        const QDir directory(path);
+        QFile marker(directory.filePath(QString::fromLatin1(HarmonyDevEcoProjectMarker)));
+        const QFileInfo markerInfo(marker);
+        const QFileInfo profileInfo(directory.filePath("build-profile.json5"));
+        return info.isDir() && markerInfo.isFile() && !markerInfo.isSymLink() && marker.open(QIODevice::ReadOnly) &&
+            marker.read(64) == HarmonyDevEcoProjectMarkerText && profileInfo.isFile() && !profileInfo.isSymLink();
+    }
+    const auto platform = job.Platform;
     if (platform == BuildPlatform::IOS)
         return info.isDir() && QFileInfo(QDir(path).filePath("Game/Player.json")).isFile();
     if (!IsMacPlayerBuild(platform)) {
@@ -58,23 +72,31 @@ bool IsBuildOutput(BuildPlatform platform, const QString& path) {
 bool ResolveOutput(PlayerBuildJob& job, QString& output) {
     const QFileInfo request(QString::fromStdString(job.Output));
     const QString parent = QFileInfo(request.absolutePath()).canonicalFilePath();
-    const auto suffix = '.' + QString::fromLatin1(BuildPlatformOutputSuffix(job.Platform));
-    if (request.fileName().size() <= suffix.size() || !request.fileName().endsWith(suffix, Qt::CaseInsensitive) || parent.isEmpty()) {
-        job.Error = "输出必须是已有目录中的 " + suffix.toStdString() + " 路径。";
+    const auto extension = QString::fromLatin1(BuildPlatformOutputSuffix(job.Profile));
+    const auto suffix = extension.isEmpty() ? QString{} : '.' + extension;
+    const auto name = request.fileName();
+    if (parent.isEmpty() || name.isEmpty() || name == "." || name == ".." ||
+        (!suffix.isEmpty() && (name.size() <= suffix.size() || !name.endsWith(suffix, Qt::CaseInsensitive)))) {
+        job.Error = suffix.isEmpty() ? "请选择已有目录下的 DevEco 工程输出目录。"
+                                    : "输出必须是已有目录中的 " + suffix.toStdString() + " 路径。";
         return false;
     }
-    output = QDir(parent).filePath(request.fileName());
+    output = QDir(parent).filePath(name);
     const QDir project(QString::fromStdString(job.ProjectRoot));
+    if (output == project.absolutePath() || project.absolutePath().startsWith(output + '/')) {
+        job.Error = "输出目录不能覆盖当前项目。";
+        return false;
+    }
     for (const QString& folder : {QStringLiteral("Assets"), QStringLiteral("Library"),
                                   QStringLiteral("ProjectSettings"), QStringLiteral("UserSettings"), QStringLiteral("Info")}) {
         const QString reserved = project.filePath(folder);
-        if (parent == reserved || parent.startsWith(reserved + '/')) {
+        if (output == reserved || output.startsWith(reserved + '/')) {
             job.Error = "请选择项目资源与缓存目录之外的输出路径。";
             return false;
         }
     }
     const QFileInfo current(output);
-    if (current.isSymLink() || (current.exists() && !IsBuildOutput(job.Platform, output))) {
+    if (current.isSymLink() || (current.exists() && !IsBuildOutput(job, output))) {
         job.Error = "输出已存在，且无法确认为 GameSprout Player 构建。";
         return false;
     }
@@ -148,7 +170,7 @@ bool Publish(const QString& staged, const QString& destination, QTemporaryDir& t
     const QFileInfo current(destination);
     const auto backup = temporary.filePath("Previous");
     const bool replacing = current.exists();
-    if (current.isSymLink() || (replacing && (!IsBuildOutput(job.Platform, destination) || !QDir().rename(destination, backup)))) {
+    if (current.isSymLink() || (replacing && (!IsBuildOutput(job, destination) || !QDir().rename(destination, backup)))) {
         job.Error = "无法替换现有 Player " + destination.toStdString();
         return false;
     }
@@ -232,6 +254,20 @@ bool RunExporter(const QString& exporter, const QString& root, const QStringList
     environment.insert("GAMESPROUT_SOURCE_ROOT", root);
     if (job.Platform == BuildPlatform::IOS && job.IOSSimulator)
         environment.insert("GAMESPROUT_IOS_SDK", "iphonesimulator");
+    if (job.Platform == BuildPlatform::HarmonyOS) {
+        const auto& build = job.Profile.Harmony;
+        const auto& local = job.HarmonyLocal;
+        environment.insert("GAMESPROUT_APPLICATION_ID", QString::fromStdString(build.ApplicationId));
+        environment.insert("GAMESPROUT_HARMONY_APP_NAME", QString::fromStdString(build.AppName));
+        environment.insert("GAMESPROUT_HARMONY_VERSION_NAME", QString::fromStdString(build.VersionName));
+        environment.insert("GAMESPROUT_HARMONY_VERSION_CODE", QString::number(build.VersionCode));
+        environment.insert("GAMESPROUT_HARMONY_COMPATIBLE_API", QString::number(build.CompatibleApi));
+        environment.insert("GAMESPROUT_HARMONY_TARGET_API", QString::number(build.TargetApi));
+        environment.insert("GAMESPROUT_HARMONY_OUTPUT", IsDevEcoProject(job) ? "deveco" : "hap");
+        environment.insert("GAMESPROUT_HARMONY_TOOLS", QString::fromStdString(local.ToolsPath));
+        environment.insert("GAMESPROUT_HARMONY_SIGNING_CONFIG", QString::fromStdString(local.SigningConfig));
+        environment.insert("GAMESPROUT_HARMONY_DEVICE", QString::fromStdString(local.DeviceId));
+    }
     if (!environment.contains("GAMESPROUT_SDL_SOURCE_DIR"))
         environment.insert("GAMESPROUT_SDL_SOURCE_DIR", QDir(root).absoluteFilePath("../SDL"));
     process.setProcessEnvironment(environment);
@@ -276,7 +312,8 @@ bool Package(PlayerBuildJob& job, const IScriptCompiler* compiler, const std::fu
     if (!outputLock.tryLock(0)) { job.Error = "该输出正在被另一次构建使用。"; return false; }
     QTemporaryDir temporary(QFileInfo(output).absoluteDir().filePath(".GameSproutBuild-XXXXXX"));
     if (!temporary.isValid()) { job.Error = "无法在输出目录内创建打包暂存目录。"; return false; }
-    const auto staged = temporary.filePath("GameSproutPlayer." + QString::fromLatin1(BuildPlatformOutputSuffix(job.Platform)));
+    const auto staged = temporary.filePath(IsDevEcoProject(job) ? QStringLiteral("GameSproutDevEco") :
+        "GameSproutPlayer." + QString::fromLatin1(BuildPlatformOutputSuffix(job.Profile)));
     const bool mac = IsMacPlayerBuild(job.Platform);
     const QDir bundle(staged);
     const QDir payload(mac ? bundle.filePath("Contents/Resources/Game") : temporary.filePath("Game"));
@@ -315,7 +352,7 @@ bool Package(PlayerBuildJob& job, const IScriptCompiler* compiler, const std::fu
             staged, work, QString::fromUtf8(GAMESPROUT_BUILD_CMAKE)};
         if (job.Platform == BuildPlatform::Linux || job.Platform == BuildPlatform::LinuxServer) arguments << platform;
         if (!RunExporter(exporter, root, arguments, job, cancelled, job.Error)) return false;
-        if (!IsBuildOutput(job.Platform, staged)) { job.Error = "目标平台工具没有生成预期的 Player。"; return false; }
+        if (!IsBuildOutput(job, staged)) { job.Error = "目标平台工具没有生成预期的构建产物。"; return false; }
     }
     if (Cancelled(job, cancelled)) return false;
     job.Published = Publish(staged, output, temporary, job);
@@ -330,6 +367,17 @@ bool Package(PlayerBuildJob& job, const IScriptCompiler* compiler, const std::fu
 
 bool ExecutePlayerBuild(PlayerBuildJob& job, const IAssetsPipeline& pipeline, const IScriptCompiler* compiler,
                         const std::function<bool()>& cancelled) {
+    if (job.Operation == BuildOperation::Building && job.Platform == BuildPlatform::HarmonyOS) {
+        auto environment = InspectHarmonyBuildEnvironment(job.Profile.Harmony, job.HarmonyLocal, cancelled);
+        if (Cancelled(job, cancelled)) return false;
+        if (!environment.Status.CanBuild || (job.Run && !environment.Status.CanRun)) {
+            job.Error = environment.Status.CanBuild ? environment.Status.RunMessage : environment.Status.BuildMessage;
+            return false;
+        }
+        job.HarmonyLocal.ToolsPath = std::move(environment.ToolsPath);
+        job.HarmonyLocal.SigningConfig = std::move(environment.SigningConfig);
+        job.HarmonyLocal.DeviceId = std::move(environment.DeviceId);
+    }
     for (auto& artifact : job.Artifacts) {
         if (Cancelled(job, cancelled)) return false;
         if (artifact.Data.Type != eAssetType::Shader && artifact.Data.Type != eAssetType::ComputeShader) continue;

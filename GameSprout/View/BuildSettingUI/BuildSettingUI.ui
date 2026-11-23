@@ -2,9 +2,9 @@
 <ui version="4.0">
  <class>BuildSettingUIWindow</class>
  <widget class="QDialog" name="BuildSettingUIWindow">
-  <property name="windowTitle"><string>Build Settings</string></property>
-  <property name="geometry"><rect><x>0</x><y>0</y><width>840</width><height>510</height></rect></property>
-  <property name="minimumSize"><size><width>640</width><height>410</height></size></property>
+  <property name="windowTitle"><string>Build Profiles</string></property>
+  <property name="geometry"><rect><x>0</x><y>0</y><width>870</width><height>640</height></rect></property>
+  <property name="minimumSize"><size><width>665</width><height>455</height></size></property>
   <layout class="QVBoxLayout" name="mainLayout">
    <property name="spacing"><number>10</number></property>
    <item>
@@ -33,9 +33,26 @@
       </widget>
      </item>
      <item>
-      <widget class="QGroupBox" name="sceneGroup">
-       <property name="title"><string>构建场景</string></property>
+      <layout class="QVBoxLayout" name="detailsLayout">
+       <item>
+        <layout class="QHBoxLayout" name="profileLayout" stretch="0,1,0,0,0">
+         <item><widget class="QLabel" name="profileLabel"><property name="text"><string>构建配置</string></property><property name="buddy"><cstring>profileList</cstring></property></widget></item>
+         <item><widget class="QComboBox" name="profileList"><property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property><property name="minimumContentsLength"><number>12</number></property></widget></item>
+         <item><widget class="QPushButton" name="addProfileButton"><property name="text"><string>新建…</string></property></widget></item>
+         <item><widget class="QPushButton" name="renameProfileButton"><property name="text"><string>重命名…</string></property></widget></item>
+         <item><widget class="QPushButton" name="removeProfileButton"><property name="text"><string>删除</string></property></widget></item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QTabWidget" name="settingsTabs">
+         <widget class="QWidget" name="sceneGroup">
+          <attribute name="title"><string>构建场景</string></attribute>
        <layout class="QVBoxLayout" name="sceneLayout">
+        <item>
+         <widget class="QCheckBox" name="overrideScenes">
+          <property name="text"><string>覆盖全局场景列表</string></property>
+         </widget>
+        </item>
         <item>
          <widget class="QLabel" name="startupHint">
           <property name="text"><string>Player 从第一个启用的场景启动。</string></property>
@@ -75,9 +92,118 @@
          </layout>
         </item>
        </layout>
-      </widget>
+         </widget>
+         <widget class="QWidget" name="harmonyPage">
+          <attribute name="title"><string>鸿蒙设置</string></attribute>
+          <layout class="QVBoxLayout" name="harmonyPageLayout">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+           <item>
+            <widget class="QScrollArea" name="harmonyScroll">
+             <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+             <property name="widgetResizable"><bool>true</bool></property>
+             <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+             <widget class="QWidget" name="harmonyContents">
+              <layout class="QVBoxLayout" name="harmonyLayout">
+               <item>
+                <widget class="QGroupBox" name="harmonyProjectGroup">
+                 <property name="title"><string>应用与产物</string></property>
+                 <layout class="QFormLayout" name="harmonyProjectLayout">
+                  <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+                  <item row="0" column="0"><widget class="QLabel" name="harmonyOutputLabel"><property name="text"><string>产物类型</string></property><property name="buddy"><cstring>harmonyOutput</cstring></property></widget></item>
+                  <item row="0" column="1">
+                   <widget class="QComboBox" name="harmonyOutput">
+                    <item><property name="text"><string>HAP 安装包</string></property></item>
+                    <item><property name="text"><string>DevEco Studio 工程</string></property></item>
+                   </widget>
+                  </item>
+                  <item row="1" column="0"><widget class="QLabel" name="applicationIdLabel"><property name="text"><string>应用标识</string></property><property name="buddy"><cstring>applicationId</cstring></property></widget></item>
+                  <item row="1" column="1"><widget class="QLineEdit" name="applicationId"><property name="placeholderText"><string>org.gamesprout.player</string></property></widget></item>
+                  <item row="2" column="0"><widget class="QLabel" name="appNameLabel"><property name="text"><string>应用名称</string></property><property name="buddy"><cstring>appName</cstring></property></widget></item>
+                  <item row="2" column="1"><widget class="QLineEdit" name="appName"/></item>
+                  <item row="3" column="0"><widget class="QLabel" name="versionNameLabel"><property name="text"><string>版本名称</string></property><property name="buddy"><cstring>versionName</cstring></property></widget></item>
+                  <item row="3" column="1"><widget class="QLineEdit" name="versionName"/></item>
+                  <item row="4" column="0"><widget class="QLabel" name="versionCodeLabel"><property name="text"><string>版本号</string></property><property name="buddy"><cstring>versionCode</cstring></property></widget></item>
+                  <item row="4" column="1"><widget class="QSpinBox" name="versionCode"><property name="minimum"><number>1</number></property><property name="maximum"><number>2147483647</number></property></widget></item>
+                  <item row="5" column="0"><widget class="QLabel" name="compatibleApiLabel"><property name="text"><string>最低 API</string></property><property name="buddy"><cstring>compatibleApi</cstring></property></widget></item>
+                  <item row="5" column="1"><widget class="QSpinBox" name="compatibleApi"><property name="minimum"><number>1</number></property><property name="maximum"><number>2147483647</number></property></widget></item>
+                  <item row="6" column="0"><widget class="QLabel" name="targetApiLabel"><property name="text"><string>目标 API</string></property><property name="buddy"><cstring>targetApi</cstring></property></widget></item>
+                  <item row="6" column="1"><widget class="QSpinBox" name="targetApi"><property name="minimum"><number>1</number></property><property name="maximum"><number>2147483647</number></property></widget></item>
+                  <item row="7" column="1">
+                   <layout class="QHBoxLayout" name="harmonyProjectButtons">
+                    <item><widget class="QPushButton" name="saveHarmonyProjectButton"><property name="text"><string>保存应用设置</string></property></widget></item>
+                    <item><widget class="QPushButton" name="resetHarmonyProjectButton"><property name="text"><string>还原</string></property></widget></item>
+                    <item><spacer name="harmonyProjectSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QGroupBox" name="harmonyLocalGroup">
+                 <property name="title"><string>本机工具、签名与运行设备</string></property>
+                 <layout class="QFormLayout" name="harmonyLocalLayout">
+                  <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+                  <item row="0" column="0"><widget class="QLabel" name="toolsPathLabel"><property name="text"><string>工具链目录</string></property><property name="buddy"><cstring>toolsPath</cstring></property></widget></item>
+                  <item row="0" column="1">
+                   <layout class="QHBoxLayout" name="toolsPathLayout">
+                    <item><widget class="QLineEdit" name="toolsPath"><property name="placeholderText"><string>自动检测</string></property></widget></item>
+                    <item><widget class="QPushButton" name="browseToolsButton"><property name="text"><string>浏览…</string></property></widget></item>
+                   </layout>
+                  </item>
+                  <item row="1" column="0"><widget class="QLabel" name="signingModeLabel"><property name="text"><string>签名方式</string></property><property name="buddy"><cstring>signingMode</cstring></property></widget></item>
+                  <item row="1" column="1">
+                   <widget class="QComboBox" name="signingMode">
+                    <item><property name="text"><string>读取环境配置</string></property></item>
+                    <item><property name="text"><string>生成未签名 HAP</string></property></item>
+                    <item><property name="text"><string>使用本机 DevEco 签名配置</string></property></item>
+                   </widget>
+                  </item>
+                  <item row="2" column="0"><widget class="QLabel" name="signingConfigLabel"><property name="text"><string>签名配置文件</string></property><property name="buddy"><cstring>signingConfig</cstring></property></widget></item>
+                  <item row="2" column="1">
+                   <layout class="QHBoxLayout" name="signingConfigLayout">
+                    <item><widget class="QLineEdit" name="signingConfig"><property name="placeholderText"><string>DevEco 签名配置 JSON</string></property></widget></item>
+                    <item><widget class="QPushButton" name="browseSigningButton"><property name="text"><string>浏览…</string></property></widget></item>
+                   </layout>
+                  </item>
+                  <item row="3" column="0"><widget class="QLabel" name="runDeviceLabel"><property name="text"><string>运行设备</string></property><property name="buddy"><cstring>runDevice</cstring></property></widget></item>
+                  <item row="3" column="1">
+                   <layout class="QHBoxLayout" name="runDeviceLayout" stretch="1,0">
+                    <item><widget class="QComboBox" name="runDevice"><property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property><property name="minimumContentsLength"><number>10</number></property></widget></item>
+                    <item><widget class="QPushButton" name="refreshDevicesButton"><property name="text"><string>刷新检测</string></property></widget></item>
+                   </layout>
+                  </item>
+                  <item row="4" column="1">
+                   <layout class="QHBoxLayout" name="harmonyLocalButtons">
+                    <item><widget class="QPushButton" name="saveHarmonyLocalButton"><property name="text"><string>保存本机设置</string></property></widget></item>
+                    <item><widget class="QPushButton" name="resetHarmonyLocalButton"><property name="text"><string>还原</string></property></widget></item>
+                    <item><spacer name="harmonyLocalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item><spacer name="harmonySpacer"><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+              </layout>
+             </widget>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="harmonyStatusLabel">
+     <property name="textFormat"><enum>Qt::PlainText</enum></property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property>
+    </widget>
    </item>
    <item>
     <widget class="QLabel" name="platformSummary">
@@ -116,7 +242,7 @@
      <item><widget class="QPushButton" name="closeButton"><property name="text"><string>关闭</string></property></widget></item>
      <item><spacer name="buttonSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
      <item><widget class="QPushButton" name="cancelButton"><property name="text"><string>取消操作</string></property></widget></item>
-     <item><widget class="QPushButton" name="switchButton"><property name="text"><string>切换平台</string></property></widget></item>
+     <item><widget class="QPushButton" name="switchButton"><property name="text"><string>切换构建配置</string></property></widget></item>
      <item><widget class="QPushButton" name="buildButton"><property name="text"><string>Build</string></property></widget></item>
      <item><widget class="QPushButton" name="buildAndRunButton"><property name="text"><string>Build And Run</string></property></widget></item>
     </layout>

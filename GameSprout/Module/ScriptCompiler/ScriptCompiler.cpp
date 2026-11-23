@@ -166,7 +166,11 @@ bool ScriptCompiler::Compile(const ScriptCompileRequest& request,ScriptCompileRe
         "extern \"C\" GAMESPROUT_SCRIPT_EXPORT const ::GameSproutRuntime::ScriptModuleAPI* GetGameSproutGameLogic() noexcept { return ::GameSproutRuntime::Internal::GetScriptModuleAPI(GetGameSproutGameLogicBuildFingerprint()); }\n";
     result.Diagnostics=result.ReflectionWarnings;
     cmake+=")\nset_target_properties(GameLogic PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)\n";
-    cmake+="if(NOT GAMESPROUT_RUNTIME_SDK_DIR)\n set(GAMESPROUT_RUNTIME_SDK_DIR "+Quoted(QString::fromUtf8(GAMESPROUT_SCRIPT_SDK))+")\nendif()\n";
+    if (request.PrepareSourcesOnly) {
+        cmake+="if(NOT GAMESPROUT_RUNTIME_SDK_DIR)\n message(FATAL_ERROR \"Set GAMESPROUT_RUNTIME_SDK_DIR to the target Player's Runtime API directory\")\nendif()\n";
+    } else {
+        cmake+="if(NOT GAMESPROUT_RUNTIME_SDK_DIR)\n set(GAMESPROUT_RUNTIME_SDK_DIR "+Quoted(QString::fromUtf8(GAMESPROUT_SCRIPT_SDK))+")\nendif()\n";
+    }
     cmake+="target_include_directories(GameLogic PRIVATE \"${GAMESPROUT_RUNTIME_SDK_DIR}\" \"${CMAKE_CURRENT_SOURCE_DIR}\")\n";
     cmake+="if(CMAKE_SYSTEM_NAME STREQUAL \"iOS\")\n set_target_properties(GameLogic PROPERTIES FRAMEWORK TRUE FRAMEWORK_VERSION A MACOSX_FRAMEWORK_IDENTIFIER com.gamesprout.gamelogic)\nendif()\n";
     cmake+="if(CMAKE_CXX_COMPILER_ID MATCHES \"^(AppleClang|Clang)$\")\n target_compile_options(GameLogic PRIVATE -Werror=overloaded-virtual -Werror=shadow-field)\nendif()\n";
