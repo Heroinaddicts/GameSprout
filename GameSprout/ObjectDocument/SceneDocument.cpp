@@ -5,6 +5,7 @@
 #include "SceneLightingDocument.h"
 #include "SceneEnvironmentLightingDocument.h"
 #include "SceneRendererShadows.h"
+#include "SceneCanvasScaleNames.h"
 #include "PrefabDocument.h"
 #include "RuntimeUIApi.h"
 
@@ -98,6 +99,33 @@ bool BoolMember(const Json::Value& value, const char* name, bool fallback, const
     if (!value.isMember(name)) return fallback;
     if (!value[name].isBool()) Fail(path+"."+name,"expected bool");
     return value[name].asBool();
+}
+template<typename Enum, std::size_t Count>
+Enum CanvasEnumMember(const Json::Value& value, const char* name, Enum fallback, const std::string& path,
+                      const std::array<std::pair<Enum,const char*>,Count>& entries) {
+    if (!value.isMember(name)) return fallback;
+    if (!value[name].isString()) Fail(path+"."+name,"expected string");
+    const auto text=value[name].asString();
+    for (const auto& [entry,entryName]:entries)
+        if (text==entryName) return entry;
+    Fail(path+"."+name,"unknown canvas scale setting");
+}
+GameSproutRuntime::CanvasScaleSettings CanvasScaleMember(const Json::Value& component, const std::string& path) {
+    GameSproutRuntime::CanvasScaleSettings settings;
+    if (!component.isMember("ScaleSettings")) return settings;
+    const auto& value=component["ScaleSettings"];
+    const auto settingsPath=path+".ScaleSettings";
+    Members(value,settingsPath,{"Mode","MatchMode","ScaleFactor","WidthHeightMatch","FallbackDpi","PhysicalUnit","UseSafeArea"});
+    settings.Mode=CanvasEnumMember(value,"Mode",settings.Mode,settingsPath,SceneCanvasScaleNames::Modes);
+    settings.MatchMode=CanvasEnumMember(value,"MatchMode",settings.MatchMode,settingsPath,SceneCanvasScaleNames::MatchModes);
+    settings.ScaleFactor=FloatMember(value,"ScaleFactor",settings.ScaleFactor,settingsPath);
+    settings.WidthHeightMatch=FloatMember(value,"WidthHeightMatch",settings.WidthHeightMatch,settingsPath);
+    settings.FallbackDpi=FloatMember(value,"FallbackDpi",settings.FallbackDpi,settingsPath);
+    settings.PhysicalUnit=CanvasEnumMember(value,"PhysicalUnit",settings.PhysicalUnit,settingsPath,SceneCanvasScaleNames::Units);
+    settings.UseSafeArea=BoolMember(value,"UseSafeArea",settings.UseSafeArea,settingsPath);
+    if (!GameSproutRuntime::IsValidCanvasScaleSettings(settings))
+        Fail(settingsPath,"scale factor and fallback DPI must be positive, and width/height match must be in [0,1]");
+    return settings;
 }
 template<std::size_t Count>
 std::array<float,Count> Numbers(const Json::Value& value, const std::string& path) {
@@ -212,7 +240,7 @@ std::string_view ComponentData(const Json::Value& value, GameSproutRuntime::IGam
             component->SetTexture(texture); component->SetColor(color); component->SetUVRect(uv);
         }
     } else if (type=="GameSproutRuntime.Canvas") {
-        Members(value,path,{"ID","Type","RenderMode","ReferenceResolution","PixelsPerUnit"});
+        Members(value,path,{"ID","Type","RenderMode","ReferenceResolution","PixelsPerUnit","ScaleSettings"});
         GameSproutRuntime::CanvasRenderMode mode=GameSproutRuntime::CanvasRenderMode::ScreenSpace;
         if (value.isMember("RenderMode")) {
             if (!value["RenderMode"].isString()) Fail(path+".RenderMode","expected string");
@@ -222,11 +250,13 @@ std::string_view ComponentData(const Json::Value& value, GameSproutRuntime::IGam
         }
         const auto resolution=Vector2Member(value,"ReferenceResolution",{1920,1080},path);
         const float pixels=FloatMember(value,"PixelsPerUnit",100,path);
+        const auto scale=CanvasScaleMember(value,path);
         if (resolution.X<=0 || resolution.Y<=0 || pixels<=0) Fail(path,"canvas dimensions must be positive");
         if (object) {
             auto* component=Component<GameSproutRuntime::ICanvasComponent>(object,path);
             component->SetRenderMode(mode);
-            if (!component->SetReferenceResolution(resolution) || !component->SetPixelsPerUnit(pixels)) Fail(path,"Runtime rejected canvas settings");
+            if (!component->SetReferenceResolution(resolution) || !component->SetPixelsPerUnit(pixels) ||
+                !component->SetScaleSettings(scale)) Fail(path,"Runtime rejected canvas settings");
         }
     } else if (type=="GameSproutRuntime.Text") {
         Members(value,path,{"ID","Type","Text","Font","Color","FontSize"});

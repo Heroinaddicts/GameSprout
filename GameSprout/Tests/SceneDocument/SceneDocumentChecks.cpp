@@ -144,6 +144,17 @@ static void CheckUIDocuments(GameSproutRuntime::IGameSproutRuntime& runtime) {
     auto buttonComponent=Component("Button");
     buttonComponent["Interactable"]=false;
     button["Components"].append(buttonComponent);
+    auto canvas=Component("Canvas");
+    canvas["ReferenceResolution"]=Vector({1280,720});
+    auto& scale=canvas["ScaleSettings"];
+    scale["Mode"]="ConstantPhysicalSize";
+    scale["MatchMode"]="MatchWidthOrHeight";
+    scale["ScaleFactor"]=1.5;
+    scale["WidthHeightMatch"]=0.25;
+    scale["FallbackDpi"]=144.0;
+    scale["PhysicalUnit"]="Millimeters";
+    scale["UseSafeArea"]=true;
+    button["Components"].append(canvas);
     source["Objects"].append(button);
     auto label=Node(2,1,"Label");
     label["Components"].append(Component("RectTransform"));
@@ -159,16 +170,32 @@ static void CheckUIDocuments(GameSproutRuntime::IGameSproutRuntime& runtime) {
     IScene* scene=nullptr;
     SceneDocument::ObjectIDs identities;
     Check(SceneDocument::Instantiate(source,runtime,scene,identities,error),error);
+    CanvasScaleSettings expectedScale;
+    expectedScale.Mode=CanvasScaleMode::ConstantPhysicalSize;
+    expectedScale.MatchMode=CanvasScreenMatchMode::MatchWidthOrHeight;
+    expectedScale.ScaleFactor=1.5f;
+    expectedScale.WidthHeightMatch=0.25f;
+    expectedScale.FallbackDpi=144.0f;
+    expectedScale.PhysicalUnit=CanvasPhysicalUnit::Millimeters;
+    expectedScale.UseSafeArea=true;
     const auto checkValues=[&](const IGameObject* root) {
         Check(root,"Button root was not restored");
         const auto* input=root->GetComponent<IButtonComponent>();
+        const auto* canvasComponent=root->GetComponent<ICanvasComponent>();
         const auto* child=root->FindChild("Label");
         const auto* labelComponent=child?child->GetComponent<ITextComponent>():nullptr;
         Check(input&&!input->GetInteractable(),"Button interactability was not restored");
+        Check(canvasComponent&&canvasComponent->GetScaleSettings()==expectedScale&&
+              canvasComponent->GetReferenceResolution().X==1280,"Canvas scale settings were not restored");
         Check(labelComponent&&labelComponent->GetText()=="开始\nPlay"&&labelComponent->GetFont()==font&&
               labelComponent->GetColor().A==0.75f&&labelComponent->GetFontSize()==28,"Text values or font identity were not restored");
     };
     checkValues(scene->FindChild("Button"));
+    auto* canvasComponent=scene->FindChild("Button")->GetComponent<ICanvasComponent>();
+    auto invalidScale=expectedScale;
+    invalidScale.FallbackDpi=0;
+    Check(!canvasComponent->SetScaleSettings(invalidScale)&&canvasComponent->GetScaleSettings()==expectedScale,
+          "Invalid Runtime Canvas scale settings changed the component");
     Json::Value saved;
     Check(SceneDocument::Serialize(*scene,identities,saved,error),error);
     IScene* reopened=nullptr;
@@ -195,6 +222,15 @@ static void CheckUIDocuments(GameSproutRuntime::IGameSproutRuntime& runtime) {
     invalid=source;
     invalid["Objects"][0]["Components"][2]["Interactable"]=1;
     Check(!SceneDocument::Validate(invalid,error)&&error.find(".Interactable")!=std::string::npos,"Invalid Button flag accepted");
+    invalid=source;
+    invalid["Objects"][0]["Components"][3]["ScaleSettings"]["WidthHeightMatch"]=1.01;
+    Check(!SceneDocument::Validate(invalid,error)&&error.find(".ScaleSettings")!=std::string::npos,"Invalid Canvas scale match accepted");
+    invalid=source;
+    invalid["Objects"][0]["Components"][3]["ScaleSettings"]["PhysicalUnit"]="Pixels";
+    Check(!SceneDocument::Validate(invalid,error)&&error.find(".PhysicalUnit")!=std::string::npos,"Unknown Canvas physical unit accepted");
+    invalid=source;
+    invalid["Objects"][0]["Components"][3]["ScaleSettings"]["UseSafeArea"]=1;
+    Check(!SceneDocument::Validate(invalid,error)&&error.find(".UseSafeArea")!=std::string::npos,"Invalid Canvas safe area flag accepted");
 }
 
 int main() {
@@ -229,6 +265,8 @@ int main() {
             "Resource LocalID was lost");
         Check(object->GetComponent<GameSproutRuntime::ICanvasComponent>()->GetPixelsPerUnit()==50,
             "Canvas settings were lost");
+        Check(object->GetComponent<GameSproutRuntime::ICanvasComponent>()->GetScaleSettings()==GameSproutRuntime::CanvasScaleSettings{},
+            "Canvas scale defaults changed for existing documents");
         Check(object->GetComponent<GameSproutRuntime::IRectTransformComponent>()->GetSizeDelta().X==-10,
             "Negative stretch size delta was rejected");
         Check(object->GetComponent<GameSproutRuntime::IMeshRendererComponent>()->GetMaterialCount()==2,

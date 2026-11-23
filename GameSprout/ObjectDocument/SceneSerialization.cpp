@@ -5,6 +5,7 @@
 #include "SceneLightingDocument.h"
 #include "SceneEnvironmentLightingDocument.h"
 #include "SceneRendererShadows.h"
+#include "SceneCanvasScaleNames.h"
 #include "RuntimeUIApi.h"
 #include <algorithm>
 #include <cmath>
@@ -22,6 +23,23 @@ Json::Value Values(std::initializer_list<float> values) {
 }
 Json::Value Vector(GameSproutRuntime::Vector2 value) {return Values({value.X,value.Y});}
 Json::Value Vector(GameSproutRuntime::Vector3 value) {return Values({value.X,value.Y,value.Z});}
+template<typename Enum, std::size_t Count>
+const char* CanvasEnumName(Enum value, const std::array<std::pair<Enum,const char*>,Count>& entries) {
+    for (const auto& [entry,name]:entries)
+        if (value==entry) return name;
+    throw std::runtime_error("Invalid canvas scale setting");
+}
+Json::Value CanvasScale(const GameSproutRuntime::CanvasScaleSettings& settings) {
+    Json::Value result(Json::objectValue);
+    result["Mode"]=CanvasEnumName(settings.Mode,SceneCanvasScaleNames::Modes);
+    result["MatchMode"]=CanvasEnumName(settings.MatchMode,SceneCanvasScaleNames::MatchModes);
+    result["ScaleFactor"]=settings.ScaleFactor;
+    result["WidthHeightMatch"]=settings.WidthHeightMatch;
+    result["FallbackDpi"]=settings.FallbackDpi;
+    result["PhysicalUnit"]=CanvasEnumName(settings.PhysicalUnit,SceneCanvasScaleNames::Units);
+    result["UseSafeArea"]=settings.UseSafeArea;
+    return result;
+}
 Json::Value Reference(const GameSproutRuntime::ResourceReference& reference) {
     if (reference.Guid.empty()) {
         if (reference.LocalID) throw std::runtime_error("Unbound resource has a nonzero LocalID");
@@ -123,6 +141,8 @@ Json::Value SerializeComponent(GameSproutRuntime::IComponent& component, const O
             if (!value) throw std::runtime_error("Canvas interface mismatch");
             data["RenderMode"]=value->GetRenderMode()==GameSproutRuntime::CanvasRenderMode::WorldSpace?"WorldSpace":"ScreenSpace";
             data["ReferenceResolution"]=Vector(value->GetReferenceResolution());data["PixelsPerUnit"]=value->GetPixelsPerUnit();
+            const auto scale=value->GetScaleSettings();
+            if (scale!=GameSproutRuntime::CanvasScaleSettings{}) data["ScaleSettings"]=CanvasScale(scale);
         } else if (type=="GameSproutRuntime.Text") {
             auto* value=dynamic_cast<GameSproutRuntime::ITextComponent*>(&component);
             if (!value) throw std::runtime_error("Text interface mismatch");

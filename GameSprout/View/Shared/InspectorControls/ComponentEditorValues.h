@@ -6,7 +6,12 @@
 namespace InspectorValues {
 struct Transform { GameSproutRuntime::Vector3 Position; GameSproutRuntime::Quaternion Rotation; GameSproutRuntime::Vector3 Scale; };
 struct RectTransform { GameSproutRuntime::Vector2 Minimum, Maximum, Pivot, Position, Size; };
-struct Canvas { GameSproutRuntime::CanvasRenderMode Mode; GameSproutRuntime::Vector2 Resolution; float Pixels; };
+struct Canvas {
+    GameSproutRuntime::CanvasRenderMode Mode;
+    GameSproutRuntime::Vector2 Resolution;
+    float Pixels;
+    GameSproutRuntime::CanvasScaleSettings Scale;
+};
 struct Image { GameSproutRuntime::ResourceReference Texture; GameSproutRuntime::Color Color; GameSproutRuntime::Rect UV; };
 struct MeshRenderer { bool Visible; std::vector<GameSproutRuntime::ResourceReference> Materials; };
 Transform Read(const GameSproutRuntime::ITransformComponent& component);

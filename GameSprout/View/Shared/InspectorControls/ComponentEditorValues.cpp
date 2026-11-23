@@ -12,7 +12,9 @@ bool Checked(bool success, std::string& error) { if (!success && error.empty()) 
 }
 Transform Read(const GameSproutRuntime::ITransformComponent& c) { return {c.GetLocalPosition(), c.GetLocalRotation(), c.GetLocalScale()}; }
 RectTransform Read(const GameSproutRuntime::IRectTransformComponent& c) { return {c.GetAnchorMin(), c.GetAnchorMax(), c.GetPivot(), c.GetAnchoredPosition(), c.GetSizeDelta()}; }
-Canvas Read(const GameSproutRuntime::ICanvasComponent& c) { return {c.GetRenderMode(), c.GetReferenceResolution(), c.GetPixelsPerUnit()}; }
+Canvas Read(const GameSproutRuntime::ICanvasComponent& c) {
+    return {c.GetRenderMode(), c.GetReferenceResolution(), c.GetPixelsPerUnit(), c.GetScaleSettings()};
+}
 Image Read(const GameSproutRuntime::IImageComponent& c) { return {c.GetTexture(), c.GetColor(), c.GetUVRect()}; }
 GameSproutRuntime::ResourceReference Read(const GameSproutRuntime::IMeshComponent& c) { return c.GetMesh(); }
 GameSproutRuntime::CameraSettings Read(const GameSproutRuntime::ICameraComponent& c) { return c.GetSettings(); }
@@ -28,7 +30,9 @@ bool Equal(const Transform& a, const Transform& b) {
     return Same(a.Position, b.Position) && Same(a.Scale, b.Scale) && (same || opposite);
 }
 bool Equal(const RectTransform& a, const RectTransform& b) { return Same(a.Minimum,b.Minimum) && Same(a.Maximum,b.Maximum) && Same(a.Pivot,b.Pivot) && Same(a.Position,b.Position) && Same(a.Size,b.Size); }
-bool Equal(const Canvas& a, const Canvas& b) { return a.Mode == b.Mode && Same(a.Resolution,b.Resolution) && a.Pixels == b.Pixels; }
+bool Equal(const Canvas& a, const Canvas& b) {
+    return a.Mode == b.Mode && Same(a.Resolution,b.Resolution) && a.Pixels == b.Pixels && a.Scale == b.Scale;
+}
 bool Equal(const Image& a, const Image& b) { return a.Texture == b.Texture && a.Color.R == b.Color.R && a.Color.G == b.Color.G && a.Color.B == b.Color.B && a.Color.A == b.Color.A && Same(a.UV.Position,b.UV.Position) && Same(a.UV.Size,b.UV.Size); }
 bool Equal(const MeshRenderer& a, const MeshRenderer& b) { return a.Visible == b.Visible && a.Materials == b.Materials; }
 bool Equal(const GameSproutRuntime::ResourceReference& a, const GameSproutRuntime::ResourceReference& b) { return a == b; }
@@ -48,6 +52,10 @@ bool Validate(RectTransform& v, std::string& error) {
 bool Validate(Canvas& v, std::string& error) {
     if ((v.Mode != GameSproutRuntime::CanvasRenderMode::ScreenSpace && v.Mode != GameSproutRuntime::CanvasRenderMode::WorldSpace) || !Finite(v.Resolution) || v.Resolution.X <= 0 || v.Resolution.Y <= 0 || !std::isfinite(v.Pixels) || v.Pixels <= 0) {
         error = "Canvas 分辨率和每米布局单位必须为有限正数。"; return false;
+    }
+    if (!GameSproutRuntime::IsValidCanvasScaleSettings(v.Scale)) {
+        error = "Canvas 缩放系数和备用 DPI 必须为有限正数，宽高匹配范围为 0 到 1。";
+        return false;
     }
     return true;
 }
@@ -92,7 +100,11 @@ bool Write(GameSproutRuntime::ITransformComponent& c, const Transform& v, std::s
     return Checked(Same(current.Position,v.Position) && Same(current.Scale,v.Scale) && std::fabs(std::fabs(dot)-1.0f) < 0.00001f,error);
 }
 bool Write(GameSproutRuntime::IRectTransformComponent& c, const RectTransform& v, std::string& error) { c.SetAnchors(v.Minimum,v.Maximum); c.SetPivot(v.Pivot); c.SetAnchoredPosition(v.Position); c.SetSizeDelta(v.Size); return Checked(Equal(Read(c),v),error); }
-bool Write(GameSproutRuntime::ICanvasComponent& c, const Canvas& v, std::string& error) { c.SetRenderMode(v.Mode); return Checked(c.SetReferenceResolution(v.Resolution) && c.SetPixelsPerUnit(v.Pixels) && Equal(Read(c),v),error); }
+bool Write(GameSproutRuntime::ICanvasComponent& c, const Canvas& v, std::string& error) {
+    c.SetRenderMode(v.Mode);
+    return Checked(c.SetReferenceResolution(v.Resolution) && c.SetPixelsPerUnit(v.Pixels) &&
+                   c.SetScaleSettings(v.Scale) && Equal(Read(c),v),error);
+}
 bool Write(GameSproutRuntime::IImageComponent& c, const Image& v, std::string& error) { c.SetTexture(v.Texture); c.SetColor(v.Color); c.SetUVRect(v.UV); return Checked(Equal(Read(c),v),error); }
 bool Write(GameSproutRuntime::IMeshComponent& c, const GameSproutRuntime::ResourceReference& v, std::string& error) { c.SetMesh(v); return Checked(Equal(c.GetMesh(),v),error); }
 bool Write(GameSproutRuntime::IMeshRendererComponent& c, const MeshRenderer& v, std::string& error) { if (!c.SetMaterials(v.Materials)) return Checked(false,error); c.SetVisible(v.Visible); return Checked(Equal(Read(c),v),error); }

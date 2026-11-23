@@ -32,6 +32,7 @@ static void CheckSerialization(GameSproutRuntime::IGameSproutRuntime& runtime,co
           FileNode(saved,"Added")["ID"].asUInt64()==addedFileID,"Loaded IDs changed or new ID was not allocated monotonically");
     Check(saved["MainCameraID"].asUInt64()==30 && saved["NextObjectID"].asUInt64()>addedFileID,"Main camera/File ID high water mark mismatch");
     Check(FileNode(saved,"Added")["Components"][0]["ID"].asUInt64()>addedFileID,"Intrinsic component has no stable ID");
+    Check(!FileNode(saved,"First")["Components"][3].isMember("ScaleSettings"),"Default Canvas scale changed the canonical document");
     Check(FileNode(saved,"First")["Components"][4]["Mesh"]["LocalID"].asUInt64()==91,"Mesh resource identity lost");
     Check(FileNode(saved,"First")["Components"][5]["Materials"][1].isNull(),"Unbound slot must remain null");
     const auto& rendererDocument=FileNode(saved,"First")["Components"][5];

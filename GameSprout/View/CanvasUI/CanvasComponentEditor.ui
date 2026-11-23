@@ -1,4 +1,137 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ui version="4.0"><class>CanvasComponentEditorForm</class><widget class="QWidget" name="CanvasComponentEditorForm"><layout class="QFormLayout" name="formLayout"><property name="formAlignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property><property name="labelAlignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property><property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property><item row="0" column="0"><widget class="QLabel" name="label0"><property name="text"><string>渲染模式</string></property></widget></item><item row="0" column="1"><widget class="QComboBox" name="canvasModeCombo"><item><property name="text"><string>Screen Space</string></property></item><item><property name="text"><string>World Space</string></property></item></widget></item>
-<item row="1" column="0"><widget class="QLabel" name="label1"><property name="text"><string>参考分辨率</string></property></widget></item><item row="1" column="1"><layout class="QHBoxLayout" name="rowResolution"><item><widget class="QLineEdit" name="canvasResolutionXEdit"><property name="placeholderText"><string>X</string></property></widget></item><item><widget class="QLineEdit" name="canvasResolutionYEdit"><property name="placeholderText"><string>Y</string></property></widget></item></layout></item>
-<item row="2" column="0"><widget class="QLabel" name="label2"><property name="text"><string>布局单位 / 米</string></property></widget></item><item row="2" column="1"><widget class="QLineEdit" name="canvasPixelsPerUnitEdit"><property name="placeholderText"><string></string></property></widget></item></layout></widget><resources/><connections/></ui>
+<ui version="4.0">
+ <class>CanvasComponentEditorForm</class>
+ <widget class="QWidget" name="CanvasComponentEditorForm">
+  <layout class="QFormLayout" name="formLayout">
+   <property name="formAlignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property>
+   <property name="labelAlignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property>
+   <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+   <item row="0" column="0">
+    <widget class="QLabel" name="canvasModeLabel">
+     <property name="text"><string>渲染模式</string></property>
+     <property name="buddy"><cstring>canvasModeCombo</cstring></property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QComboBox" name="canvasModeCombo">
+     <item><property name="text"><string>Screen Space</string></property></item>
+     <item><property name="text"><string>World Space</string></property></item>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="canvasScaleModeLabel">
+     <property name="text"><string>缩放模式</string></property>
+     <property name="buddy"><cstring>canvasScaleModeCombo</cstring></property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QComboBox" name="canvasScaleModeCombo">
+     <item><property name="text"><string>固定像素大小</string></property></item>
+     <item><property name="text"><string>随屏幕尺寸缩放</string></property></item>
+     <item><property name="text"><string>固定物理大小</string></property></item>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="canvasResolutionLabel">
+     <property name="text"><string>参考分辨率</string></property>
+     <property name="buddy"><cstring>canvasResolutionXEdit</cstring></property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="QWidget" name="canvasResolutionFields">
+     <layout class="QHBoxLayout" name="rowResolution">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <item>
+       <widget class="QLineEdit" name="canvasResolutionXEdit">
+        <property name="placeholderText"><string>X</string></property>
+        <property name="accessibleName"><string>参考分辨率宽度</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="canvasResolutionYEdit">
+        <property name="placeholderText"><string>Y</string></property>
+        <property name="accessibleName"><string>参考分辨率高度</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="canvasMatchModeLabel">
+     <property name="text"><string>屏幕匹配</string></property>
+     <property name="buddy"><cstring>canvasMatchModeCombo</cstring></property>
+    </widget>
+   </item>
+   <item row="3" column="1">
+    <widget class="QComboBox" name="canvasMatchModeCombo">
+     <item><property name="text"><string>匹配宽度或高度</string></property></item>
+     <item><property name="text"><string>扩展画布</string></property></item>
+     <item><property name="text"><string>收缩画布</string></property></item>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel" name="canvasWidthHeightMatchLabel">
+     <property name="text"><string>宽高匹配</string></property>
+     <property name="toolTip"><string>0 匹配宽度，1 匹配高度。</string></property>
+     <property name="buddy"><cstring>canvasWidthHeightMatchEdit</cstring></property>
+    </widget>
+   </item>
+   <item row="4" column="1">
+    <widget class="QLineEdit" name="canvasWidthHeightMatchEdit"/>
+   </item>
+   <item row="5" column="0">
+    <widget class="QLabel" name="canvasScaleFactorLabel">
+     <property name="text"><string>缩放系数</string></property>
+     <property name="buddy"><cstring>canvasScaleFactorEdit</cstring></property>
+    </widget>
+   </item>
+   <item row="5" column="1">
+    <widget class="QLineEdit" name="canvasScaleFactorEdit"/>
+   </item>
+   <item row="6" column="0">
+    <widget class="QLabel" name="canvasPhysicalUnitLabel">
+     <property name="text"><string>物理单位</string></property>
+     <property name="buddy"><cstring>canvasPhysicalUnitCombo</cstring></property>
+    </widget>
+   </item>
+   <item row="6" column="1">
+    <widget class="QComboBox" name="canvasPhysicalUnitCombo">
+     <item><property name="text"><string>厘米</string></property></item>
+     <item><property name="text"><string>毫米</string></property></item>
+     <item><property name="text"><string>英寸</string></property></item>
+     <item><property name="text"><string>点 (pt)</string></property></item>
+     <item><property name="text"><string>派卡 (pc)</string></property></item>
+    </widget>
+   </item>
+   <item row="7" column="0">
+    <widget class="QLabel" name="canvasFallbackDpiLabel">
+     <property name="text"><string>备用 DPI</string></property>
+     <property name="toolTip"><string>设备未提供屏幕 DPI 时使用。</string></property>
+     <property name="buddy"><cstring>canvasFallbackDpiEdit</cstring></property>
+    </widget>
+   </item>
+   <item row="7" column="1">
+    <widget class="QLineEdit" name="canvasFallbackDpiEdit"/>
+   </item>
+   <item row="8" column="1">
+    <widget class="QCheckBox" name="canvasUseSafeAreaCheck">
+     <property name="text"><string>使用屏幕安全区域</string></property>
+    </widget>
+   </item>
+   <item row="9" column="0">
+    <widget class="QLabel" name="canvasPixelsPerUnitLabel">
+     <property name="text"><string>布局单位 / 米</string></property>
+     <property name="buddy"><cstring>canvasPixelsPerUnitEdit</cstring></property>
+    </widget>
+   </item>
+   <item row="9" column="1">
+    <widget class="QLineEdit" name="canvasPixelsPerUnitEdit"/>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
