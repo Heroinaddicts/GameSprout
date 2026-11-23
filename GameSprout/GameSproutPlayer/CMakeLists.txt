@@ -28,9 +28,6 @@ endif()
 target_link_libraries(GameSproutPlayer PRIVATE ObjectDocument::ObjectDocument
     PreparedResources::PreparedResources GameSproutRuntime::GameSproutRuntimeApi ${player_sdl})
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    enable_language(OBJCXX)
-    target_sources(GameSproutPlayer PRIVATE CocoaPlayerWindow.mm)
-    target_link_libraries(GameSproutPlayer PRIVATE "-framework Cocoa")
     set_target_properties(GameSproutPlayer PROPERTIES
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.gamesprout.player"
         MACOSX_BUNDLE_BUNDLE_NAME "GameSprout Player"

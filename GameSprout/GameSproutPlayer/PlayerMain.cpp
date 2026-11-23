@@ -23,14 +23,6 @@ bool MobilePaths(std::filesystem::path& binary, std::filesystem::path& directory
 }
 #endif
 
-#if !defined(SDL_PLATFORM_MACOS)
-namespace GameSproutPlayer {
-GameSproutRuntime::NativeWindow RenderWindow(SDL_Window* window) {
-    return {GameSproutRuntime::NativeWindowSystem::SDL, reinterpret_cast<std::uintptr_t>(window)};
-}
-}
-#endif
-
 namespace {
 using GameSproutRuntime::IGameSproutRuntime;
 volatile std::sig_atomic_t Interrupted = 0;
@@ -223,7 +215,11 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
     if (!headless) {
         player.Window = SDL_CreateWindow(startupSceneName.c_str(), 1280, 720, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
         if (!player.Window) { error = SDL_GetError(); return false; }
-        player.Viewport = player.Runtime->CreateViewport(GameSproutPlayer::RenderWindow(player.Window), &player.Package, error);
+        // Rendering and input share the Player's SDL window identity. Wrapping its
+        // NSView on macOS creates a second SDL window that can take keyboard focus.
+        const GameSproutRuntime::NativeWindow nativeWindow{
+            GameSproutRuntime::NativeWindowSystem::SDL, reinterpret_cast<std::uintptr_t>(player.Window)};
+        player.Viewport = player.Runtime->CreateViewport(nativeWindow, &player.Package, error);
         if (!player.Viewport) return false;
     }
     scene->SetSimulationEnabled(true);
