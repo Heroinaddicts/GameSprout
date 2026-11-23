@@ -17,6 +17,8 @@ if(NOT TARGET GameSproutRuntime::GameSproutRuntime)
     add_library(GameSproutRuntime::GameSproutRuntime SHARED IMPORTED GLOBAL)
     get_filename_component(gamesprout_runtime_binary_directory
         "${CMAKE_CURRENT_LIST_DIR}/../../Bin" ABSOLUTE)
+    set(GAMESPROUT_RUNTIME_BINARY_DIRECTORY "${gamesprout_runtime_binary_directory}" CACHE PATH "Directory containing the Runtime SDK library")
+    set(gamesprout_runtime_binary_directory "${GAMESPROUT_RUNTIME_BINARY_DIRECTORY}")
     if(WIN32)
         set(gamesprout_runtime_binary_name "GameSproutRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}")
     else()

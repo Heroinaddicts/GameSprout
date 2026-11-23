@@ -19,31 +19,55 @@ SurfaceSDL* SurfaceSDL::CreateSurfaceSDL(DeviceSDL* device, GRHIWindowHandle han
     configured = SDL_SetPointerProperty(props, SDL_PROP_WINDOW_CREATE_COCOA_VIEW_POINTER, handle);
 #elif defined(SDL_PLATFORM_WINDOWS)
     configured = SDL_SetPointerProperty(props, SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER, handle);
-#else
+#elif defined(SDL_PLATFORM_LINUX)
     configured = SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X11_WINDOW_NUMBER, static_cast<Sint64>(handle));
+#else
+    (void)handle;
 #endif
-    SDL_Window* window = configured ? SDL_CreateWindowWithProperties(props) : nullptr;
+    if (!configured) {
+        SDL_DestroyProperties(props);
+        device->Fail("Cannot wrap the native window on this platform.");
+        return nullptr;
+    }
+    SDL_Window* window = SDL_CreateWindowWithProperties(props);
     SDL_DestroyProperties(props);
     if (!window) { device->FailSDL(); return nullptr; }
+    return ClaimWindow(device, window, handle, true);
+}
+
+SurfaceSDL* SurfaceSDL::BorrowWindow(DeviceSDL* device, SDL_Window* window) {
+    if (!device->OnMainThread()) { device->Fail("Surface creation requires the device/window main thread."); return nullptr; }
+    return ClaimWindow(device, window, {}, false);
+}
+
+SurfaceSDL* SurfaceSDL::ClaimWindow(DeviceSDL* device, SDL_Window* window, GRHIWindowHandle handle, bool ownsWindow) {
     if (!SDL_ClaimWindowForGPUDevice(device->Native(), window)) {
-        device->FailSDL(); SDL_DestroyWindow(window); return nullptr;
+        device->FailSDL();
+        if (ownsWindow) SDL_DestroyWindow(window);
+        return nullptr;
     }
     // Shaders output linear colors. Use an sRGB swapchain so presentation encodes
     // RGB once, matching sRGB texture sampling and linear alpha blending.
     if (!SDL_WindowSupportsGPUSwapchainComposition(device->Native(), window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR_LINEAR) ||
         !SDL_SetGPUSwapchainParameters(device->Native(), window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR_LINEAR, SDL_GPU_PRESENTMODE_VSYNC)) {
         device->Fail("Cannot configure a linear-output/sRGB swapchain: " + std::string(SDL_GetError()));
-        SDL_ReleaseWindowFromGPUDevice(device->Native(), window); SDL_DestroyWindow(window); return nullptr;
+        SDL_ReleaseWindowFromGPUDevice(device->Native(), window);
+        if (ownsWindow) SDL_DestroyWindow(window);
+        return nullptr;
     }
-    try { return new SurfaceSDL(device, window,handle); }
-    catch (...) { SDL_ReleaseWindowFromGPUDevice(device->Native(), window); SDL_DestroyWindow(window); throw; }
+    try { return new SurfaceSDL(device, window, handle, ownsWindow); }
+    catch (...) {
+        SDL_ReleaseWindowFromGPUDevice(device->Native(), window);
+        if (ownsWindow) SDL_DestroyWindow(window);
+        throw;
+    }
 }
 void SurfaceSDL::Release() {
     delete _Renderer; _Renderer = nullptr;
     if (_Window) {
         SDL_ReleaseWindowFromGPUDevice(_Device->Native(), _Window);
-        // SDL's foreign-window wrapper does not own the host native window/view.
-        SDL_DestroyWindow(_Window); _Window = nullptr;
+        if (_OwnsWindow) SDL_DestroyWindow(_Window);
+        _Window = nullptr;
     }
 }
 TextureFormat SurfaceSDL::GetColorFormat() const {
@@ -70,12 +94,15 @@ AcquireFrameResult SurfaceSDL::AcquireFrame(ICommandBuffer* value, SurfaceFrame&
         _Device->Fail("Invalid surface, command, thread, active pass or duplicate frame acquisition."); return AcquireFrameResult::Failed;
     }
 #if defined(SDL_PLATFORM_MACOS)
-    bool drawableAvailable=false;
-    std::string syncError;
-    if(!SyncCocoaSurfaceDrawable(_HostHandle,_Window,drawableAvailable,syncError)) {
-        command->Fail(syncError);return AcquireFrameResult::Failed;
+    if (_OwnsWindow) {
+        bool drawableAvailable = false;
+        std::string syncError;
+        if (!SyncCocoaSurfaceDrawable(_HostHandle, _Window, drawableAvailable, syncError)) {
+            command->Fail(syncError);
+            return AcquireFrameResult::Failed;
+        }
+        if (!drawableAvailable) return AcquireFrameResult::Unavailable;
     }
-    if(!drawableAvailable)return AcquireFrameResult::Unavailable;
 #endif
     // Reserve bookkeeping before acquiring; allocation must not strand an acquired frame.
     command->FrameTokens.reserve(command->FrameTokens.size() + 1);

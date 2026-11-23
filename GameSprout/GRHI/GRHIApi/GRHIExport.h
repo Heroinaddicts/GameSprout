@@ -3,6 +3,11 @@
 
 #include "GRHIApi.h"
 
+#if defined(GAMESPROUT_GRHI_STATIC_LINK)
+namespace GRHI {
+    GRHIApi* CreateGRHI() noexcept;
+}
+#else
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -114,5 +119,6 @@ inline GRHI::GRHIApi* ExportGRHIApi(const std::string& path) {
 
     return api;
 }
+#endif
 
 #endif //__GRHIExport_h__

@@ -8,18 +8,23 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project(GRHI VERSION 0.1 LANGUAGES CXX)
 endif()
-if(APPLE)
+if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     enable_language(OBJCXX)
 endif()
 
-# SDL is built independently; only its prebuilt shared target is consumed here.
-find_package(SDL3 3.2 CONFIG REQUIRED COMPONENTS SDL3-shared
-    HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../SDL/build"
-)
+option(GAMESPROUT_GRHI_STATIC "Link GRHI into the target Player" OFF)
+set(GAMESPROUT_GRHI_SDL_TARGET "SDL3::SDL3-shared" CACHE STRING "SDL library target shared with the Player")
+if(NOT TARGET "${GAMESPROUT_GRHI_SDL_TARGET}")
+    string(REPLACE "SDL3::" "" grhi_sdl_component "${GAMESPROUT_GRHI_SDL_TARGET}")
+    find_package(SDL3 3.2 CONFIG REQUIRED COMPONENTS "${grhi_sdl_component}"
+        HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../SDL/build")
+endif()
+get_target_property(grhi_sdl_is_imported "${GAMESPROUT_GRHI_SDL_TARGET}" IMPORTED)
+if(grhi_sdl_is_imported)
 include(CMakePushCheckState)
 include(CheckCXXSourceCompiles)
 cmake_push_check_state(RESET)
-set(CMAKE_REQUIRED_LIBRARIES SDL3::SDL3-shared)
+set(CMAKE_REQUIRED_LIBRARIES "${GAMESPROUT_GRHI_SDL_TARGET}")
 unset(GRHI_SDL_ADAPTER_EXTENSION CACHE)
 check_cxx_source_compiles("#include <SDL3/SDL.h>
 #if !defined(SDL_GRHI_GPU_ADAPTERS_VERSION) || SDL_GRHI_GPU_ADAPTERS_VERSION < 2
@@ -32,6 +37,7 @@ cmake_pop_check_state()
 if(NOT GRHI_SDL_ADAPTER_EXTENSION)
     message(FATAL_ERROR "Build the local SDL with the GRHI GPU adapter extension first, then set SDL3_DIR to that build.")
 endif()
+endif()
 
 file(GLOB_RECURSE grhi_api_files CONFIGURE_DEPENDS
     LIST_DIRECTORIES false "${CMAKE_CURRENT_SOURCE_DIR}/GRHIApi/*"
@@ -39,7 +45,7 @@ file(GLOB_RECURSE grhi_api_files CONFIGURE_DEPENDS
 file(GLOB_RECURSE grhi_implementation_files CONFIGURE_DEPENDS
     LIST_DIRECTORIES false "${CMAKE_CURRENT_SOURCE_DIR}/GRHI/*"
 )
-if(NOT APPLE)
+if(NOT APPLE OR NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     list(FILTER grhi_implementation_files EXCLUDE REGEX "[.]mm$")
 endif()
 set(grhi_project_files
@@ -76,12 +82,17 @@ if(CMAKE_GENERATOR STREQUAL "Xcode")
     endforeach()
 endif()
 
-add_library(GRHI SHARED ${grhi_files})
+if(GAMESPROUT_GRHI_STATIC)
+    add_library(GRHI STATIC ${grhi_files})
+    target_compile_definitions(GRHI PUBLIC GAMESPROUT_GRHI_STATIC_LINK)
+else()
+    add_library(GRHI SHARED ${grhi_files})
+endif()
 add_library(GRHI::GRHI ALIAS GRHI)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/GRHI.cmake")
-target_link_libraries(GRHI PUBLIC GRHI::GRHIApi PRIVATE SDL3::SDL3-shared)
-if(APPLE)
+target_link_libraries(GRHI PUBLIC GRHI::GRHIApi PRIVATE "${GAMESPROUT_GRHI_SDL_TARGET}")
+if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     target_link_libraries(GRHI PRIVATE "-framework Cocoa" "-framework QuartzCore")
     set_target_properties(GRHI PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON OBJCXX_EXTENSIONS OFF)
 endif()
@@ -93,8 +104,9 @@ option(GRHI_GPU_DEBUG "Enable SDL GPU validation (requires a compatible SDL buil
 if(GRHI_GPU_DEBUG)
     target_compile_definitions(GRHI PRIVATE GRHI_GPU_DEBUG)
 endif()
-# Use Bin directly, including with multi-configuration generators such as Xcode.
-set(grhi_output_directory "$<1:${CMAKE_CURRENT_SOURCE_DIR}/../../Bin>")
+get_filename_component(grhi_default_output "${CMAKE_CURRENT_SOURCE_DIR}/../../Bin" ABSOLUTE)
+set(GAMESPROUT_GRHI_OUTPUT_DIRECTORY "${grhi_default_output}" CACHE PATH "GRHI binary output directory")
+set(grhi_output_directory "$<1:${GAMESPROUT_GRHI_OUTPUT_DIRECTORY}>")
 set_target_properties(GRHI PROPERTIES
     CXX_EXTENSIONS OFF
     POSITION_INDEPENDENT_CODE ON
@@ -125,17 +137,21 @@ elseif(UNIX)
         INSTALL_RPATH "$ORIGIN"
     )
 endif()
-if(UNIX)
-    set(grhi_sdl_runtime_name "$<TARGET_SONAME_FILE_NAME:SDL3::SDL3-shared>")
-else()
-    set(grhi_sdl_runtime_name "$<TARGET_FILE_NAME:SDL3::SDL3-shared>")
+if(NOT GAMESPROUT_GRHI_STATIC)
+    if(UNIX)
+        set(grhi_sdl_runtime_name "$<TARGET_SONAME_FILE_NAME:${GAMESPROUT_GRHI_SDL_TARGET}>")
+    else()
+        set(grhi_sdl_runtime_name "$<TARGET_FILE_NAME:${GAMESPROUT_GRHI_SDL_TARGET}>")
+    endif()
+    set_property(TARGET GRHI PROPERTY GRHI_RUNTIME_DEPENDENCIES
+        "${GAMESPROUT_GRHI_OUTPUT_DIRECTORY}/${grhi_sdl_runtime_name}")
+    add_custom_command(TARGET GRHI POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:${GAMESPROUT_GRHI_SDL_TARGET}>"
+            "$<TARGET_FILE_DIR:GRHI>/${grhi_sdl_runtime_name}"
+        VERBATIM
+    )
 endif()
-add_custom_command(TARGET GRHI POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        "$<TARGET_FILE:SDL3::SDL3-shared>"
-        "$<TARGET_FILE_DIR:GRHI>/${grhi_sdl_runtime_name}"
-    VERBATIM
-)
 
 # All paths are relative to the GRHI project root, never grouped by extension.
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${grhi_files})

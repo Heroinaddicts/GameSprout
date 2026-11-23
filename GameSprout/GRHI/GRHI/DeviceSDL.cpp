@@ -130,4 +130,13 @@ namespace GRHI {
 
         return SurfaceSDL::CreateSurfaceSDL(this, handle);
     }
+
+    ISurface* DeviceSDL::CreateSDLSurface(void* window) {
+        ClearError();
+        if (!_Device || !window) {
+            Fail("An SDL surface requires a live device and window.");
+            return nullptr;
+        }
+        return SurfaceSDL::BorrowWindow(this, static_cast<SDL_Window*>(window));
+    }
 }

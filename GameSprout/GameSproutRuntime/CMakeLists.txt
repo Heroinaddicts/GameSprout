@@ -28,7 +28,13 @@ list(FILTER gamesprout_runtime_files EXCLUDE REGEX
     "/(build|Build|cmake-build-[^/]+|CMakeFiles|[^/]+_autogen|Tests|ThirdParty)/")
 list(SORT gamesprout_runtime_files)
 
-add_library(GameSproutRuntime SHARED ${gamesprout_runtime_files})
+option(GAMESPROUT_RUNTIME_STATIC "Link Runtime into the target Player" OFF)
+if(GAMESPROUT_RUNTIME_STATIC)
+    add_library(GameSproutRuntime STATIC ${gamesprout_runtime_files})
+    target_compile_definitions(GameSproutRuntime PUBLIC GAMESPROUT_RUNTIME_STATIC_LINK)
+else()
+    add_library(GameSproutRuntime SHARED ${gamesprout_runtime_files})
+endif()
 add_library(GameSproutRuntime::GameSproutRuntime ALIAS GameSproutRuntime)
 
 # This entry defines the public API target. The real library alias above keeps
@@ -38,6 +44,9 @@ target_link_libraries(GameSproutRuntime PUBLIC
     GameSproutRuntime::GameSproutRuntimeApi
 )
 target_link_libraries(GameSproutRuntime PRIVATE GRHI::GRHIApi)
+if(GAMESPROUT_GRHI_STATIC)
+    target_link_libraries(GameSproutRuntime PRIVATE GRHI::GRHI)
+endif()
 find_package(Threads REQUIRED)
 target_link_libraries(GameSproutRuntime PRIVATE Threads::Threads)
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../GPhysics" "${CMAKE_CURRENT_BINARY_DIR}/GPhysics")
@@ -51,10 +60,15 @@ target_compile_definitions(GameSproutRuntime PRIVATE GAMESPROUT_RUNTIME_EXPORTS)
 
 # Keep Debug symbols while optimizing the Runtime paths used by large scene edits.
 if(NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang|GNU)$")
-    set_property(SOURCE
-        GameObject.cpp GameSproutRuntime.cpp RuntimeCommands.cpp RuntimeEvents.cpp
-        RuntimeInitialization.cpp RuntimeObjectReferences.cpp Scene.cpp
-        APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:-O2>")
+    if(CMAKE_GENERATOR STREQUAL "Xcode")
+        # Xcode cannot vary per-source compiler flags by configuration.
+        target_compile_options(GameSproutRuntime PRIVATE "$<$<CONFIG:Debug>:-O2>")
+    else()
+        set_property(SOURCE
+            GameObject.cpp GameSproutRuntime.cpp RuntimeCommands.cpp RuntimeEvents.cpp
+            RuntimeInitialization.cpp RuntimeObjectReferences.cpp Scene.cpp
+            APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:-O2>")
+    endif()
 endif()
 
 get_filename_component(gamesprout_runtime_output_directory
@@ -111,8 +125,10 @@ if(GAMESPROUT_RUNTIME_BUILD_TESTS)
 endif()
 
 # Keep standalone Runtime SDK outputs self-contained for shell and GPU tests.
-get_target_property(runtime_backend_dependencies GRHI::GRHI GRHI_RUNTIME_DEPENDENCIES)
-add_custom_command(TARGET GameSproutRuntime POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        "$<TARGET_FILE:GRHI::GRHI>" ${runtime_backend_dependencies} "$<TARGET_FILE_DIR:GameSproutRuntime>"
-    VERBATIM)
+if(NOT GAMESPROUT_RUNTIME_STATIC AND NOT GAMESPROUT_GRHI_STATIC)
+    get_target_property(runtime_backend_dependencies GRHI::GRHI GRHI_RUNTIME_DEPENDENCIES)
+    add_custom_command(TARGET GameSproutRuntime POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:GRHI::GRHI>" ${runtime_backend_dependencies} "$<TARGET_FILE_DIR:GameSproutRuntime>"
+        VERBATIM)
+endif()

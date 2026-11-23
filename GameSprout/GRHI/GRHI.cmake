@@ -17,6 +17,8 @@ if(NOT TARGET GRHI::GRHI)
     get_filename_component(grhi_runtime_directory
         "${CMAKE_CURRENT_LIST_DIR}/../../Bin" ABSOLUTE
     )
+    set(GAMESPROUT_GRHI_BINARY_DIRECTORY "${grhi_runtime_directory}" CACHE PATH "Directory containing the GRHI and SDL SDK libraries")
+    set(grhi_runtime_directory "${GAMESPROUT_GRHI_BINARY_DIRECTORY}")
     if(WIN32)
         set(grhi_runtime_filename "GRHI${CMAKE_SHARED_LIBRARY_SUFFIX}")
         set(grhi_sdl_runtime_filename "SDL3.dll")

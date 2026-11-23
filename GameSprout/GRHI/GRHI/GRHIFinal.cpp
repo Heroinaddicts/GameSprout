@@ -67,6 +67,13 @@ namespace GRHI {
         }
         SDL_free(adapters);
         if (_Adapters.empty()) {
+#if defined(SDL_PLATFORM_LINUX) && !defined(SDL_PLATFORM_ANDROID) && !defined(SDL_PLATFORM_OPENHARMONY)
+            // The Linux build VM uses a software Vulkan device. Keep physical
+            // adapter enumeration empty and let SDL select its default device.
+            if (SDL_GetHintBoolean("GAMESPROUT_LINUX_PREVIEW", false)) {
+                return true;
+            }
+#endif
             SDL_LogError(SDL_LOG_CATEGORY_GPU, "GRHI initialization failed: no identifiable physical GPU adapters found.");
             return false;
         }

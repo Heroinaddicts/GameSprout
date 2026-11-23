@@ -6,7 +6,6 @@
 #include <functional>
 #include <cstddef>
 #include <cstdint>
-#include <source_location>
 #include <string_view>
 #include <type_traits>
 #include <typeinfo>
@@ -662,7 +661,7 @@ namespace GameSproutRuntime {
         virtual void UnregisterLogListener(IRuntimeLogListener*) {}
         // UTF-8 message. Calls made from a log listener are ignored.
         void Log(RuntimeLogLevel level, std::string_view message,
-                 std::source_location location = std::source_location::current()) noexcept {
+                 RuntimeSourceLocation location = RuntimeSourceLocation::current()) noexcept {
             WriteLog(level, message, location.file_name(), location.line());
         }
 

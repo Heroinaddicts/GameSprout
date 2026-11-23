@@ -5,8 +5,9 @@
 namespace GameSproutRuntime {
 
 // Native window identity only; ownership remains with the platform/Qt host.
-// Cocoa: NSView*, Win32: HWND, X11: Window. No GPU backend objects cross the API.
-enum class NativeWindowSystem : std::uint8_t { Cocoa, Win32, X11, Wayland };
+// Cocoa: NSView*, Win32: HWND, X11: Window, SDL: borrowed SDL_Window*.
+// An SDL host and GRHI must share the same SDL library instance.
+enum class NativeWindowSystem : std::uint8_t { Cocoa, Win32, X11, Wayland, SDL };
 struct NativeWindow {
     NativeWindowSystem System = NativeWindowSystem::Cocoa;
     std::uintptr_t Handle = 0;

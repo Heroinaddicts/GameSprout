@@ -7,7 +7,10 @@ if(NOT FOUNDATION_BUILD_CORES MATCHES "^[1-9][0-9]*$")
 endif()
 
 # Ninja starts jobs automatically; cap compilation at the host core count.
-set_property(GLOBAL APPEND PROPERTY JOB_POOLS foundation_compile=${FOUNDATION_BUILD_CORES})
+get_property(foundation_job_pools GLOBAL PROPERTY JOB_POOLS)
+if(NOT "foundation_compile=${FOUNDATION_BUILD_CORES}" IN_LIST foundation_job_pools)
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS foundation_compile=${FOUNDATION_BUILD_CORES})
+endif()
 set(CMAKE_JOB_POOL_COMPILE foundation_compile)
 set(CMAKE_AUTOGEN_PARALLEL "${FOUNDATION_BUILD_CORES}")
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/MP${FOUNDATION_BUILD_CORES}>")

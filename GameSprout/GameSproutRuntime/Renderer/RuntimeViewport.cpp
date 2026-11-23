@@ -11,6 +11,7 @@ struct GraphicsApiOwner {
     GRHI::GRHIApi* Api=nullptr;
     ~GraphicsApiOwner(){delete Api;}
 };
+#if !defined(GAMESPROUT_GRHI_STATIC_LINK)
 std::string LibraryDirectory() {
 #if defined(_WIN32)
     HMODULE module=nullptr;
@@ -27,6 +28,7 @@ std::string LibraryDirectory() {
     return std::filesystem::absolute(image.dli_fname).parent_path().string();
 #endif
 }
+#endif
 }
 GRHI::IDevice* Runtime::RenderDevice(std::string& error) {
     error.clear();
@@ -35,7 +37,13 @@ GRHI::IDevice* Runtime::RenderDevice(std::string& error) {
     // ExportGRHIApi shares one API instance. A process owner releases it once,
     // after all Runtime instances have released their own shared-view device.
     static GraphicsApiOwner owner;
-    if(!owner.Api)owner.Api=ExportGRHIApi(LibraryDirectory());
+    if(!owner.Api) {
+#if defined(GAMESPROUT_GRHI_STATIC_LINK)
+        owner.Api=GRHI::CreateGRHI();
+#else
+        owner.Api=ExportGRHIApi(LibraryDirectory());
+#endif
+    }
     _RenderApi=owner.Api;
     if(!_RenderApi){error="Cannot load the Runtime graphics backend beside the Runtime library";return nullptr;}
     _RenderDevice=_RenderApi->CreateDevice();
@@ -49,21 +57,24 @@ void Runtime::ReleaseGraphics() {
 IRuntimeViewport* Runtime::CreateViewport(const NativeWindow& window,IRuntimeResourceProvider* resources,std::string& error) {
     error.clear();
     if(!resources||!window.Handle){error="A viewport requires a resource provider and a native window";return nullptr;}
-#if defined(__APPLE__)
+    const bool sdlWindow=window.System==NativeWindowSystem::SDL;
+#if defined(__APPLE__) && TARGET_OS_OSX
     const bool supported=window.System==NativeWindowSystem::Cocoa;
 #elif defined(_WIN32)
     const bool supported=window.System==NativeWindowSystem::Win32;
-#else
+#elif defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
     const bool supported=window.System==NativeWindowSystem::X11;
+#else
+    const bool supported=false;
 #endif
-    if(!supported){error="The native window system is unsupported by the current Runtime backend";return nullptr;}
+    if(!supported&&!sdlWindow){error="The native window system is unsupported by the current Runtime backend";return nullptr;}
     auto* device=RenderDevice(error);if(!device)return nullptr;
 #if defined(__APPLE__)||defined(_WIN32)
     const auto handle=reinterpret_cast<GRHI::GRHIWindowHandle>(window.Handle);
 #else
     const auto handle=static_cast<GRHI::GRHIWindowHandle>(window.Handle);
 #endif
-    auto* surface=device->CreateSurface(handle);
+    auto* surface=sdlWindow?device->CreateSDLSurface(reinterpret_cast<void*>(window.Handle)):device->CreateSurface(handle);
     if(!surface){error=device->GetLastError();return nullptr;}
     try {
         auto* renderer=new Renderer(*this,*device,*resources);renderer->BindSurface(surface);return renderer;

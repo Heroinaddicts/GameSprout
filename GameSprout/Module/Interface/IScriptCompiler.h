@@ -14,6 +14,8 @@ struct ScriptCompileRequest {
     // Worker-thread wait for another Editor/IDE process using this project's
     // fixed build tree. Zero fails immediately; waiting remains cancellable.
     int LockWaitMilliseconds = 0;
+    // Generate validated bindings for an exporter to compile with its target SDK.
+    bool PrepareSourcesOnly = false;
 };
 struct ScriptCompilerToolchain {
     std::string RuntimeSDKDirectory;
@@ -38,6 +40,7 @@ struct ScriptCompileResult {
     std::string SchemaPath;
     std::string SchemaHash;
     bool CacheHit = false;
+    std::string SourcesDirectory;
 };
 class IScriptCompiler : public GameSproutEditor::IGameSproutModule {
 public:

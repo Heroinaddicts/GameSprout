@@ -6,6 +6,8 @@ namespace GRHI {
 namespace {
 template<typename... Handlers>
 struct VisitOperation : Handlers... {using Handlers::operator()...;};
+template<typename... Handlers>
+VisitOperation(Handlers...) -> VisitOperation<Handlers...>;
 }
 
 void RenderPassSDL::Encode(SDL_GPURenderPass* pass) const {

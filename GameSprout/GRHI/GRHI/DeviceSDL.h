@@ -24,6 +24,7 @@ namespace GRHI {
         static DeviceSDL* CreateDeviceSDL(const std::string&, std::string&);
         void Release() override;
         ISurface* CreateSurface(GRHIWindowHandle handle) override;
+        ISurface* CreateSDLSurface(void* window) override;
         ITexture* CreateTexture(const TextureDesc&, const TextureInitialData*) override;
         bool UploadTextureRows(ITexture*, uint32_t, uint32_t, const TextureInitialData&) override;
         IBuffer* CreateBuffer(const BufferDesc&, const BufferInitialData*) override;

@@ -1,8 +1,11 @@
 #include "GRHIExport.h"
 #include "GRHIFinal.h"
 
-// Preserve the existing factory symbol used by the public dynamic loader.
+#if defined(GAMESPROUT_GRHI_STATIC_LINK)
+GRHI::GRHIApi* GRHI::CreateGRHI() noexcept {
+#else
 extern "C" API GRHI::GRHIApi* CALL CreateFoundation() noexcept {
+#endif
     try {
         return GRHI::GRHIFinal::GetInstance();
     } catch (...) {

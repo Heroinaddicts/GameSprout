@@ -133,20 +133,22 @@ bool ScriptCompiler::Compile(const ScriptCompileRequest& request,ScriptCompileRe
     std::string schemaError;
     const bool sameSchema=!schemaBytes.isEmpty() && state.value("SchemaHash").toString()==schemaHash &&
         ScriptSchemaDocument::Parse(schemaBytes,result.Fingerprint,result.Types,result.Modules,schemaError);
-    if(sameToolchain && sameLibrary && sameSchema && state.value("ToolchainFingerprint").toString()==toolchainHash && state.value("Fingerprint").toString()==QString::fromStdString(result.Fingerprint) && ScriptBuildStorage::SnapshotMatches(sourceRoot,state.value("Snapshot").toObject())) {
+    if(!request.PrepareSourcesOnly && sameToolchain && sameLibrary && sameSchema && state.value("ToolchainFingerprint").toString()==toolchainHash && state.value("Fingerprint").toString()==QString::fromStdString(result.Fingerprint) && ScriptBuildStorage::SnapshotMatches(sourceRoot,state.value("Snapshot").toObject())) {
         result.ReflectionWarnings=state.value("ReflectionWarnings").toString().toStdString();result.Diagnostics=result.ReflectionWarnings;
         result.SchemaPath=schemaPath.toStdString();result.SchemaHash=schemaHash.toStdString();
         result.LibraryPath=library.toStdString();result.LibraryHash=currentLibraryHash.toStdString();result.CacheHit=true;return true;
     }
     // A failed linker or external corruption may leave a newer invalid output.
     // Invalidate that managed candidate so Ninja must relink instead of no-op.
-    if(QFileInfo::exists(library) && !sameLibrary && !QFile::remove(library)) {result.Diagnostics="Cannot invalidate damaged GameLogic output";return false;}
-    QString cmake="cmake_minimum_required(VERSION 3.21)\nproject(GameSproutGameLogic LANGUAGES CXX)\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\nset(CMAKE_CXX_EXTENSIONS OFF)\n";
-    cmake+="set(CMAKE_CXX_FLAGS "+CMakeString(QString::fromUtf8(GAMESPROUT_SCRIPT_BASE_FLAGS))+")\n";
-    cmake+="string(TOUPPER "+Quoted(QString::fromUtf8(GAMESPROUT_SCRIPT_CONFIGURATION))+" script_configuration)\nset(CMAKE_CXX_FLAGS_${script_configuration} "+CMakeString(QString::fromUtf8(GAMESPROUT_SCRIPT_CONFIGURATION_FLAGS))+")\n";
+    if(!request.PrepareSourcesOnly && QFileInfo::exists(library) && !sameLibrary && !QFile::remove(library)) {result.Diagnostics="Cannot invalidate damaged GameLogic output";return false;}
+    QString cmake="cmake_minimum_required(VERSION 3.21)\nif(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)\n project(GameSproutGameLogic LANGUAGES CXX)\nendif()\n";
+    if (!request.PrepareSourcesOnly) {
+        cmake+="set(CMAKE_CXX_FLAGS "+CMakeString(QString::fromUtf8(GAMESPROUT_SCRIPT_BASE_FLAGS))+")\n";
+        cmake+="string(TOUPPER "+Quoted(QString::fromUtf8(GAMESPROUT_SCRIPT_CONFIGURATION))+" script_configuration)\nset(CMAKE_CXX_FLAGS_${script_configuration} "+CMakeString(QString::fromUtf8(GAMESPROUT_SCRIPT_CONFIGURATION_FLAGS))+")\n";
+    }
     cmake+="add_library(GameLogic SHARED GameLogic.generated.cpp GameLogic.buildstamp.cpp";
     for (const auto& source : sources) {
-        if (source.Compile) cmake+=' '+Quoted(QDir(sourceRoot).filePath(source.Relative));
+        if (source.Compile) cmake+=' '+Quoted(source.Relative);
     }
     const QString probe=QDir(sourceRoot).filePath("GameLogic.reflection.cpp");
     QByteArray aggregate;
@@ -163,11 +165,16 @@ bool ScriptCompiler::Compile(const ScriptCompileRequest& request,ScriptCompileRe
     aggregate+="extern \"C\" const char* GetGameSproutGameLogicBuildFingerprint() noexcept;\n"
         "extern \"C\" GAMESPROUT_SCRIPT_EXPORT const ::GameSproutRuntime::ScriptModuleAPI* GetGameSproutGameLogic() noexcept { return ::GameSproutRuntime::Internal::GetScriptModuleAPI(GetGameSproutGameLogicBuildFingerprint()); }\n";
     result.Diagnostics=result.ReflectionWarnings;
-    cmake+=")\ntarget_include_directories(GameLogic PRIVATE "+Quoted(QString::fromUtf8(GAMESPROUT_SCRIPT_SDK))+' '+Quoted(sourceRoot)+")\n";
+    cmake+=")\nset_target_properties(GameLogic PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)\n";
+    cmake+="if(NOT GAMESPROUT_RUNTIME_SDK_DIR)\n set(GAMESPROUT_RUNTIME_SDK_DIR "+Quoted(QString::fromUtf8(GAMESPROUT_SCRIPT_SDK))+")\nendif()\n";
+    cmake+="target_include_directories(GameLogic PRIVATE \"${GAMESPROUT_RUNTIME_SDK_DIR}\" \"${CMAKE_CURRENT_SOURCE_DIR}\")\n";
+    cmake+="if(CMAKE_SYSTEM_NAME STREQUAL \"iOS\")\n set_target_properties(GameLogic PROPERTIES FRAMEWORK TRUE FRAMEWORK_VERSION A MACOSX_FRAMEWORK_IDENTIFIER com.gamesprout.gamelogic)\nendif()\n";
     cmake+="if(CMAKE_CXX_COMPILER_ID MATCHES \"^(AppleClang|Clang)$\")\n target_compile_options(GameLogic PRIVATE -Werror=overloaded-virtual -Werror=shadow-field)\nendif()\n";
-    cmake+="set_target_properties(GameLogic PROPERTIES RUNTIME_OUTPUT_DIRECTORY "+Quoted(output)+" LIBRARY_OUTPUT_DIRECTORY "+Quoted(output)+" ARCHIVE_OUTPUT_DIRECTORY "+Quoted(output)+" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)\n";
-    cmake+="foreach(script_configuration IN LISTS CMAKE_CONFIGURATION_TYPES)\n string(TOUPPER \"${script_configuration}\" script_upper)\n set_target_properties(GameLogic PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+" LIBRARY_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+" ARCHIVE_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+")\nendforeach()\n";
-    cmake+="include(ProcessorCount)\nProcessorCount(script_jobs)\nif(NOT script_jobs)\n set(script_jobs 1)\nendif()\nset_property(GLOBAL PROPERTY JOB_POOLS script_compile=${script_jobs})\nset_property(TARGET GameLogic PROPERTY JOB_POOL_COMPILE script_compile)\n";
+    if (!request.PrepareSourcesOnly) {
+        cmake+="set_target_properties(GameLogic PROPERTIES RUNTIME_OUTPUT_DIRECTORY "+Quoted(output)+" LIBRARY_OUTPUT_DIRECTORY "+Quoted(output)+" ARCHIVE_OUTPUT_DIRECTORY "+Quoted(output)+" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)\n";
+        cmake+="foreach(script_configuration IN LISTS CMAKE_CONFIGURATION_TYPES)\n string(TOUPPER \"${script_configuration}\" script_upper)\n set_target_properties(GameLogic PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+" LIBRARY_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+" ARCHIVE_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+")\nendforeach()\n";
+    }
+    cmake+="include(ProcessorCount)\nProcessorCount(script_jobs)\nif(NOT script_jobs)\n set(script_jobs 1)\nendif()\nset_property(GLOBAL APPEND PROPERTY JOB_POOLS script_compile=${script_jobs})\nset_property(TARGET GameLogic PROPERTY JOB_POOL_COMPILE script_compile)\n";
     // Keep the image identity in its own tiny TU: a helper edit need not rebuild
     // the aggregate containing every script class and reflected field bridge.
     const QByteArray buildstamp=QByteArray(
@@ -180,6 +187,10 @@ bool ScriptCompiler::Compile(const ScriptCompileRequest& request,ScriptCompileRe
     )+QByteArray::fromStdString(result.Fingerprint)+"\";}\n";
     if(!Write(QDir(sourceRoot).filePath("GameLogic.buildstamp.cpp"),buildstamp,result.Diagnostics)) return false;
     if(!Write(QDir(sourceRoot).filePath("GameLogic.generated.cpp"),aggregate,result.Diagnostics) || !Write(QDir(sourceRoot).filePath("CMakeLists.txt"),cmake.toUtf8(),result.Diagnostics)) return false;
+    if (request.PrepareSourcesOnly) {
+        result.SourcesDirectory = sourceRoot.toStdString();
+        return true;
+    }
     if(!sameToolchain && !ScriptBuildStorage::ResetCMakeState(build,result.Diagnostics)) return false;
     QStringList configure{"-S",sourceRoot,"-B",build,"-G",QString::fromUtf8(GAMESPROUT_SCRIPT_GENERATOR),
         "-DCMAKE_CXX_COMPILER="+QString::fromUtf8(GAMESPROUT_SCRIPT_COMPILER),

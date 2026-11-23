@@ -586,6 +586,9 @@ namespace GRHI {
         // to samplers only once all its required rows have been initialized.
         virtual bool UploadTextureRows(ITexture*, uint32_t firstRow, uint32_t rowCount,
                                        const TextureInitialData&) = 0;
+        // Borrow an SDL_Window* from the same SDL library. The host destroys
+        // the window after releasing this surface.
+        virtual ISurface* CreateSDLSurface(void*) { return nullptr; }
     };
 
     // GRHI 的入口，负责枚举物理显卡和创建渲染设备，不直接记录绘制命令。

@@ -4,7 +4,10 @@
 #include "GameSproutRuntimeApi.h"
 #include <filesystem>
 
-#if defined(_WIN32)
+#if defined(GAMESPROUT_RUNTIME_STATIC_LINK)
+#define GAMESPROUT_RUNTIME_CALL
+#define GAMESPROUT_RUNTIME_API
+#elif defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -41,6 +44,7 @@ extern "C" GAMESPROUT_RUNTIME_API GameSproutRuntime::IGameSproutRuntime*
 // 成功后库保持加载至进程退出，使对象的虚函数、析构和内部代码一直有效。
 // 返回对象由调用方在停止使用其场景/对象/组件后 delete，不支持热卸载。
 // 这里只加载并调用工厂，不擅自缓存 Runtime 实例。
+#if !defined(GAMESPROUT_RUNTIME_STATIC_LINK)
 inline GameSproutRuntime::IGameSproutRuntime* Export(const std::string& dlPath) noexcept {
     if (dlPath.empty() || dlPath.find('\0') != std::string::npos) return nullptr;
 
@@ -92,5 +96,6 @@ inline GameSproutRuntime::IGameSproutRuntime* Export(const std::string& dlPath) 
         return nullptr;
     }
 }
+#endif
 
 #endif //__GameSproutRuntimeExport_h__

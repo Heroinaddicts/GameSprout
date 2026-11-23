@@ -24,7 +24,7 @@ template<typename T> struct GameplayFactory;
 [[gnu::format(printf, 4, 5)]]
 #endif
 inline void LogFormatted(IGameSproutRuntime* runtime, RuntimeLogLevel level,
-                         std::source_location location, const char* format, ...) noexcept {
+                         RuntimeSourceLocation location, const char* format, ...) noexcept {
     if (!runtime || !format) return;
 
     char buffer[256];
@@ -54,11 +54,11 @@ inline void LogFormatted(IGameSproutRuntime* runtime, RuntimeLogLevel level,
 }
 
 #define GS_DEBUG(runtime, ...) \
-    ::GameSproutRuntime::Internal::LogFormatted((runtime), ::GameSproutRuntime::RuntimeLogLevel::Debug, ::std::source_location::current(), __VA_ARGS__)
+    ::GameSproutRuntime::Internal::LogFormatted((runtime), ::GameSproutRuntime::RuntimeLogLevel::Debug, ::GameSproutRuntime::RuntimeSourceLocation::current(), __VA_ARGS__)
 #define GS_TRACE(runtime, ...) \
-    ::GameSproutRuntime::Internal::LogFormatted((runtime), ::GameSproutRuntime::RuntimeLogLevel::Trace, ::std::source_location::current(), __VA_ARGS__)
+    ::GameSproutRuntime::Internal::LogFormatted((runtime), ::GameSproutRuntime::RuntimeLogLevel::Trace, ::GameSproutRuntime::RuntimeSourceLocation::current(), __VA_ARGS__)
 #define GS_ERROR(runtime, ...) \
-    ::GameSproutRuntime::Internal::LogFormatted((runtime), ::GameSproutRuntime::RuntimeLogLevel::Error, ::std::source_location::current(), __VA_ARGS__)
+    ::GameSproutRuntime::Internal::LogFormatted((runtime), ::GameSproutRuntime::RuntimeLogLevel::Error, ::GameSproutRuntime::RuntimeSourceLocation::current(), __VA_ARGS__)
 
 // The compiler recognizes this declaration marker and generates a dedicated
 // accessor for the declaring class. Access stays private/protected in user code.
