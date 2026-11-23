@@ -128,6 +128,19 @@ add_dependencies(GameSproutEditor GameSproutDeployFoundation)
 
 GameSproutRuntimeDeploy(GameSproutEditor)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../GameSproutPlayer" "${CMAKE_CURRENT_BINARY_DIR}/Player")
+    add_custom_target(GameSproutDeployPlayerTemplate
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory
+            "$<TARGET_BUNDLE_DIR:GameSproutPlayer>"
+            "$<TARGET_FILE_DIR:GameSproutEditor>/PlayerTemplate/GameSproutPlayer.app"
+        DEPENDS GameSproutPlayer
+        COMMENT "Deploying the standalone macOS Player template"
+        VERBATIM
+    )
+    add_dependencies(GameSproutEditor GameSproutDeployPlayerTemplate)
+endif()
+
 include(GNUInstallDirs)
 install(TARGETS GameSproutEditor
     BUNDLE DESTINATION .

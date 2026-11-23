@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>BuildOutputDialog</class>
+ <widget class="QFileDialog" name="BuildOutputDialog">
+  <property name="windowTitle"><string>选择 Player 输出位置</string></property>
+  <property name="acceptMode"><enum>QFileDialog::AcceptSave</enum></property>
+  <property name="fileMode"><enum>QFileDialog::AnyFile</enum></property>
+  <property name="defaultSuffix"><string notr="true">app</string></property>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

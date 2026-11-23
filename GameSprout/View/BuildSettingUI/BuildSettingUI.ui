@@ -1,6 +1,130 @@
-<?xml version='1.0' encoding='UTF-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>BuildSettingUIWindow</class>
- <widget class="QMainWindow" name="BuildSettingUIWindow">
+ <widget class="QDialog" name="BuildSettingUIWindow">
+  <property name="windowTitle"><string>Build Settings</string></property>
+  <property name="geometry"><rect><x>0</x><y>0</y><width>840</width><height>510</height></rect></property>
+  <property name="minimumSize"><size><width>640</width><height>410</height></size></property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing"><number>10</number></property>
+   <item>
+    <layout class="QHBoxLayout" name="contentLayout" stretch="0,1">
+     <property name="spacing"><number>12</number></property>
+     <item>
+      <widget class="QGroupBox" name="platformGroup">
+       <property name="title"><string>目标平台</string></property>
+       <property name="minimumSize"><size><width>185</width><height>0</height></size></property>
+       <layout class="QVBoxLayout" name="platformLayout">
+        <item>
+         <widget class="QTreeWidget" name="platformTree">
+          <property name="rootIsDecorated"><bool>false</bool></property>
+          <property name="itemsExpandable"><bool>false</bool></property>
+          <property name="allColumnsShowFocus"><bool>true</bool></property>
+          <property name="uniformRowHeights"><bool>true</bool></property>
+          <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+          <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+          <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+          <property name="headerHidden"><bool>true</bool></property>
+          <column><property name="text"><string>平台</string></property></column>
+          <column><property name="text"><string>状态</string></property></column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="sceneGroup">
+       <property name="title"><string>构建场景</string></property>
+       <layout class="QVBoxLayout" name="sceneLayout">
+        <item>
+         <widget class="QLabel" name="startupHint">
+          <property name="text"><string>Player 从第一个启用的场景启动。</string></property>
+          <property name="wordWrap"><bool>true</bool></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTreeWidget" name="sceneTree">
+          <property name="rootIsDecorated"><bool>false</bool></property>
+          <property name="itemsExpandable"><bool>false</bool></property>
+          <property name="uniformRowHeights"><bool>true</bool></property>
+          <property name="alternatingRowColors"><bool>true</bool></property>
+          <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+          <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+          <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+          <column><property name="text"><string>场景</string></property></column>
+          <column><property name="text"><string>构建索引</string></property></column>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="addSceneLayout" stretch="1,0">
+          <item>
+           <widget class="QComboBox" name="availableScenes">
+            <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property>
+            <property name="minimumContentsLength"><number>10</number></property>
+           </widget>
+          </item>
+          <item><widget class="QPushButton" name="addSceneButton"><property name="text"><string>添加场景</string></property></widget></item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="orderLayout">
+          <item><widget class="QPushButton" name="moveUpButton"><property name="text"><string>上移</string></property></widget></item>
+          <item><widget class="QPushButton" name="moveDownButton"><property name="text"><string>下移</string></property></widget></item>
+          <item><widget class="QPushButton" name="removeSceneButton"><property name="text"><string>移除</string></property></widget></item>
+          <item><spacer name="orderSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="platformSummary">
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="exportUnavailable">
+     <property name="text"><string>所选平台可切换，当前版本暂不支持导出该平台。</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="messageLabel">
+     <property name="textFormat"><enum>Qt::PlainText</enum></property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPlainTextEdit" name="buildDiagnostics">
+     <property name="maximumHeight"><number>120</number></property>
+     <property name="readOnly"><bool>true</bool></property>
+     <property name="accessibleName"><string>构建诊断</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QProgressBar" name="operationProgress">
+     <property name="minimum"><number>0</number></property>
+     <property name="maximum"><number>0</number></property>
+     <property name="textVisible"><bool>false</bool></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="buttonLayout">
+     <item><widget class="QPushButton" name="closeButton"><property name="text"><string>关闭</string></property></widget></item>
+     <item><spacer name="buttonSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+     <item><widget class="QPushButton" name="cancelButton"><property name="text"><string>取消操作</string></property></widget></item>
+     <item><widget class="QPushButton" name="switchButton"><property name="text"><string>切换平台</string></property></widget></item>
+     <item><widget class="QPushButton" name="buildButton"><property name="text"><string>Build</string></property></widget></item>
+     <item><widget class="QPushButton" name="buildAndRunButton"><property name="text"><string>Build And Run</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+  <action name="fileMenuAction"><property name="text"><string>File</string></property></action>
+  <action name="buildSettingsAction"><property name="text"><string>Build Settings…</string></property></action>
  </widget>
+ <resources/>
+ <connections/>
 </ui>

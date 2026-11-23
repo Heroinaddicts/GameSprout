@@ -48,6 +48,7 @@ target_link_libraries(BuildSettingUI PRIVATE
 target_include_directories(BuildSettingUI PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/../Interface"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../Module/Interface"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../GameSproutEditor/Api"
 )
 # Let AUTOUIC also find forms stored in subdirectories.

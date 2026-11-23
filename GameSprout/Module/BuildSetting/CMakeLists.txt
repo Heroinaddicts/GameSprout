@@ -14,6 +14,7 @@ endif()
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../Foundation/FoundationApi.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/../../GameSproutRuntime/GameSproutRuntime.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../ObjectDocument/ObjectDocument.cmake")
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core)
@@ -35,9 +36,14 @@ list(APPEND module_files "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt")
 
 add_library(BuildSetting SHARED ${module_files})
 target_compile_features(BuildSetting PRIVATE cxx_std_20)
+target_compile_definitions(BuildSetting PRIVATE
+    "GAMESPROUT_BUILD_SOURCE_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}/../../..\""
+    "GAMESPROUT_BUILD_CMAKE=\"${CMAKE_COMMAND}\""
+)
 target_link_libraries(BuildSetting PRIVATE
     Foundation::FoundationApi
     GameSproutRuntime::GameSproutRuntimeApi
+    ObjectDocumentJson
     Qt${QT_VERSION_MAJOR}::Core
 )
 target_include_directories(BuildSetting PRIVATE

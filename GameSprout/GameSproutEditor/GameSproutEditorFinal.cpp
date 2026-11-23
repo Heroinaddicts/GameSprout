@@ -271,6 +271,8 @@ namespace GameSproutEditor {
         // Cancel them while the IDE, asset registry and compiler are still alive.
         const auto codeEditor=_ModuleMap.find("CodeEditor");
         if(codeEditor!=_ModuleMap.end())codeEditor->second->Release(_Api);
+        const auto builds=_ModuleMap.find("BuildSetting");
+        if(builds!=_ModuleMap.end())builds->second->Release(_Api);
         // Cancel compilation and release native gameplay callbacks while both
         // Runtime and the loading UI still exist. Source listeners go first.
         const auto scripts=_ModuleMap.find("ScriptEditor");
@@ -295,7 +297,7 @@ namespace GameSproutEditor {
         const auto host=_ModuleMap.find("RuntimeHost");
         if(host!=_ModuleMap.end())host->second->Release(_Api);
         for (const auto& [name, module] : _ModuleMap) {
-            if(name!="PrefabStage"&&name!="PrefabManager"&&name!="CodeEditor"&&name!="PlayMode"&&name!="ScriptEditor"&&name!="Console"&&name!="AnimationPreview"&&name!="SceneManager"&&name!="RuntimeHost")module->Release(_Api);
+            if(name!="PrefabStage"&&name!="PrefabManager"&&name!="CodeEditor"&&name!="BuildSetting"&&name!="PlayMode"&&name!="ScriptEditor"&&name!="Console"&&name!="AnimationPreview"&&name!="SceneManager"&&name!="RuntimeHost")module->Release(_Api);
         }
         _ViewMap.clear();
         _ModuleMap.clear();
