@@ -23,7 +23,7 @@ Texture 使用 null 或 {"Guid":"...","LocalID":123}。
 Color 可声明 ColorSpace=Linear 或 SRGB；Linear 的数值及源文件保留线性值，拾色器与色块在 View 边界转换为 sRGB。
 Linear Color 的 RGB 不得为负；未启用 HDR 时不得超过1；Alpha 保持0..1。Float 可用有限 Min 限制最小值。
 同一 Schema 的内部名称不能重复，也不能占用 Version/Name/Shader/ExternalMaterial/Textures/UnresolvedTextures，
-或引擎选项 EnableGPUInstancing/SpecularHighlights/EnvironmentReflections/SortingPriority；这些字段由引擎保留。
+或引擎选项 EnableGPUInstancing/SpecularHighlights/EnvironmentReflections/PlanarReflection/SortingPriority；这些字段由引擎保留。
 没有声明的 Shader 提供空属性面板；不会从 GPU float4 猜测颜色等编辑语义。
 
 Shader 产物的 ArtifactDB Descriptor.Material 保存编辑属性定义。
@@ -80,6 +80,7 @@ EnableGPUInstancing（bool，默认true）是允许Runtime自动归组，不是�
 SortingPriority 为[-50,50]整数，默认0；仅在不透明/透明类别内生效，数值越大越晚绘制，
 透明对象仍受距离排序约束，不能为合批破坏混合顺序。
 内置 Lit 的 SpecularHighlights 控制直接光镜面高光，EnvironmentReflections 控制预滤波天空反射，两者默认启用。
+内置 Lit 的 PlanarReflection 默认关闭。选中后允许等高表面接收场景的水平镜面反射。
 环境漫反射由场景环境光决定。内嵌材质的 Inspector 高级选项只读，提取为独立 .mat 后可编辑。
 Unity桥接保留SpecularHighlights、EnvironmentReflections和QueueOffset，传统source.enableInstancing只记录到报告，
 不将其false误译为禁止GameSprout自动实例化，因为Unity GPU Resident Drawer不受该传统开关控制。

@@ -121,6 +121,12 @@
               </widget>
             </item>
             <item>
+              <widget class="QCheckBox" name="planarReflectionCheck">
+                <property name="text"><string>接收平面反射</string></property>
+                <property name="toolTip"><string>用于与场景反射平面等高的 Lit 表面，例如水面。</string></property>
+              </widget>
+            </item>
+            <item>
               <widget class="QCheckBox" name="enableGPUInstancingCheck">
                 <property name="text"><string>允许 GPU 实例化</string></property>
                 <property name="toolTip"><string>Runtime 自动归组合适的内置不透明非蒙皮网格，不要求勾选对象的 Static。网格、材质和渲染状态满足条件时减少绘制；自定义 Shader、蒙皮等不满足条件的对象正常绘制，无需脚本手动合批。</string></property>

@@ -201,6 +201,7 @@ cbuffer LitUniform : register(b0, space3)
     float4 LocalLightDirections[4];
     float4 LocalLightParameters[4];
     float4 LocalLightRadiances[4];
+    float4 PlanarReflection;
 };
 cbuffer EnvironmentUniform : register(b1, space3)
 {
@@ -240,6 +241,7 @@ SamplerState ShadowSampler : register(s2, space2);
 Texture2D<float> DynamicShadowTexture : register(t3, space2);
 SamplerState DynamicShadowSampler : register(s3, space2);
 #include "LocalLighting.hlsl"
+#include "PlanarReflection.hlsl"
 
 float SampleShadowVisibility(float2 staticUV, float2 dynamicUV, float2 reference, bool sampleDynamic)
 {
@@ -556,8 +558,10 @@ float4 EvaluateLit(MeshOutput input, bool useReflections, bool useSpatialLightin
         stylized = max(lerp(luminance.xxx, stylized, StyleParameters.w), 0.0);
         color = lerp(color, stylized, StyleParameters.x);
     }
-    if (useReflections || useSpatialLighting)
-        color += ReflectedEnvironment(input.WorldPosition, normal, view, nDotV, f0, useSpatialLighting);
+    if (useSpatialLighting)
+        color = ApplyPlanarReflection(color, ReflectedEnvironment(input.WorldPosition, normal, view, nDotV, f0, true),
+            input.Position.xy, input.WorldPosition.y, normal, view, saturate(LitParameters.y), f0);
+    else if (useReflections) color += ReflectedEnvironment(input.WorldPosition, normal, view, nDotV, f0, false);
     return float4(ApplySceneFog(color, input.WorldPosition), base.a);
 }
 

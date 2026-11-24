@@ -161,12 +161,13 @@ Renderer::LitUniform Renderer::MakeLitUniform(const RenderView& view,const Prepa
     result.Emission=material.EmissionColor;result.NormalTextureST=material.NormalTextureST;
     result.StyleParameters={material.Stylization,material.LightThreshold,material.LightSoftness,material.ColorSaturation};
     result.StylizedShadowTint=material.StylizedShadowTint;
+    const auto& shadowSource=_PlanarShadowSource?*_PlanarShadowSource:*this;
     std::size_t count=0;
     for(const auto& light:lights) {
         const auto lightIndex=static_cast<std::size_t>(&light-lights.data());
         if(!(light.CullingMask&(std::uint32_t{1}<<object.Layer)))continue;
         if(count==MaxDirectionalLights){Diagnostic("Lit uses the four brightest matching directional lights per object");break;}
-        const bool sampleShadows=object.ReceiveShadows&&lightIndex==_ShadowLightIndex&&_ShadowUniform.Info.X>0;
+        const bool sampleShadows=object.ReceiveShadows&&lightIndex==shadowSource._ShadowLightIndex&&shadowSource._ShadowUniform.Info.X>0;
         result.Directions[count]={light.TowardsLight.X,light.TowardsLight.Y,light.TowardsLight.Z,sampleShadows?2.0f:1.0f};
         result.Radiances[count]=light.Radiance;++count;
     }
@@ -174,8 +175,8 @@ Renderer::LitUniform Renderer::MakeLitUniform(const RenderView& view,const Prepa
         const auto index=draw.LocalLightIndices[slot];if(!index)break;
         const auto& light=_LocalLights[index-1];
         float shadowSlot=0;
-        if(object.ReceiveShadows)for(std::size_t i=0;i<_SpotShadowCount;++i)
-            if(_SpotShadowIndices[i]==index){shadowSlot=static_cast<float>(i+1);break;}
+        if(object.ReceiveShadows)for(std::size_t i=0;i<shadowSource._SpotShadowCount;++i)
+            if(shadowSource._SpotShadowIndices[i]==index){shadowSlot=static_cast<float>(i+1);break;}
         result.LocalPositions[slot]={light.Position.X,light.Position.Y,light.Position.Z,light.Range};
         result.LocalDirections[slot]={light.Forward.X,light.Forward.Y,light.Forward.Z,light.OuterCosine};
         result.LocalParameters[slot]={light.InnerCosine,shadowSlot,0,0};

@@ -37,7 +37,7 @@ namespace GameSproutRuntime {
 bool Renderer::Render(const RenderView& view) {
     _HasRenderedCamera=false;_RenderedCamera={};_LinearCaptureReady=false;
     if(_Rendering || _Runtime.IsExecuting() || _Runtime.IsShuttingDown() || _Runtime.IsConstructing()) return Fail("Runtime Renderer cannot run inside a Runtime callback, construction or another Render");
-    _Error.clear();_Statistics={};_ShadowRecorded=false;_SpotShadowRecorded=false;
+    _Error.clear();_Statistics={};_ShadowRecorded=false;_SpotShadowRecorded=false;_PlanarParameters={};
     if(!_Surface&&!_ColorTarget){_Statistics={};return true;}
     if(view.CaptureLinearColor&&(_Surface||!view.DrawScene))return Fail("Linear capture requires an offscreen 3D render");
     if(!IsValidStaticFlags(view.RequiredStaticFlags))return Fail("RenderView mesh static flag filter is invalid");
@@ -114,23 +114,13 @@ bool Renderer::Render(const RenderView& view) {
         if(view.DrawScene) {
             BeginTexturePrefetchFrame(view.EnableTexturePrefetch);
             PrepareDraws(view,viewProjection);
-            EndTexturePrefetchFrame();
             PrepareLocalLights();
             PrepareReflectionProbes(view,*settings);
-            if(!_ColorInstanceBatchesKnown||_ColorInstancingEnabled!=view.EnableGPUInstancing) {
-                _ColorInstances.Indices.clear();
-                PrepareInstanceBatches(_PreparedDraws,view.EnableGPUInstancing,false,_ColorInstanceDraws,_ColorInstances.Indices);
-                _ColorInstanceBatchesKnown=true;
-                _ColorInstancingEnabled=view.EnableGPUInstancing;
-            }
-            if(view.EnableGPUInstancing) {
-                if(!UploadResidentInstances(*command.Command)||!UploadInstanceStream(*command.Command,_ColorInstances))return false;
-            }else if(!_ChangedInstanceTransforms.empty()) {
-                _InstanceTransformsDirty=true;
-                _ChangedInstanceTransforms.clear();
-            }
+            if(!PrepareColorInstances(*command.Command,view))return false;
             if(!RenderShadows(*command.Command,view,float(width)/height))return false;
             if(!RenderSpotShadows(*command.Command,view,viewProjection))return false;
+            if(!RenderPlanarReflection(*command.Command,view,width,height,environment,sky,reflections))return false;
+            EndTexturePrefetchFrame();
             for(auto* buffer:{_InstanceTransformsBuffer,_ColorInstances.Buffer,_StaticShadowInstances.Buffer,
                 _DynamicShadowInstances.Buffer,_SpotShadowInstances.Buffer})
                 if(buffer)_Statistics.ResidentInstanceBytes+=buffer->GetSize();
@@ -173,6 +163,7 @@ bool Renderer::Render(const RenderView& view) {
         auto* submitted=command.Command;command.Command=nullptr;
         if(!_Device.Submit(submitted)) return Fail(DeviceError("Submit Runtime view"));
         _InstanceFrameSubmitted=true;
+        if(_PlanarCapture&&_PlanarParameters.X>0)_PlanarCapture->_InstanceFrameSubmitted=true;
         _LinearCaptureReady=view.CaptureLinearColor;
         // A recorded atlas is reusable only after the whole command is submitted.
         // A later color-pass error/cancel must not cache an unexecuted depth pass.

@@ -161,6 +161,11 @@ EnvironmentLightingSettings::ReflectionProbes 是场景拥有的 ReflectionProbe
 每个 Lit 绘制按接收者 CullingMask 和包围盒选一个探针。重叠时优先较大的 Priority；同优先级优先覆盖对象中心的探针，再比较归一化距离。BlendDistance 以米为单位，从盒内边缘渐显局部探针，盒外使用全局天空。Intensity 单独控制该探针亮度。材质 EnvironmentReflections 关闭时跳过局部探针和天空的镜面反射。
 按探针设置、资源版本和接收物变换缓存选择。Renderer 只上传局部探针的反射 mip 链，并在使用同一 Runtime 设备和 Provider 的 Scene 与 Game 视口间复用 GPU 纹理。RenderView::EnableReflectionProbes 默认开启，可在离线捕获场景时关闭，避免将旧探针反馈到新探针。RenderStatistics::ReflectionProbeDrawCalls 统计使用局部探针的主视口颜色批次。
 
+平面反射
+EnvironmentLightingSettings::PlanarReflection 提供一个世界 Y 高度的水平镜面。默认关闭。需要物体使用内置 Lit 材质并启用 MaterialRenderData::PlanarReflection。平面的 Height 单位是米，Strength 范围 0 到 1，控制保留多少镜面画面。表面法线、Metallic 和 Roughness 决定可见倒影强度与柔化。
+ResolutionScale 范围 0.125 到 1，按视口等比例缩小，默认 0.5。MaxResolution 为反射目标最大边长，默认 1024 像素，范围 128 到 4096。MaxDistance 单位是米，限制近处接收者和镜面取景范围。LayerMask 与相机可见层取交集，控制哪些对象进入倒影。
+RenderView::EnablePlanarReflections 可关闭视口的额外绘制。仅在上方视角存在可见接收者时生成倒影。反射相机裁剪水面以下几何，跳过参与平面反射的水面材质，复用主视口阴影图集。线性 FP16 倒影在主视口统一应用曝光和色调映射。RenderStatistics::PlanarReflectionDrawCalls、PlanarReflectionWidth 和 PlanarReflectionHeight 分别报告额外绘制和目标大小。
+
 方向光阴影设置
 方向光的 LightShadowSettings::CacheStaticCasters 默认关闭。通过 ILightComponent::SetShadows 开启后，带 StaticFlags::ShadowCasterStatic 的非蒙皮网格进入静态层，其他网格和蒙皮网格进入动态层。
 通过 IGameObject::SetStaticFlags 标记投影物体，保留节点原有的其他标记。静态投影物体的变换、几何或投影状态变化后会重新生成静态层。仅动态物体移动时复用静态层。

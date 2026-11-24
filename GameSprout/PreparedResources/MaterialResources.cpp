@@ -31,10 +31,11 @@ bool PreparedResources::ResourceProvider::LoadMaterial(const GameSproutRuntime::
         if (!ReferenceValue(body["ExternalMaterial"], current)) return fail();
     }
     GameSproutRuntime::MaterialRenderData data;
-    for (const char* name : {"EnableGPUInstancing","SpecularHighlights","EnvironmentReflections"})
+    for (const char* name : {"EnableGPUInstancing","SpecularHighlights","EnvironmentReflections","PlanarReflection"})
         if (body.isMember(name) && !body[name].isBool()) return fail();
     data.EnableGPUInstancing=body.get("EnableGPUInstancing",true).asBool();
     data.SpecularHighlights=body.get("SpecularHighlights",true).asBool();
+    data.PlanarReflection=body.get("PlanarReflection",false).asBool();
     data.EnvironmentReflections=body.get("EnvironmentReflections",true).asBool();
     if (body.isMember("SortingPriority")) {
         if (!body["SortingPriority"].isInt() || body["SortingPriority"].asInt()<-50 || body["SortingPriority"].asInt()>50) return fail();

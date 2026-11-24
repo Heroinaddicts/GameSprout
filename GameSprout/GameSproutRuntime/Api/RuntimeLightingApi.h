@@ -39,6 +39,26 @@ struct SpotShadowBudgetSettings {
     bool operator==(const SpotShadowBudgetSettings&) const = default;
 };
 
+// A world-space horizontal mirror shared by opted-in Lit materials.
+struct PlanarReflectionSettings {
+    bool Enabled = false;
+    float Height = 0; // World-space Y in metres.
+    float ResolutionScale = .5f;
+    std::uint32_t MaxResolution = 1024; // Maximum render-target edge.
+    float Strength = 1; // Blends the planar contribution against ordinary environment specular.
+    float MaxDistance = 100; // Limit for reflection receiver and capture distance in metres.
+    std::uint32_t LayerMask = ~std::uint32_t{0}; // Objects drawn into the capture.
+    bool operator==(const PlanarReflectionSettings&) const = default;
+};
+
+inline bool IsValidPlanarReflection(const PlanarReflectionSettings& settings) {
+    return std::isfinite(settings.Height)&&std::isfinite(settings.ResolutionScale)&&
+        settings.ResolutionScale>=.125f&&settings.ResolutionScale<=1&&
+        settings.MaxResolution>=128&&settings.MaxResolution<=4096&&
+        std::isfinite(settings.Strength)&&settings.Strength>=0&&settings.Strength<=1&&
+        std::isfinite(settings.MaxDistance)&&settings.MaxDistance>0;
+}
+
 inline bool IsValidLightShadowResolution(std::uint32_t edge) {
     return edge>=256&&edge<=4096&&(edge&(edge-1))==0;
 }
@@ -104,6 +124,7 @@ struct EnvironmentLightingSettings {
     float ExposureEV = 0;         // Fixed exposure [-16,16], in stops. +1 doubles linear radiance.
     ToneMapping Tonemap = ToneMapping::None;
     SpotShadowBudgetSettings SpotShadows;
+    PlanarReflectionSettings PlanarReflection;
     std::vector<ReflectionProbeSettings> ReflectionProbes;
 };
 
@@ -112,7 +133,8 @@ inline bool IsValidEnvironmentLighting(const EnvironmentLightingSettings& settin
        settings.Mode!=AmbientLightMode::Gradient && settings.Mode!=AmbientLightMode::SphericalHarmonics &&
        settings.Mode!=AmbientLightMode::SkyEnvironment)return false;
     if(!std::isfinite(settings.Intensity)||settings.Intensity<0||settings.SpotShadows.MaxLights>4||
-        !IsValidLightShadowResolution(settings.SpotShadows.MaxResolution))return false;
+        !IsValidLightShadowResolution(settings.SpotShadows.MaxResolution)||
+        !IsValidPlanarReflection(settings.PlanarReflection))return false;
     if(settings.SkyEnvironment.Guid.empty()!=(settings.SkyEnvironment.LocalID==0)||
        !std::isfinite(settings.SkyRotationDegrees)||!std::isfinite(settings.SkyIntensity)||settings.SkyIntensity<0||
        !std::isfinite(settings.ReflectionIntensity)||settings.ReflectionIntensity<0||

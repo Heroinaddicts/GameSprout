@@ -131,6 +131,7 @@ struct MaterialRenderData {
     float Roughness = 0.5f;
     bool SpecularHighlights = true; // Built-in Lit's direct-light specular term.
     bool EnvironmentReflections = true; // Built-in Lit's prefiltered environment specular term.
+    bool PlanarReflection = false; // Opt in a horizontal surface to the scene's planar pass.
     ResourceReference NormalTexture;
     Vector4 NormalTextureST{1,1,0,0};
     float NormalScale = 1;

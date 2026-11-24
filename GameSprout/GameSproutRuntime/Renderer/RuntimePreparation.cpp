@@ -111,6 +111,9 @@ void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
             }
             // The shadow pass still needs the resolved geometry and materials.
             if(shadowsOnly)continue;
+            // The main viewport owns the planar pass and accepts only explicit
+            // receivers. Exclude them from its mirrored view.
+            if(_PlanarShadowSource&&material->PlanarReflection)continue;
             const bool builtin=material->Shader.Guid.empty();
             const auto sectionOrdinal=static_cast<std::uint64_t>(&section-mesh->Data.Sections.data());
             auto opaqueSlot=invisible;

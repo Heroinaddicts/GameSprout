@@ -187,8 +187,9 @@ private:
         Vector4 LocalDirections[MaxLocalLights]; // XYZ spot forward, W outer cosine (-1 for Point).
         Vector4 LocalParameters[MaxLocalLights]; // X inner cosine, Y one-based shadow slot or zero.
         Color LocalRadiances[MaxLocalLights];
+        Vector4 PlanarReflection; // Strength, reciprocal main width/height, plane height.
     };
-    static_assert(sizeof(LitUniform)==496,"Lit material block must match HLSL packing");
+    static_assert(sizeof(LitUniform)==512,"Lit material block must match HLSL packing");
     struct PreparedDraw;
     struct ShadowUniform {
         Mat4 WorldToShadow[4];
@@ -282,6 +283,12 @@ private:
         std::vector<InstanceDraw>&,std::vector<std::uint32_t>&) const;
     bool UploadResidentInstances(GRHI::ICommandBuffer&);
     bool UploadInstanceStream(GRHI::ICommandBuffer&,InstanceStream&);
+    bool PrepareColorInstances(GRHI::ICommandBuffer&,const RenderView&);
+    bool RenderPlanarReflection(GRHI::ICommandBuffer&,const RenderView&,std::uint32_t width,std::uint32_t height,
+        const RenderEnvironment::Uniform&,const EnvironmentGPU*,const EnvironmentGPU*);
+    bool IsPlanarReceiver(const PreparedDraw&,const PlanarReflectionSettings&,Vector3 eye) const;
+    bool UsesPlanarReflection(const PreparedDraw&) const;
+    void BindPlanarReflection(GRHI::IRenderPass&,const PreparedDraw&,LitUniform&);
     bool DrawPrepared(GRHI::IRenderPass&,const std::vector<PreparedDraw>&,const RenderView&,const Mat4&,
         GRHI::TextureFormat,const std::vector<DirectionalLight>&,const RenderEnvironment::Uniform&,const EnvironmentGPU*);
     bool DrawBuiltin(GRHI::IRenderPass&,const PreparedDraw&,const RenderView&,const Mat4&,
@@ -376,6 +383,12 @@ private:
     GRHI::IDevice& _Device;
     GRHI::ISurface* _Surface=nullptr;
     GRHI::ITexture* _ColorTarget=nullptr;
+    // An auxiliary color view owns visibility/batches and borrows this view's
+    // prepared shadow atlases. It shares meshes, materials and pipelines.
+    std::unique_ptr<Renderer> _PlanarCapture;
+    std::unique_ptr<GRHI::ITexture> _PlanarColor;
+    const Renderer* _PlanarShadowSource=nullptr;
+    Vector4 _PlanarParameters;
     IRuntimeResourceProvider& _Resources;
     RenderResourceLease _ResourceLease;
     RenderResourceCache& _ResourceCache;

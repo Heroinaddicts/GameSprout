@@ -25,6 +25,7 @@ MaterialInspector::MaterialInspector(QWidget * parent) : ImportSettingsInspector
     const auto changed=[this] { if (!_Loading && !_Embedded && Changed) Changed(); };
     QObject::connect(_Ui->specularHighlightsCheck,&QCheckBox::toggled,this,changed);
     QObject::connect(_Ui->environmentReflectionsCheck,&QCheckBox::toggled,this,changed);
+    QObject::connect(_Ui->planarReflectionCheck,&QCheckBox::toggled,this,changed);
     QObject::connect(_Ui->enableGPUInstancingCheck,&QCheckBox::toggled,this,changed);
     QObject::connect(_Ui->sortingPrioritySpin,qOverload<int>(&QSpinBox::valueChanged),this,changed);
 }
@@ -64,6 +65,8 @@ bool MaterialInspector::Capture(Json::Value & document,std::string & error) cons
     document["SortingPriority"]=_Ui->sortingPrioritySpin->value();
     if (_Document["Shader"]=="GameSprout/Lit") {
         document["SpecularHighlights"]=_Ui->specularHighlightsCheck->isChecked();
+        if(_Ui->planarReflectionCheck->isChecked())document["PlanarReflection"]=true;
+        else document.removeMember("PlanarReflection");
         document["EnvironmentReflections"]=_Ui->environmentReflectionsCheck->isChecked();
     }
     return true;
@@ -101,6 +104,8 @@ void MaterialInspector::Rebuild() {
     const bool lit=_Document["Shader"]=="GameSprout/Lit";
     _Ui->specularHighlightsCheck->setVisible(lit);
     _Ui->environmentReflectionsCheck->setVisible(lit);
+    _Ui->planarReflectionCheck->setVisible(lit);
+    _Ui->planarReflectionCheck->setChecked(_Error.empty()&&_Document.get("PlanarReflection",false).asBool());
     _Ui->advancedOptionsGroup->setEnabled(!_Embedded && _Error.empty());
     _Loading=wasLoading;
 }

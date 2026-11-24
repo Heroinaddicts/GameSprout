@@ -69,6 +69,23 @@ Json::Value Resource(const GameSproutRuntime::ResourceReference& reference,const
     return result;
 }
 void ReadSpatial(const Json::Value& root,const std::string& path,GameSproutRuntime::EnvironmentLightingSettings& settings) {
+    if(root.isMember("PlanarReflection")) {
+        const auto& value=root["PlanarReflection"];const auto key=path+".PlanarReflection";
+        if(!value.isObject())Fail(key,"expected object");
+        auto& planar=settings.PlanarReflection;
+        for(const auto& name:value.getMemberNames()) {
+            const auto member=key+"."+name;
+            if(name=="Enabled")planar.Enabled=Boolean(value[name],member);
+            else if(name=="Height")planar.Height=Number(value[name],member,true);
+            else if(name=="ResolutionScale")planar.ResolutionScale=Number(value[name],member);
+            else if(name=="MaxResolution")planar.MaxResolution=Unsigned(value[name],member);
+            else if(name=="Strength")planar.Strength=Number(value[name],member);
+            else if(name=="MaxDistance")planar.MaxDistance=Number(value[name],member);
+            else if(name=="LayerMask")planar.LayerMask=Unsigned(value[name],member);
+            else Fail(member,"unknown field");
+        }
+        if(!GameSproutRuntime::IsValidPlanarReflection(planar))Fail(key,"invalid planar reflection settings");
+    }
     if(root.isMember("ReflectionProbes")) {
         const auto& values=root["ReflectionProbes"];const auto key=path+".ReflectionProbes";
         if(!values.isArray())Fail(key,"expected array");
@@ -95,6 +112,13 @@ void ReadSpatial(const Json::Value& root,const std::string& path,GameSproutRunti
     }
 }
 void SerializeSpatial(const GameSproutRuntime::EnvironmentLightingSettings& settings,Json::Value& result) {
+    const auto& plan=settings.PlanarReflection;
+    if(plan!=GameSproutRuntime::PlanarReflectionSettings{}) {
+        auto& value=result["PlanarReflection"];
+        value["Enabled"]=plan.Enabled;value["Height"]=plan.Height;value["Strength"]=plan.Strength;
+        value["ResolutionScale"]=plan.ResolutionScale;value["MaxResolution"]=plan.MaxResolution;
+        value["MaxDistance"]=plan.MaxDistance;value["LayerMask"]=plan.LayerMask;
+    }
     for(const auto& probe:settings.ReflectionProbes) {
         auto& value=result["ReflectionProbes"].append(Json::Value(Json::objectValue));
         value["Enabled"]=probe.Enabled;value["BoxProjection"]=probe.BoxProjection;
@@ -112,7 +136,7 @@ GameSproutRuntime::EnvironmentLightingSettings Read(const Json::Value& data,cons
         if(name!="Mode"&&name!="AmbientColor"&&name!="SkyColor"&&name!="EquatorColor"&&name!="GroundColor"&&name!="Intensity"&&
            name!="SHCoefficients"&&name!="Atmosphere"&&name!="SkyEnvironment"&&name!="SkyRotationDegrees"&&name!="SkyIntensity"&&
            name!="ReflectionIntensity"&&name!="HDREnabled"&&name!="ExposureEV"&&name!="Tonemap"&&name!="SpotShadows"&&
-           name!="ReflectionProbes")
+           name!="PlanarReflection"&&name!="ReflectionProbes")
             Fail(path+"."+name,"unknown field");
     GameSproutRuntime::EnvironmentLightingSettings result;
     if(data.isMember("Mode")) {

@@ -98,6 +98,7 @@ struct RenderView {
     // Host caps for the authored scene budget. Either zero disables the pass.
     std::uint32_t MaxSpotShadowLights = 4;
     std::uint32_t MaxSpotShadowResolution = 4096;
+    bool EnablePlanarReflections = true; // The scene and a visible Lit material must also opt in.
     // Export/bake tools can capture the scene without feeding probes back into the capture.
     bool EnableReflectionProbes = true;
 };
@@ -160,6 +161,8 @@ struct RenderStatistics {
     std::uint32_t SpotShadowLights = 0;
     std::uint32_t SpotShadowTilesUpdated = 0;
     std::uint32_t SpotShadowDrawCalls = 0;
+    std::uint32_t PlanarReflectionDrawCalls = 0;
+    std::uint32_t PlanarReflectionWidth = 0, PlanarReflectionHeight = 0;
     std::uint32_t ReflectionProbeDrawCalls = 0; // Color batches using a local cubemap.
 };
 

@@ -64,6 +64,7 @@ int main(int argc,char** argv) {
         badSettings=settings;badSettings.SpotShadows.MaxResolution=768;invalid(badSettings);
         runtime->ProcessPendingEvents();Check(listener.Changes==3,"Rejected environment emitted a notification");runtime->UnregisterListener(&listener);
 
+        settings.PlanarReflection={true,-2.75f,.5f,768,.8f,150,7};
         auto& probe=settings.ReflectionProbes.emplace_back();
         probe.Environment={"abcdef1234567890abcdef1234567890",9};
         probe.Center={1,2,3};probe.CapturePosition={1,2,4};probe.Size={14,5,6};probe.Priority=-3;
@@ -112,6 +113,7 @@ int main(int argc,char** argv) {
         bad=document;bad["EnvironmentLighting"]["Tonemap"]="Uncharted2";reject(bad);
         bad=document;bad["EnvironmentLighting"]["SpotShadows"]["MaxLights"]=3.5f;reject(bad);
         bad=document;bad["EnvironmentLighting"]["SpotShadows"]["MaxResolution"]=8192;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["PlanarReflection"]["ResolutionScale"]=2;reject(bad);
         bad=document;bad["EnvironmentLighting"]["ReflectionProbes"][0]["Size"][2]=0;reject(bad);
         bad=document;bad["EnvironmentLighting"]["ReflectionProbes"][0]["BoxProjection"]=1;reject(bad);
         bad=document;bad["EnvironmentLighting"]=Json::Value();reject(bad);

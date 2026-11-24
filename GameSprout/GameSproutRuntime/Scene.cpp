@@ -45,6 +45,7 @@ bool Scene::SetEnvironmentLighting(const EnvironmentLightingSettings& settings) 
         settings.ReflectionIntensity==_EnvironmentLighting.ReflectionIntensity&&settings.HDREnabled==_EnvironmentLighting.HDREnabled&&
         settings.ExposureEV==_EnvironmentLighting.ExposureEV&&settings.Tonemap==_EnvironmentLighting.Tonemap&&
         settings.SpotShadows==_EnvironmentLighting.SpotShadows&&settings.ReflectionProbes==_EnvironmentLighting.ReflectionProbes&&
+        settings.PlanarReflection==_EnvironmentLighting.PlanarReflection&&
         sameColor(settings.AmbientColor,_EnvironmentLighting.AmbientColor)&&sameColor(settings.SkyColor,_EnvironmentLighting.SkyColor)&&
         sameColor(settings.EquatorColor,_EnvironmentLighting.EquatorColor)&&sameColor(settings.GroundColor,_EnvironmentLighting.GroundColor);
     for(std::size_t index=0;same&&index<settings.SHCoefficients.size();++index) {

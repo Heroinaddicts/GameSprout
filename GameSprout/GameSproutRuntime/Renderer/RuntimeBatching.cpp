@@ -179,6 +179,22 @@ bool Renderer::UploadInstanceStream(GRHI::ICommandBuffer& command,InstanceStream
     return true;
 }
 
+bool Renderer::PrepareColorInstances(GRHI::ICommandBuffer& command,const RenderView& view) {
+    if(!_ColorInstanceBatchesKnown||_ColorInstancingEnabled!=view.EnableGPUInstancing) {
+        _ColorInstances.Indices.clear();
+        PrepareInstanceBatches(_PreparedDraws,view.EnableGPUInstancing,false,_ColorInstanceDraws,_ColorInstances.Indices);
+        _ColorInstanceBatchesKnown=true;
+        _ColorInstancingEnabled=view.EnableGPUInstancing;
+    }
+    if(view.EnableGPUInstancing)
+        return UploadResidentInstances(command)&&UploadInstanceStream(command,_ColorInstances);
+    if(!_ChangedInstanceTransforms.empty()) {
+        _InstanceTransformsDirty=true;
+        _ChangedInstanceTransforms.clear();
+    }
+    return true;
+}
+
 bool Renderer::DrawPrepared(GRHI::IRenderPass& pass,const std::vector<PreparedDraw>& draws,const RenderView& view,
     const Mat4& viewProjection,GRHI::TextureFormat format,const std::vector<DirectionalLight>& lights,
     const RenderEnvironment::Uniform& environment,const EnvironmentGPU* reflections) {
