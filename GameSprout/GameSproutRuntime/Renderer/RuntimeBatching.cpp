@@ -98,7 +98,7 @@ void Renderer::ClearInstanceBuffers() {
     InvalidateInstanceUploads();
 }
 
-void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,bool enabled,bool shadow,
+void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,bool enabled,
     std::vector<InstanceDraw>& batches,std::vector<std::uint32_t>& indices) const {
     batches.clear();
     for(std::size_t begin=0;begin<draws.size();) {
@@ -110,9 +110,7 @@ void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,boo
             if(next.Shader||next.Transparent||next.Object->Skinned||!next.Material->EnableGPUInstancing||
                 next.Mesh!=draw.Mesh||next.Section.FirstIndex!=draw.Section.FirstIndex||
                 next.Section.IndexCount!=draw.Section.IndexCount||next.Object->Negative!=draw.Object->Negative)break;
-            if(shadow) {
-                if(next.ShadowDoubleSided!=draw.ShadowDoubleSided)break;
-            }else if(next.Material!=draw.Material||next.Object->Layer!=draw.Object->Layer||
+            if(next.Material!=draw.Material||next.Object->Layer!=draw.Object->Layer||
                 (draw.Material->ShadingModel==MaterialShadingModel::Lit&&
                     (next.Object->ReceiveShadows!=draw.Object->ReceiveShadows||next.LocalLightIndices!=draw.LocalLightIndices||
                      next.ReflectionProbeIndex!=draw.ReflectionProbeIndex)))break;
@@ -182,7 +180,7 @@ bool Renderer::UploadInstanceStream(GRHI::ICommandBuffer& command,InstanceStream
 bool Renderer::PrepareColorInstances(GRHI::ICommandBuffer& command,const RenderView& view) {
     if(!_ColorInstanceBatchesKnown||_ColorInstancingEnabled!=view.EnableGPUInstancing) {
         _ColorInstances.Indices.clear();
-        PrepareInstanceBatches(_PreparedDraws,view.EnableGPUInstancing,false,_ColorInstanceDraws,_ColorInstances.Indices);
+        PrepareInstanceBatches(_PreparedDraws,view.EnableGPUInstancing,_ColorInstanceDraws,_ColorInstances.Indices);
         _ColorInstanceBatchesKnown=true;
         _ColorInstancingEnabled=view.EnableGPUInstancing;
     }

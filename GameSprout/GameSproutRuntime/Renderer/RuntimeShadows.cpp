@@ -56,19 +56,21 @@ ShadowClipBounds ProjectShadowBounds(const Bounds& bounds,const Mat4& projection
 }
 }
 
-bool Renderer::DrawShadow(GRHI::IRenderPass& pass,const PreparedDraw& draw,const Mat4& lightViewProjection,
-    std::size_t firstInstance,std::uint32_t instanceCount,const InstanceStream* instances) {
+bool Renderer::DrawShadow(GRHI::IRenderPass& pass,const ShadowBatch& batch,const Mat4& lightViewProjection,
+    const InstanceStream& instances) {
+    const auto& draw=*batch.Caster;
+    const bool instanced=batch.Count>1;
     const auto& data=draw.Mesh->Data;
     PipelineKey key;key.Shadow=true;key.Stride=data.VertexStride;key.Position=data.PositionOffset;
-    key.DoubleSided=draw.ShadowDoubleSided;key.Negative=draw.Object->Negative;key.Instanced=instances!=nullptr;
+    key.DoubleSided=draw.DoubleSided;key.Negative=draw.Object->Negative;key.Instanced=instanced;
     if(draw.Object->Skinned){key.BoneIndices=data.BoneIndicesOffset;key.BoneWeights=data.BoneWeightsOffset;}
     auto* pipeline=Pipeline(key);if(!pipeline)return false;
     struct ShadowDrawUniform { Mat4 Model,ViewProjection; };
     static_assert(sizeof(ShadowDrawUniform)==128,"Shadow draw matrices must match HLSL layout");
-    const ShadowDrawUniform uniform{instances?Mat4{}:draw.Object->Model,lightViewProjection};
+    const ShadowDrawUniform uniform{instanced?Mat4{}:draw.Object->Model,lightViewProjection};
     pass.SetPipeline(pipeline);pass.SetVertexBuffer(0,draw.Mesh->Buffer,0);
-    if(instances) {
-        pass.SetVertexBuffer(1,instances->Buffer,firstInstance*sizeof(std::uint32_t));
+    if(instanced) {
+        pass.SetVertexBuffer(1,instances.Buffer,batch.IndexOffset*sizeof(std::uint32_t));
         pass.SetVertexStorageBuffer(0,_InstanceTransformsBuffer);
     }
     pass.SetIndexBuffer(draw.Mesh->Buffer,GRHI::IndexFormat::UInt32,static_cast<std::size_t>(data.IndexOffset));
@@ -77,7 +79,7 @@ bool Renderer::DrawShadow(GRHI::IRenderPass& pass,const PreparedDraw& draw,const
         SkinUniform skin;std::copy(draw.Object->SkinMatrices.begin(),draw.Object->SkinMatrices.end(),skin.Bones);
         pass.SetVertexUniform(1,&skin,sizeof(skin));
     }
-    pass.DrawIndexed(draw.Section.IndexCount,instanceCount,draw.Section.FirstIndex,0,0);
+    pass.DrawIndexed(draw.IndexCount,batch.Count,draw.FirstIndex,0,0);
     ++_Statistics.ShadowDrawCalls;return true;
 }
 
@@ -89,15 +91,31 @@ bool Renderer::StaticShadowCasterKey::operator==(const StaticShadowCasterKey& ot
 }
 
 void Renderer::SortShadowCandidates(std::vector<ShadowCandidate>& candidates) {
-    std::stable_sort(candidates.begin(),candidates.end(),[](const ShadowCandidate& left,const ShadowCandidate& right) {
-        const auto& a=left.Draw;
-        const auto& b=right.Draw;
+    std::stable_sort(candidates.begin(),candidates.end(),[](const ShadowCandidate& a,const ShadowCandidate& b) {
         if(a.Mesh->SortRank!=b.Mesh->SortRank)return a.Mesh->SortRank<b.Mesh->SortRank;
-        if(a.Section.FirstIndex!=b.Section.FirstIndex)return a.Section.FirstIndex<b.Section.FirstIndex;
-        if(a.Section.IndexCount!=b.Section.IndexCount)return a.Section.IndexCount<b.Section.IndexCount;
-        if(a.ShadowDoubleSided!=b.ShadowDoubleSided)return a.ShadowDoubleSided<b.ShadowDoubleSided;
+        if(a.FirstIndex!=b.FirstIndex)return a.FirstIndex<b.FirstIndex;
+        if(a.IndexCount!=b.IndexCount)return a.IndexCount<b.IndexCount;
+        if(a.DoubleSided!=b.DoubleSided)return a.DoubleSided<b.DoubleSided;
+        if(a.Instancing!=b.Instancing)return a.Instancing<b.Instancing;
         return a.Object->Negative<b.Object->Negative;
     });
+}
+
+void Renderer::AppendShadowBatch(const ShadowCandidate& caster,bool instancing,
+    std::vector<ShadowBatch>& batches,std::vector<std::uint32_t>& indices) {
+    if(instancing&&caster.Instancing&&!batches.empty()) {
+        auto& batch=batches.back();
+        const auto& first=*batch.Caster;
+        if(first.Instancing&&first.Mesh==caster.Mesh&&first.FirstIndex==caster.FirstIndex&&
+            first.IndexCount==caster.IndexCount&&first.DoubleSided==caster.DoubleSided&&
+            first.Object->Negative==caster.Object->Negative) {
+            if(batch.Count==1)indices.push_back(first.Object->InstanceIndex);
+            indices.push_back(caster.Object->InstanceIndex);
+            ++batch.Count;
+            return;
+        }
+    }
+    batches.push_back({&caster,indices.size()});
 }
 
 bool Renderer::DrawShadowAtlas(GRHI::ICommandBuffer& command,GRHI::ITexture& atlas,
@@ -107,33 +125,34 @@ bool Renderer::DrawShadowAtlas(GRHI::ICommandBuffer& command,GRHI::ITexture& atl
     struct TileDraws {
         GRHI::Viewport Viewport;
         Mat4 Projection;
-        std::vector<PreparedDraw> Draws;
-        std::vector<InstanceDraw> Batches;
+        std::vector<const ShadowCandidate*> Repairs;
+        std::vector<ShadowBatch> Batches;
     };
     std::vector<TileDraws> tiles;
     const std::uint32_t allCascades=(std::uint32_t{1}<<cascades.Count)-1;
     cascadeMask&=allCascades;
     tiles.reserve(repair?repair->size():cascades.Count);
     stream.Indices.clear();
+    const bool instancing=view.EnableGPUInstancing;
     for(std::uint32_t cascade=0;cascade<cascades.Count;++cascade) {
         if(!(cascadeMask&(std::uint32_t{1}<<cascade)))continue;
         const auto& projection=cascades.Entries[cascade].ViewProjection;
         const auto x=(cascade%columns)*tile,y=(cascade/columns)*tile;
         if(!repair) {
             auto& work=tiles.emplace_back(TileDraws{{float(x),float(y),float(tile),float(tile),0,1},projection,{},{}});
-            work.Draws.reserve(candidates.size());
             const RenderFrustum::Frustum frustum(projection);
             for(const auto& candidate:candidates) {
-                const auto& object=*candidate.Draw.Object;
+                const auto& object=*candidate.Object;
                 if(object.CullBoxKnown) {
                     // Reuse the transformed local mesh bounds. A world AABB
                     // expands again when projected onto the light's tilted axes.
-                    if(frustum.Intersects(object.CullBox))work.Draws.push_back(candidate.Draw);
+                    if(frustum.Intersects(object.CullBox))AppendShadowBatch(candidate,instancing,work.Batches,stream.Indices);
                     continue;
                 }
                 const auto bounds=ProjectShadowBounds(candidate.World,projection);
                 if(bounds.Maximum[0]>=-1&&bounds.Minimum[0]<=1&&bounds.Maximum[1]>=-1&&bounds.Minimum[1]<=1&&
-                   bounds.Maximum[2]>=0&&bounds.Minimum[2]<=1)work.Draws.push_back(candidate.Draw);
+                   bounds.Maximum[2]>=0&&bounds.Minimum[2]<=1)
+                    AppendShadowBatch(candidate,instancing,work.Batches,stream.Indices);
             }
             continue;
         }
@@ -157,13 +176,13 @@ bool Renderer::DrawShadowAtlas(GRHI::ICommandBuffer& command,GRHI::ITexture& atl
                 const auto& patch=patches[index];
                 if(!(bounds.Maximum[0]<patch.Left||bounds.Minimum[0]>patch.Right||
                      bounds.Maximum[1]<patch.Bottom||bounds.Minimum[1]>patch.Top))
-                    tiles[firstPatch+index].Draws.push_back(candidate.Draw);
+                    tiles[firstPatch+index].Repairs.push_back(&candidate);
             }
         }
     }
 
-    for(auto& work:tiles)
-        PrepareInstanceBatches(work.Draws,view.EnableGPUInstancing,true,work.Batches,stream.Indices);
+    for(auto& work:tiles)for(const auto* caster:work.Repairs)
+        AppendShadowBatch(*caster,instancing,work.Batches,stream.Indices);
     if(!UploadInstanceStream(command,stream))return false;
 
     const bool preserveOtherTiles=repair||cascadeMask!=allCascades;
@@ -179,8 +198,7 @@ bool Renderer::DrawShadowAtlas(GRHI::ICommandBuffer& command,GRHI::ITexture& atl
         pass->SetViewport(work.Viewport);
         if(preserveOtherTiles&&!ClearShadowRegion(*pass))return false;
         for(const auto& batch:work.Batches)
-            if(!DrawShadow(*pass,work.Draws[batch.First],work.Projection,batch.IndexOffset,batch.Count,
-                batch.Count>1?&stream:nullptr))return false;
+            if(!DrawShadow(*pass,batch,work.Projection,stream))return false;
     }
     command.EndRenderPass(pass);
     passScope.Pass=nullptr;
@@ -343,13 +361,11 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
             }
             // User programs require an explicit shadow-caster contract.
             if(!material->Shader.Guid.empty())continue;
-            PreparedDraw draw;
-            draw.Object=&object;draw.Mesh=mesh;draw.Section=section;draw.Material=material;
-            draw.SectionOrdinal=static_cast<std::uint64_t>(&section-mesh->Data.Sections.data());
-            draw.ShadowDoubleSided=material->DoubleSided||object.ShadowMode==ShadowCastingMode::TwoSided;
-            casters.push_back({draw,world});
+            const bool doubleSided=material->DoubleSided||object.ShadowMode==ShadowCastingMode::TwoSided;
+            casters.push_back({&object,mesh,world,section.FirstIndex,section.IndexCount,doubleSided,
+                material->EnableGPUInstancing&&!object.Skinned});
             if(layered&&!dynamic)staticKeys.push_back({object.ObjectID,mesh,object.Model,world,
-                section.FirstIndex,section.IndexCount,draw.ShadowDoubleSided});
+                section.FirstIndex,section.IndexCount,doubleSided});
         }
         if(casters.size()!=previousCount) {
             bounds.push_back(world);

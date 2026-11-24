@@ -234,8 +234,6 @@ private:
         std::vector<std::uint32_t> Indices;
         std::vector<std::uint32_t> Uploaded;
     };
-    bool DrawShadow(GRHI::IRenderPass&,const PreparedDraw&,const Mat4&,
-        std::size_t firstInstance=0,std::uint32_t instanceCount=1,const InstanceStream* instances=nullptr);
     struct PreparedDraw {
         const DrawObject* Object=nullptr;
         MeshGPU* Mesh=nullptr;
@@ -249,11 +247,24 @@ private:
         bool Transparent=false;
         float DistanceSquared=0;
         std::uint64_t SectionOrdinal=0;
-        bool ShadowDoubleSided=false;
         std::array<std::uint32_t,MaxLocalLights> LocalLightIndices{}; // One-based indices, zero terminator.
         std::size_t ReflectionProbeIndex=0; // One-based authored index, zero selects the global sky.
     };
-    struct ShadowCandidate { PreparedDraw Draw; Bounds World; };
+    struct ShadowCandidate {
+        const DrawObject* Object;
+        const MeshGPU* Mesh;
+        Bounds World;
+        std::uint32_t FirstIndex,IndexCount;
+        bool DoubleSided,Instancing;
+    };
+    struct ShadowBatch {
+        const ShadowCandidate* Caster;
+        std::size_t IndexOffset;
+        std::uint32_t Count=1;
+    };
+    bool DrawShadow(GRHI::IRenderPass&,const ShadowBatch&,const Mat4&,const InstanceStream&);
+    static void AppendShadowBatch(const ShadowCandidate&,bool instancing,std::vector<ShadowBatch>&,
+        std::vector<std::uint32_t>&);
     struct StaticShadowCasterKey {
         std::uint64_t ObjectID;
         const MeshGPU* Mesh;
@@ -292,7 +303,7 @@ private:
     static bool OpaqueDrawBefore(const PreparedDraw&,const PreparedDraw&);
     static bool PriorityAndDepthBefore(const PreparedDraw&,const PreparedDraw&);
     void SortPrepared(std::vector<PreparedDraw>&);
-    void PrepareInstanceBatches(const std::vector<PreparedDraw>&,bool enabled,bool shadow,
+    void PrepareInstanceBatches(const std::vector<PreparedDraw>&,bool enabled,
         std::vector<InstanceDraw>&,std::vector<std::uint32_t>&) const;
     bool UploadResidentInstances(GRHI::ICommandBuffer&);
     bool UploadInstanceStream(GRHI::ICommandBuffer&,InstanceStream&);

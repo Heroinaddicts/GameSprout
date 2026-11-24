@@ -107,7 +107,7 @@ bool Renderer::RenderSpotShadows(GRHI::ICommandBuffer& command,const RenderView&
     struct Tile {
         GRHI::Viewport Viewport;
         std::vector<ShadowCandidate> Casters;
-        std::vector<InstanceDraw> Batches;
+        std::vector<ShadowBatch> Batches;
         bool Dirty=false;
     };
     std::array<Tile,MaxSpotShadows> tiles;
@@ -154,11 +154,10 @@ bool Renderer::RenderSpotShadows(GRHI::ICommandBuffer& command,const RenderView&
                     else if(!object.Materials[section.MaterialSlot].Guid.empty())continue;
                 }
                 if(!material->Shader.Guid.empty())continue;
-                PreparedDraw draw;
-                draw.Object=&object;draw.Mesh=mesh;draw.Section=section;draw.Material=material;
-                draw.ShadowDoubleSided=material->DoubleSided||object.ShadowMode==ShadowCastingMode::TwoSided;
-                tile.Casters.push_back({draw,{}});
-                casters.push_back({object.ObjectID,mesh,object.Model,{},section.FirstIndex,section.IndexCount,draw.ShadowDoubleSided});
+                const bool doubleSided=material->DoubleSided||object.ShadowMode==ShadowCastingMode::TwoSided;
+                tile.Casters.push_back({&object,mesh,{},section.FirstIndex,section.IndexCount,doubleSided,
+                    material->EnableGPUInstancing&&!object.Skinned});
+                casters.push_back({object.ObjectID,mesh,object.Model,{},section.FirstIndex,section.IndexCount,doubleSided});
                 skinned|=object.Skinned;
             }
         }
@@ -167,10 +166,8 @@ bool Renderer::RenderSpotShadows(GRHI::ICommandBuffer& command,const RenderView&
         _SpotShadowCasters[slot]=std::move(casters);
         if(!tile.Dirty)continue;
         SortShadowCandidates(tile.Casters);
-        std::vector<PreparedDraw> sorted;
-        sorted.reserve(tile.Casters.size());
-        for(const auto& caster:tile.Casters)sorted.push_back(caster.Draw);
-        PrepareInstanceBatches(sorted,view.EnableGPUInstancing,true,tile.Batches,_SpotShadowInstances.Indices);
+        for(const auto& caster:tile.Casters)
+            AppendShadowBatch(caster,view.EnableGPUInstancing,tile.Batches,_SpotShadowInstances.Indices);
     }
     _SpotShadowKeys=keys;_SpotShadowSceneID=sceneID;_SpotShadowSceneRevision=revision;
     _SpotShadowViewMask=cameraMask;_SpotShadowHasSkinned=hasSkinned;_SpotShadowTileStride=tileStride;
@@ -194,8 +191,7 @@ bool Renderer::RenderSpotShadows(GRHI::ICommandBuffer& command,const RenderView&
         if(validAtlas&&!ClearShadowRegion(*pass))return false;
         ++_Statistics.SpotShadowTilesUpdated;
         for(const auto& batch:tile.Batches)
-            if(!DrawShadow(*pass,tile.Casters[batch.First].Draw,keys[slot].Projection,batch.IndexOffset,batch.Count,
-                batch.Count>1?&_SpotShadowInstances:nullptr))return false;
+            if(!DrawShadow(*pass,batch,keys[slot].Projection,_SpotShadowInstances))return false;
     }
     command.EndRenderPass(pass);scope.Pass=nullptr;
     _Statistics.SpotShadowDrawCalls=_Statistics.ShadowDrawCalls-startDraws;
