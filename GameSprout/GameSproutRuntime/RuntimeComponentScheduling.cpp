@@ -4,16 +4,17 @@
 
 namespace GameSproutRuntime {
 void Runtime::RegisterAnimationComponent(std::uint64_t objectID,const IComponent* component) {
-    if(component->GetComponentType()==typeid(IAnimatorComponent)||component->GetComponentType()==typeid(ISkinnedMeshRendererComponent))
+    // The animation phase evaluates Animators. Skin renderers publish or read
+    // palettes during their respective script and render work.
+    if(component->GetComponentType()==typeid(IAnimatorComponent))
         ++_AnimationObjects[objectID];
 }
 void Runtime::UnregisterAnimationComponent(std::uint64_t objectID,const IComponent* component) {
     const auto& type=component->GetComponentType();
-    if(type==typeid(IAnimatorComponent))
-        SetAnimationBindingOwners(objectID,static_cast<const IAnimatorComponent*>(component)->GetNodeBindings(),{});
-    else if(type==typeid(ISkinnedMeshRendererComponent))
+    if(type==typeid(ISkinnedMeshRendererComponent))
         SetSkinAnimatorReference(objectID,static_cast<const ISkinnedMeshRendererComponent*>(component)->GetAnimatorObjectID(),0);
-    else return;
+    if(type!=typeid(IAnimatorComponent))return;
+    SetAnimationBindingOwners(objectID,static_cast<const IAnimatorComponent*>(component)->GetNodeBindings(),{});
     const auto found=_AnimationObjects.find(objectID);if(found==_AnimationObjects.end())return;
     if(found->second>1)--found->second;else _AnimationObjects.erase(found);
 }

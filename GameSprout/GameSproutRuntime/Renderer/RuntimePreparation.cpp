@@ -22,7 +22,10 @@ void Renderer::RefreshSkinPoses(const RenderFrustum::Frustum& frustum) {
                 });
             if(!samePose) {
                 ready=SkinPoseBounds(*mesh,_SkinScratch,skin.LocalBounds);
-                if(ready)object.SkinMatrices.swap(_SkinScratch);
+                if(ready) {
+                    object.SkinMatrices.swap(_SkinScratch);
+                    object.SkinUploadDirty=true;
+                }
             }
             if(ready&&component&&component->GetMesh()==object.Mesh)component->_Bounds=skin.LocalBounds;
         } else if(!mesh&&component&&component->GetMesh()==object.Mesh)component->_Bounds={};

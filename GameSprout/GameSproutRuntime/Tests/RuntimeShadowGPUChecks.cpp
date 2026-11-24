@@ -68,6 +68,7 @@ public:
     bool LoadMaterial(const ResourceReference& reference,MaterialRenderData& data,std::string& error)override{
         data={};data.ShadingModel=MaterialShadingModel::Lit;data.BaseColor={.4f,.4f,.4f,1};
         if(reference.LocalID==11)data.BaseColor={.8f,.2f,.1f,1};
+        if(reference.LocalID==12)data.DoubleSided=true;
         data.Roughness=1;data.SpecularHighlights=false;error.clear();return true;
     }
 };
@@ -257,6 +258,72 @@ void CheckObjectShadowControls(IGameSproutRuntime& runtime,IRuntimeViewport& vie
         run(*receiver->GetComponent<IMeshRendererComponent>(),*caster->GetComponent<IMeshRendererComponent>());
         CheckTwoSidedAndInstancedShadows(*scene,viewport,view,*receiver,*caster);
     }
+}
+
+void CheckSkinnedShadowInstancing(IGameSproutRuntime& runtime,IRuntimeViewport& viewport,bool spot) {
+    auto* scene=runtime.CreateScene(spot?"Instanced spot skin shadows":"Instanced directional skin shadows");
+    Check(scene,"Cannot create skinned shadow instancing scene");
+    auto* receiver=MeshObject(*scene,"Receiving plane",1);
+    Check(receiver->GetComponent<IMeshRendererComponent>()->SetShadowCastingMode(ShadowCastingMode::Off),
+        "Cannot disable receiver casting in skinned instancing fixture");
+    std::array<IGameObject*,2> bones{};
+    ISkinnedMeshRendererComponent* streamedSkin=nullptr;
+    for(std::size_t index=0;index<bones.size();++index) {
+        auto* caster=MeshObject(*scene,"Skinned shadow instance",4);
+        caster->GetTransform()->SetLocalPosition({0,0,1});
+        streamedSkin=SkinShadowObject(*scene,*caster);
+        Check(streamedSkin->SetShadowCastingMode(ShadowCastingMode::ShadowsOnly),
+            "Cannot hide the skinned shadow instance from color rendering");
+        bones[index]=caster->GetChild(0);
+        bones[index]->GetTransform()->SetLocalPosition({0,index==0?-.68f:.68f,0});
+    }
+    auto* lightObject=scene->CreateGameObject("Instanced shadow light");
+    auto* light=lightObject->AddComponent<ILightComponent>();
+    Check(light&&lightObject->GetTransform()->SetLocalRotation(Yaw(180)),"Cannot aim skin shadow light");
+    auto settings=light->GetSettings();
+    settings.Intensity=spot?12.f:.5f;
+    settings.Type=spot?LightType::Spot:LightType::Directional;
+    settings.Range=12;
+    settings.Shadows.Distance=16;
+    settings.Shadows.CascadeCount=1;
+    settings.Shadows.Resolution=512;
+    settings.Shadows.Soft=false;
+    settings.Shadows.CacheStaticCasters=true;
+    if(spot)lightObject->GetTransform()->SetLocalPosition({0,0,4});
+    Check(light->SetSettings(settings),"Cannot configure skin shadow light");
+
+    RenderView view;view.Scene=scene;view.DrawGrid=false;view.Camera.Position={0,0,5};
+    view.Camera.Projection.Projection=CameraProjection::Orthographic;
+    view.Camera.Projection.OrthographicHeight=4;view.Camera.Projection.FarPlane=20;
+    Check(TryMakeLookAt(view.Camera.Position,{0,0,0},{0,1,0},view.Camera.View),"Cannot aim skin shadow camera");
+    const auto base=Render(viewport,view);
+    settings.Shadows.Enabled=true;
+    Check(light->SetShadows(settings.Shadows),"Cannot enable skinned shadows");
+    const auto instance=Render(viewport,view);
+    const auto draws=[spot](const Frame& frame) {
+        return spot?frame.Statistics.SpotShadowDrawCalls:frame.Statistics.DynamicShadowDrawCalls;
+    };
+    Check(instance.Statistics.VisibleObjects==1,"Shadow-only skinned instances leaked into the color pass");
+    EffectiveShadow(base,instance,"Skinned instance shadows");
+    Check(draws(instance)==1,"Same-mesh skinned casters did not share a depth batch");
+
+    view.EnableGPUInstancing=false;
+    light->RequestShadowRefresh();
+    const auto individual=Render(viewport,view);
+    Check(draws(individual)==2&&Difference(instance,individual)<16,
+        "Instanced depth disagrees with individual draws for distinct skeletal poses");
+    view.EnableGPUInstancing=true;
+    bones[1]->GetTransform()->SetLocalPosition({.85f,.68f,0});
+    const auto moved=Render(viewport,view);
+    Check(draws(moved)==1&&Difference(instance,moved)>100,"Changing one bone did not update the skinned shadow batch");
+
+    Mat4 streamedPose;
+    streamedPose(0,3)=-.85f;streamedPose(1,3)=.68f;
+    Check(streamedSkin->SetSkinPose(std::span(&streamedPose,1)),"Cannot submit a streamed shadow pose");
+    const auto streamed=Render(viewport,view);
+    Check(draws(streamed)==1&&Difference(moved,streamed)>100&&streamed.Statistics.SceneSnapshotRebuilds==0,
+        "An in-place streamed skin pose left the cached shadow stale");
+    runtime.DestroyScene(scene);
 }
 
 void CheckScrollingShadows(IGameSproutRuntime& runtime,IRuntimeViewport& viewport,Provider& provider) {
@@ -534,6 +601,15 @@ void CheckLayeredShadows(IGameSproutRuntime& runtime,IRuntimeViewport& viewport,
     const auto restoredBuilding=Render(viewport,view);
     Check(!restoredBuilding.Statistics.SceneSnapshotRebuilds&&restoredBuilding.Statistics.StaticShadowMapUpdates==1&&
         Difference(emptyBuilding,restoredBuilding)>100,"Restoring a mesh did not invalidate the static caster membership");
+    auto* buildingRenderer=building->GetComponent<IMeshRendererComponent>();
+    Check(buildingRenderer->SetMaterial(0,{Guid,12}),"Cannot change static caster material sidedness");
+    const auto twoSidedBuilding=Render(viewport,view);
+    Check(!twoSidedBuilding.Statistics.SceneSnapshotRebuilds&&twoSidedBuilding.Statistics.StaticShadowMapUpdates==1,
+        "Changing a static caster material left stale cached shadow sidedness");
+    Check(buildingRenderer->SetMaterials({{Guid,10}}),"Cannot restore original static caster material");
+    const auto originalBuilding=Render(viewport,view);
+    Check(!originalBuilding.Statistics.SceneSnapshotRebuilds&&originalBuilding.Statistics.StaticShadowMapUpdates==1&&
+        Difference(originalBuilding,restoredBuilding)==0,"Restored static caster material left stale depth or color");
 
     // Moving along the light ray leaves the footprint on the receiver fixed,
     // but puts the dynamic cube far outside the static atlas's light depth range.
@@ -883,6 +959,8 @@ int main(int argc,char** argv){
         CheckScrollingShadows(*runtime,*viewport,provider);
         CheckObjectShadowControls(*runtime,*viewport,false);
         CheckObjectShadowControls(*runtime,*viewport,true);
+        CheckSkinnedShadowInstancing(*runtime,*viewport,false);
+        CheckSkinnedShadowInstancing(*runtime,*viewport,true);
         (void)receiver;delete viewport;viewport=nullptr;delete runtime;runtime=nullptr;
         std::cout<<"PASS directional shadows GPU: cast/receive controls for rigid, skinned and instanced meshes, cascade fitting, filter quality, fade, update policies, one-shot refresh and atlas reuse\n";
         return 0;

@@ -24,6 +24,9 @@ bool Renderer::SkinMatrices(IGameObject& object,const MeshGPU& mesh,std::vector<
     if(!sampled || matrices.size()!=mesh.Data.Bones.size()) {
         Diagnostic("Cannot bind skinned mesh '"+object.GetName()+"': "+error);matrices.clear();return false;
     }
+    // The built-in component checks finiteness when supplying a pose or
+    // constructing its Animator palette. Keep validation for other sources.
+    if(builtin)return true;
     for(const auto& matrix:matrices) if(!RuntimeMath::IsFinite(matrix)) {
         Diagnostic("Skinned mesh has a nonfinite pose matrix: "+object.GetName());matrices.clear();return false;
     }
@@ -43,16 +46,20 @@ bool Renderer::SkinPoseBounds(const MeshGPU& mesh,const std::vector<Mat4>& matri
     // Each weighted source point is inside its influencing joint's box.
     // Nonnegative weights make the posed point, divided by its total weight,
     // a convex combination inside the union AABB of the transformed boxes.
-    for(std::size_t joint=0;joint<mesh.JointBounds.size();++joint) {
-        const auto& source=mesh.JointBounds[joint];
-        if(!source.Used)continue;
-        const RenderFrustum::Box transformed(source.Minimum,source.Maximum,matrices[joint]);
+    // Geometry validation prepared the source boxes once. SkinMatrices has
+    // already validated the palette, and only the first three rows affect the
+    // positions written by linear skinning.
+    for(const auto& source:mesh.JointBounds) {
+        const auto& matrix=matrices[source.Joint].Data;
         for(std::size_t axis=0;axis<3;++axis) {
-            const double radius=std::fabs(transformed.Axis[0][axis])+std::fabs(transformed.Axis[1][axis])+
-                std::fabs(transformed.Axis[2][axis]);
-            minimum[axis]=std::min(minimum[axis],transformed.Center[axis]-radius);
-            maximum[axis]=std::max(maximum[axis],transformed.Center[axis]+radius);
-            magnitude[axis]=std::max(magnitude[axis],transformed.Magnitude[axis]);
+            const double x=matrix[axis],y=matrix[axis+4],z=matrix[axis+8],translation=matrix[axis+12];
+            const double center=translation+x*source.Center[0]+y*source.Center[1]+z*source.Center[2];
+            const double radius=std::fabs(x*source.Extent[0])+std::fabs(y*source.Extent[1])+std::fabs(z*source.Extent[2]);
+            const double arithmeticMagnitude=std::fabs(translation)+std::fabs(x)*source.Magnitude[0]+
+                std::fabs(y)*source.Magnitude[1]+std::fabs(z)*source.Magnitude[2];
+            if(const auto low=center-radius;low<minimum[axis])minimum[axis]=low;
+            if(const auto high=center+radius;high>maximum[axis])maximum[axis]=high;
+            if(arithmeticMagnitude>magnitude[axis])magnitude[axis]=arithmeticMagnitude;
         }
     }
 

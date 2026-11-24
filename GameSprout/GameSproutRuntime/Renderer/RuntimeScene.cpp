@@ -36,7 +36,7 @@ bool Renderer::UpdateDrawTransform(DrawObject& draw,const Mat4& model,const Rend
     const bool wasNegative=draw.Negative;
     if(!SetDrawTransform(draw,model))return false;
     if(draw.Negative!=wasNegative)_OpaqueDrawOrderKnown=false;
-    if(!_InstanceTransformsDirty&&!draw.Skinned)_ChangedInstanceTransforms.push_back(draw.InstanceIndex);
+    if(!_InstanceTransformsDirty)_ChangedInstanceTransforms.push_back(draw.InstanceIndex);
     if(hadCullBox) {
         draw.CullBox=RenderFrustum::Box(draw.Geometry->CullMinimum,draw.Geometry->CullMaximum,draw.Model);
         draw.CullBoxKnown=true;

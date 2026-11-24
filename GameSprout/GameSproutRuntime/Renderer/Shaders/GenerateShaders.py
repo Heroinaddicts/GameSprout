@@ -35,7 +35,10 @@ def main():
                              ("HDRResolveVertex", "vertex"), ("HDRResolveFragment", "fragment"),
                              ("UIVertex", "vertex"), ("UIFragment", "fragment"),
                              ("ShadowVertex", "vertex"), ("InstancedShadowVertex", "vertex"),
-                             ("SkinnedShadowVertex", "vertex")]:
+                             ("SkinnedShadowVertex", "vertex"), ("InstancedSkinnedShadowVertex", "vertex"),
+                             ("InstancedSkinnedMeshVertex", "vertex"), ("InstancedSkinnedMeshNoUVVertex", "vertex"),
+                             ("InstancedSkinnedMeshNoColorVertex", "vertex"),
+                             ("InstancedSkinnedMeshNoUVNoColorVertex", "vertex")]:
             spirv = root / (entry + ".spv")
             # One source contains several entry points. Keep only resources used
             # by that entry; retaining a fragment binding in a vertex module

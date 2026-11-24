@@ -32,25 +32,40 @@ public:
     std::uint64_t GetRevision() const override{return Revision;}
     bool LoadMesh(const ResourceReference& reference,MeshRenderData& data,std::string&) override {
         ++MeshLoads;data={};
-        // IDs 1..4 cover all optional color/UV layouts; ID 5 has two independently
-        // material-addressable sections, not a synthetic split of one draw call.
-        const auto layout=reference.LocalID==5?3u:static_cast<unsigned>(reference.LocalID-1);
+        // IDs 1..4 and 6..9 cover all optional color/UV layouts, the latter
+        // with skin data. ID 5 has two material-addressable sections.
+        // ID 10 uses split corners with an otherwise identical color seam.
+        const bool colorSeam=reference.LocalID==10;
+        const bool skin=reference.LocalID>=6&&reference.LocalID<=10;
+        const auto layout=colorSeam?1u:reference.LocalID==5?3u:static_cast<unsigned>(reference.LocalID-(skin?6:1));
         const bool color=(layout&1)!=0,uv=(layout&2)!=0;
-        data.VertexCount=reference.LocalID==5?6:3;
+        data.VertexCount=reference.LocalID==5||colorSeam?6:3;
         data.VertexStride=24+(color?16:0)+(uv?8:0);
         data.ColorOffset=color?24:-1;data.UVOffset=uv?(color?40:24):-1;
+        if(skin) {
+            data.BoneIndicesOffset=data.VertexStride;
+            data.BoneWeightsOffset=data.VertexStride+16;
+            data.VertexStride+=32;
+            data.Bones={{"/bone",{}}};
+        }
         for(unsigned index=0;index<data.VertexCount;++index){
             const unsigned corner=index%3;
             const float offset=reference.LocalID==5?(index<3?-.4f:.4f):0;
             const Vector3 positions[]={{-.3f+offset,-.3f,0},{.3f+offset,-.3f,0},{offset,.35f,0}};
             Float(data.Bytes,positions[corner].X);Float(data.Bytes,positions[corner].Y);Float(data.Bytes,positions[corner].Z);
             Float(data.Bytes,Normal.X);Float(data.Bytes,Normal.Y);Float(data.Bytes,Normal.Z);
-            if(color){Float(data.Bytes,.6f);Float(data.Bytes,1);Float(data.Bytes,.8f);Float(data.Bytes,1);}
+            if(colorSeam) {
+                const bool shared=index<3||corner==0;
+                Float(data.Bytes,shared?1:0);Float(data.Bytes,shared?0:1);Float(data.Bytes,0);Float(data.Bytes,1);
+            } else if(color){Float(data.Bytes,.6f);Float(data.Bytes,1);Float(data.Bytes,.8f);Float(data.Bytes,1);}
             if(uv){Float(data.Bytes,corner==1?1:corner==2?.5f:0);Float(data.Bytes,corner==2?1:0);}
+            if(skin){for(unsigned slot=0;slot<4;++slot)UInt(data.Bytes,0);
+                Float(data.Bytes,1);Float(data.Bytes,0);Float(data.Bytes,0);Float(data.Bytes,0);}
         }
         data.IndexOffset=data.Bytes.size();data.IndexCount=data.VertexCount;
         for(unsigned index=0;index<data.IndexCount;++index)UInt(data.Bytes,index);
-        data.Sections=reference.LocalID==5?std::vector<MeshSection>{{0,3,0},{3,3,1}}:std::vector<MeshSection>{{0,3,0}};
+        data.Sections=reference.LocalID==5?std::vector<MeshSection>{{0,3,0},{3,3,1}}:
+            std::vector<MeshSection>{{0,data.IndexCount,0}};
         data.LocalBounds={{0,0,0},{reference.LocalID==5?.7f:.3f,.35f,0}};return true;
     }
     bool LoadTexture(const ResourceReference& reference,TextureRenderData& data,std::string&) override {
@@ -63,6 +78,19 @@ public:
         ++MaterialLoads;const auto found=Materials.find(reference.LocalID);
         if(found==Materials.end()){data={};error="Test material not found";return false;}
         data=found->second;return true;
+    }
+    bool LoadSkeleton(const ResourceReference&,SkeletonData& data,std::string&) override {
+        data={};data.Nodes={{"/bone","Bone",-1,{}}};return true;
+    }
+    bool LoadAnimationClip(const ResourceReference&,AnimationClipData& data,std::string&) override {
+        data={};data.Duration=1;data.SampleRate=1;data.Tracks={"/bone"};
+        AnimationFrame first,last;last.Time=1;
+        first.Poses.resize(1);last.Poses.resize(1);
+        first.Poses[0].Position.Y=-.72f;
+        last.Poses[0].Position.Y=.72f;
+        last.Poses[0].Rotation={0,0,.25881905f,.96592583f};
+        last.Poses[0].Scale={.8f,1.1f,.85f};
+        data.Frames={first,last};return true;
     }
 };
 
@@ -114,6 +142,49 @@ void CompareSingleDraws(IRuntimeViewport& viewport,const RenderView& view,const 
     Equivalent(Pixels(viewport,individual),instanced,message);
     Check(viewport.GetStatistics().InstancedDrawCalls==0&&viewport.GetStatistics().InstancedInstances==0,
         message+": view opt-out still emitted instanced draws");
+}
+IAnimatorComponent* AnimateSkin(IScene& scene,IGameObject& object,float seconds) {
+    auto* bone=scene.CreateGameObject("Bone",&object);
+    auto* animator=object.AddComponent<IAnimatorComponent>();
+    auto* skin=object.AddComponent<ISkinnedMeshRendererComponent>();
+    Check(bone&&animator&&skin,"Cannot create skinned instance components");
+    animator->SetSkeleton({Guid,300});
+    Check(animator->SetNodeBindings({{"/bone",bone->GetInstanceID()}})&&
+        skin->SetAnimatorObjectID(object.GetInstanceID()),"Cannot bind skinned instance");
+    Check(animator->PlayClip({Guid,301},seconds,1,false),animator->GetLastError());
+    return animator;
+}
+
+void CheckSkinnedInstances(IGameSproutRuntime& runtime,IRuntimeViewport& viewport,Provider& provider) {
+    runtime.SetResourceProvider(&provider);
+    for(std::uint64_t layout=6;layout<=9;++layout) {
+        auto* scene=runtime.CreateScene("Instanced animated mesh layout");
+        auto* left=Object(*scene,layout,100,{-1.2f,0,0});
+        auto* right=Object(*scene,layout,100,{1.2f,0,0});
+        auto* leftAnimator=AnimateSkin(*scene,*left,0);
+        auto* rightAnimator=AnimateSkin(*scene,*right,1);
+        constexpr float height=4.f;
+        const auto view=View(scene,height);
+        const auto first=Pixels(viewport,view);
+        auto stats=viewport.GetStatistics();
+        Check(stats.DrawCalls==1&&stats.InstancedInstances==2,"Independently posed skins did not batch");
+        Check(Sample(first,stats,-1.2f,-.72f,height)[0]>40&&Sample(first,stats,1.2f,.72f,height)[0]>40&&
+            Sample(first,stats,-1.2f,.72f,height)[0]==0&&Sample(first,stats,1.2f,-.72f,height)[0]==0,
+            "Skin instances shared a pose instead of using independent palette offsets");
+
+        Check(leftAnimator->SeekClip(1)&&rightAnimator->SeekClip(0),"Cannot advance instance playback phases");
+        right->GetTransform()->SetLocalPosition({1.5f,0,0});
+        const auto changed=Pixels(viewport,view);
+        stats=viewport.GetStatistics();
+        Check(stats.DrawCalls==1&&stats.InstancedInstances==2&&stats.InstanceTransformUploadBytes==128,
+            "Skin pose or transform change dropped the compatible batch or failed to update its resident transform");
+        Check(Sample(changed,stats,-1.2f,.72f,height)[0]>40&&Sample(changed,stats,1.5f,-.72f,height)[0]>40&&
+            Sample(changed,stats,-1.2f,-.72f,height)[0]==0&&Sample(changed,stats,1.2f,-.72f,height)[0]==0,
+            "Changing both poses and one transform retained stale resident data");
+        CompareSingleDraws(viewport,view,changed,"Instanced skin layout differed from per-object skin uniform");
+        Check(runtime.DestroyScene(scene),"Cannot remove skinned instance scene");
+    }
+    runtime.SetResourceProvider(nullptr);
 }
 }
 
@@ -285,7 +356,21 @@ int main(int argc,char** argv){
         const auto ambientPixel=Sample(ambient,viewport->GetStatistics(),-1,0,4);
         Check(ambientPixel[0]>20&&ambientPixel[1]>10,"Ambient preservation comparison rendered no surface");
 
+        CheckSkinnedInstances(*runtime,*viewport,provider);
+        runtime->SetResourceProvider(&provider);
+        scene=runtime->CreateScene("Split skin vertices and color seam");view=View(scene,4);
+        provider.Materials[100].BaseColor={1,1,1,1};
+        ++provider.Revision;
+        auto* leftSkin=Object(*scene,10,100,{-1,0,0});
+        auto* rightSkin=Object(*scene,10,100,{1,0,0});
+        AnimateSkin(*scene,*leftSkin,0);
+        AnimateSkin(*scene,*rightSkin,0);
+        pixels=Pixels(*viewport,view);stats=viewport->GetStatistics();
+        Check(stats.InstancedInstances==2&&stats.Triangles==4,"Skinned remap changed triangle ranges");
+        const auto seam=Sample(pixels,stats,-1,-.58f,4);
+        Check(seam[1]>seam[0],"Skinned remap merged vertices across a color seam");
+        CompareSingleDraws(*viewport,view,pixels,"Skinned remap changed individual drawing");
         delete viewport;viewport=nullptr;delete runtime;runtime=nullptr;
-        std::cout<<"PASS actual GPU automatic instancing: image baseline, resident transform edits and compact visibility, buffer growth, resource and viewport isolation, optional layouts/mirrors/normals, material/section/light isolation and opt-outs\n";return 0;
+        std::cout<<"PASS actual GPU automatic instancing: image baseline, resident transform edits and compact visibility, buffer growth, resource and viewport isolation, optional layouts/mirrors/normals, independently animated poses, material/section/light isolation and opt-outs\n";return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';delete secondViewport;delete viewport;delete runtime;return 1;}
 }

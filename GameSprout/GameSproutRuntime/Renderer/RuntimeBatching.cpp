@@ -78,6 +78,7 @@ bool ReserveInstanceBuffer(GRHI::IDevice& device,GRHI::IBuffer*& buffer,
 
 void Renderer::InvalidateInstanceUploads() {
     _InstanceTransformsDirty=true;
+    _SkinPaletteLayoutDirty=true;
     _ColorInstances.Uploaded.clear();
     _StaticShadowInstances.Uploaded.clear();
     _DynamicShadowInstances.Uploaded.clear();
@@ -87,6 +88,13 @@ void Renderer::InvalidateInstanceUploads() {
 void Renderer::ClearInstanceBuffers() {
     delete _InstanceTransformsBuffer;
     _InstanceTransformsBuffer=nullptr;
+    delete _SkinPaletteOffsetsBuffer;
+    delete _SkinPaletteBuffer;
+    _SkinPaletteOffsetsBuffer=nullptr;
+    _SkinPaletteBuffer=nullptr;
+    _SkinPaletteOffsets.clear();
+    _SkinPaletteOffsetScratch.clear();
+    _SkinPaletteMatrices.clear();
     _InstanceTransforms.clear();
     _ChangedInstanceTransforms.clear();
     _ColorInstanceDraws.clear();
@@ -103,11 +111,11 @@ void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,boo
     batches.clear();
     for(std::size_t begin=0;begin<draws.size();) {
         const auto& draw=draws[begin];
-        const bool eligible=enabled&&draw.Material->EnableGPUInstancing&&!draw.Transparent&&!draw.Shader&&!draw.Object->Skinned;
+        const bool eligible=enabled&&draw.Material->EnableGPUInstancing&&!draw.Transparent&&!draw.Shader;
         std::size_t end=begin+1;
         if(eligible)while(end<draws.size()) {
             const auto& next=draws[end];
-            if(next.Shader||next.Transparent||next.Object->Skinned||!next.Material->EnableGPUInstancing||
+            if(next.Shader||next.Transparent||next.Object->Skinned!=draw.Object->Skinned||!next.Material->EnableGPUInstancing||
                 next.Mesh!=draw.Mesh||next.Section.FirstIndex!=draw.Section.FirstIndex||
                 next.Section.IndexCount!=draw.Section.IndexCount||next.Object->Negative!=draw.Object->Negative)break;
             if(next.Material!=draw.Material||next.Object->Layer!=draw.Object->Layer||
@@ -177,6 +185,66 @@ bool Renderer::UploadInstanceStream(GRHI::ICommandBuffer& command,InstanceStream
     return true;
 }
 
+bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
+    if(_SkinnedDraws.empty())return true;
+    _SkinPaletteOffsetScratch.assign(_SceneObjects.size(),0);
+    constexpr auto maxMatrices=std::numeric_limits<std::uint32_t>::max()/sizeof(Mat4);
+    std::uint32_t matrixCount=0;
+    for(const auto& skinned:_SkinnedDraws) {
+        const auto& object=_SceneObjects[skinned.ObjectIndex];
+        if(!object.SkinPoseReady)continue;
+        if(object.SkinMatrices.size()>maxMatrices-matrixCount)
+            return Fail("Skinned instance palette exceeds the storage buffer limit");
+        _SkinPaletteOffsetScratch[object.InstanceIndex]=matrixCount;
+        matrixCount+=static_cast<std::uint32_t>(object.SkinMatrices.size());
+    }
+    if(!matrixCount)return true;
+    const bool layoutChanged=_SkinPaletteLayoutDirty||_SkinPaletteOffsetScratch!=_SkinPaletteOffsets||
+        matrixCount!=_SkinPaletteMatrices.size();
+    if(layoutChanged) {
+        _SkinPaletteOffsets.swap(_SkinPaletteOffsetScratch);
+        _SkinPaletteMatrices.resize(matrixCount);
+    }
+    // Matrices for each drawable have stable offsets until scene membership or its mesh changes.
+    // Merge adjacent dirty spans. For many separate spans, one full upload is cheaper.
+    struct Span { std::uint32_t Begin,End; };
+    constexpr std::size_t maxSpans=32;
+    std::array<Span,maxSpans> spans;
+    std::size_t spanCount=0;
+    bool fullUpload=layoutChanged;
+    for(const auto& skinned:_SkinnedDraws) {
+        auto& object=_SceneObjects[skinned.ObjectIndex];
+        if(!object.SkinPoseReady||(!layoutChanged&&!object.SkinUploadDirty))continue;
+        const auto begin=_SkinPaletteOffsets[object.InstanceIndex];
+        const auto end=begin+static_cast<std::uint32_t>(object.SkinMatrices.size());
+        std::copy(object.SkinMatrices.begin(),object.SkinMatrices.end(),_SkinPaletteMatrices.begin()+begin);
+        object.SkinUploadDirty=false;
+        if(fullUpload)continue;
+        if(spanCount&&spans[spanCount-1].End==begin)spans[spanCount-1].End=end;
+        else if(spanCount==maxSpans)fullUpload=true;
+        else spans[spanCount++]={begin,end};
+    }
+    if(!fullUpload&&!spanCount)return true;
+    const auto offsetBytes=_SkinPaletteOffsets.size()*sizeof(std::uint32_t);
+    const auto matrixBytes=_SkinPaletteMatrices.size()*sizeof(Mat4);
+    if(!ReserveInstanceBuffer(_Device,_SkinPaletteOffsetsBuffer,offsetBytes,GRHI::BufferUsage::VertexStorage)||
+       !ReserveInstanceBuffer(_Device,_SkinPaletteBuffer,matrixBytes,GRHI::BufferUsage::VertexStorage))
+        return Fail(DeviceError("Allocate skinned instance buffers"));
+    std::array<GRHI::BufferUpload,maxSpans+1> uploads;
+    std::uint32_t uploadCount=0;
+    if(layoutChanged)uploads[uploadCount++]={_SkinPaletteOffsetsBuffer,0,_SkinPaletteOffsets.data(),offsetBytes,true};
+    if(fullUpload)uploads[uploadCount++]={_SkinPaletteBuffer,0,_SkinPaletteMatrices.data(),matrixBytes,true};
+    else for(std::size_t i=0;i<spanCount;++i) {
+        const auto [begin,end]=spans[i];
+        uploads[uploadCount++]={_SkinPaletteBuffer,begin*sizeof(Mat4),_SkinPaletteMatrices.data()+begin,(end-begin)*sizeof(Mat4)};
+    }
+    if(!command.UploadBuffers(uploads.data(),uploadCount))return Fail(DeviceError("Upload skinned instance palettes"));
+    ++_Statistics.InstanceBufferUploads;
+    for(std::uint32_t i=0;i<uploadCount;++i)_Statistics.InstanceSkinPaletteUploadBytes+=uploads[i].Size;
+    _SkinPaletteLayoutDirty=false;
+    return true;
+}
+
 bool Renderer::PrepareColorInstances(GRHI::ICommandBuffer& command,const RenderView& view) {
     if(!_ColorInstanceBatchesKnown||_ColorInstancingEnabled!=view.EnableGPUInstancing) {
         _ColorInstances.Indices.clear();
@@ -185,7 +253,7 @@ bool Renderer::PrepareColorInstances(GRHI::ICommandBuffer& command,const RenderV
         _ColorInstancingEnabled=view.EnableGPUInstancing;
     }
     if(view.EnableGPUInstancing)
-        return UploadResidentInstances(command)&&UploadInstanceStream(command,_ColorInstances);
+        return UploadResidentInstances(command)&&UploadSkinPalettes(command)&&UploadInstanceStream(command,_ColorInstances);
     if(!_ChangedInstanceTransforms.empty()) {
         _InstanceTransformsDirty=true;
         _ChangedInstanceTransforms.clear();
@@ -209,6 +277,10 @@ bool Renderer::DrawPrepared(GRHI::IRenderPass& pass,const std::vector<PreparedDr
         if(batch.Count>1) {
             ++_Statistics.InstancedDrawCalls;_Statistics.InstancedInstances+=batch.Count;
             _Statistics.SavedDrawCalls+=batch.Count-1;
+            if(draw.Object->Skinned) {
+                ++_Statistics.SkinnedInstancedDrawCalls;
+                _Statistics.SkinnedInstancedInstances+=batch.Count;
+            }
         }
     }
     return true;

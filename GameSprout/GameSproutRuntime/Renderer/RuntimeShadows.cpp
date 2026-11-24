@@ -72,10 +72,16 @@ bool Renderer::DrawShadow(GRHI::IRenderPass& pass,const ShadowBatch& batch,const
     if(instanced) {
         pass.SetVertexBuffer(1,instances.Buffer,batch.IndexOffset*sizeof(std::uint32_t));
         pass.SetVertexStorageBuffer(0,_InstanceTransformsBuffer);
+        if(draw.Object->Skinned) {
+            pass.SetVertexStorageBuffer(1,_SkinPaletteOffsetsBuffer);
+            pass.SetVertexStorageBuffer(2,_SkinPaletteBuffer);
+        }
     }
-    pass.SetIndexBuffer(draw.Mesh->Buffer,GRHI::IndexFormat::UInt32,static_cast<std::size_t>(data.IndexOffset));
+    auto* skinIndices=draw.Object->Skinned?draw.Mesh->SkinDepthIndices.get():nullptr;
+    pass.SetIndexBuffer(skinIndices?skinIndices:draw.Mesh->Buffer,GRHI::IndexFormat::UInt32,
+        skinIndices?0:static_cast<std::size_t>(data.IndexOffset));
     pass.SetVertexUniform(0,&uniform,sizeof(uniform));
-    if(draw.Object->Skinned) {
+    if(draw.Object->Skinned&&!instanced) {
         SkinUniform skin;std::copy(draw.Object->SkinMatrices.begin(),draw.Object->SkinMatrices.end(),skin.Bones);
         pass.SetVertexUniform(1,&skin,sizeof(skin));
     }
@@ -97,6 +103,7 @@ void Renderer::SortShadowCandidates(std::vector<ShadowCandidate>& candidates) {
         if(a.IndexCount!=b.IndexCount)return a.IndexCount<b.IndexCount;
         if(a.DoubleSided!=b.DoubleSided)return a.DoubleSided<b.DoubleSided;
         if(a.Instancing!=b.Instancing)return a.Instancing<b.Instancing;
+        if(a.Object->Skinned!=b.Object->Skinned)return a.Object->Skinned<b.Object->Skinned;
         return a.Object->Negative<b.Object->Negative;
     });
 }
@@ -108,6 +115,7 @@ void Renderer::AppendShadowBatch(const ShadowCandidate& caster,bool instancing,
         const auto& first=*batch.Caster;
         if(first.Instancing&&first.Mesh==caster.Mesh&&first.FirstIndex==caster.FirstIndex&&
             first.IndexCount==caster.IndexCount&&first.DoubleSided==caster.DoubleSided&&
+            first.Object->Skinned==caster.Object->Skinned&&
             first.Object->Negative==caster.Object->Negative) {
             if(batch.Count==1)indices.push_back(first.Object->InstanceIndex);
             indices.push_back(caster.Object->InstanceIndex);
@@ -240,6 +248,7 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
     const auto sceneID=view.Scene->GetInstanceID();
     const auto& scene=static_cast<const Scene&>(*view.Scene);
     const auto sceneRevision=scene.GetRenderRevision();
+    const auto skinPoseRevision=scene.GetSkinPoseRevision();
     _Statistics.ShadowCascadeCount=settings.CascadeCount;
     _Statistics.LayeredShadows=layered;
     const std::uint32_t columns=settings.CascadeCount==1?1:2;
@@ -267,7 +276,8 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
     const bool reuseFit=sameFitSettings&&(sameView||navigationReuse||coveredCascades==allCascades);
     const auto& samplingCamera=navigationReuse&&reuseFit?_ShadowCamera:view.Camera;
     const bool sameSampling=std::memcmp(_ShadowUniform.CameraView.Data,samplingCamera.View.Data,sizeof(samplingCamera.View.Data))==0;
-    if(reuseFit&&sameSampling&&_ShadowSceneRevision==sceneRevision&&(samePreview||!previewID)) {
+    if(reuseFit&&sameSampling&&_ShadowSceneRevision==sceneRevision&&_ShadowSkinPoseRevision==skinPoseRevision&&
+        (samePreview||!previewID)) {
         // The submitted split still represents the exact committed pose.
         // Rebuild with the authored policy at the next actual invalidation.
         _Statistics.LayeredShadows=layered||_ShadowPreviewObjectID!=0;
@@ -363,7 +373,7 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
             if(!material->Shader.Guid.empty())continue;
             const bool doubleSided=material->DoubleSided||object.ShadowMode==ShadowCastingMode::TwoSided;
             casters.push_back({&object,mesh,world,section.FirstIndex,section.IndexCount,doubleSided,
-                material->EnableGPUInstancing&&!object.Skinned});
+                material->EnableGPUInstancing});
             if(layered&&!dynamic)staticKeys.push_back({object.ObjectID,mesh,object.Model,world,
                 section.FirstIndex,section.IndexCount,doubleSided});
         }
@@ -552,6 +562,7 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
     _ShadowPreviewObjectID=previewID;
     _ShadowSceneID=sceneID;
     _ShadowSceneRevision=sceneRevision;
+    _ShadowSkinPoseRevision=skinPoseRevision;
     _ShadowLightObjectID=light.ObjectID;
     _ShadowLightComponentID=componentID;
     _ShadowRefreshRevision=refreshRevision;

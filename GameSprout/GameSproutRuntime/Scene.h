@@ -31,6 +31,8 @@ public:
     bool HasRenderMaterialChanges(std::uint64_t after) const {return after<_RenderMaterialRevision;}
     void InvalidateRenderSnapshot(std::uint64_t objectID=0,RenderObjectChangeKind kind=RenderObjectChangeKind::Transform);
     void InvalidateVisual() { _VisualPending = true; }
+    std::uint64_t GetSkinPoseRevision() const {return _SkinPoseRevision;}
+    void InvalidateSkinPose() {++_SkinPoseRevision;InvalidateVisual();}
     std::uint64_t GetUIRevision() const { return _UIRevision; }
     void InvalidateUI() { ++_UIRevision; _VisualPending = true; }
     // False after a structural change or when the bounded journal no longer covers the revision.
@@ -69,6 +71,7 @@ private:
     bool _ParkedForPlay = false;
     EnvironmentLightingSettings _EnvironmentLighting;
     std::uint64_t _RenderRevision=1;
+    std::uint64_t _SkinPoseRevision=1;
     std::uint64_t _RenderStructureRevision=1;
     std::uint64_t _RenderMeshRevision=1;
     std::uint64_t _RenderMaterialRevision=1;

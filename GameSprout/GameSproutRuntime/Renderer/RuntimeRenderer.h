@@ -47,7 +47,10 @@ private:
         std::uint64_t ResourceRevision=0;
         std::uint64_t SortRank=0;
         struct SkinVertex { std::uint32_t Bones[4]{}; float Weights[4]{}; };
-        struct SkinInfluenceBounds {Vector3 Minimum,Maximum;bool Used=false;};
+        struct SkinInfluenceBounds {
+            std::size_t Joint=0;
+            double Center[3]{},Extent[3]{},Magnitude[3]{};
+        };
         MeshRenderData Data;
         std::vector<Vector3> Positions;
         std::vector<SkinVertex> Skin;
@@ -56,6 +59,7 @@ private:
         std::vector<std::uint32_t> Indices;
         GRHI::IBuffer* Buffer=nullptr;
         GRHI::IBuffer* ShaderVertexBuffer=nullptr; // Canonical P/N/C/UV, only allocated for user shaders.
+        std::unique_ptr<GRHI::IBuffer> SkinColorIndices,SkinDepthIndices;
         // A private render-only bound derived from validated vertex positions.
         // Does not replace the provider's authored/queried LocalBounds contract.
         Vector3 CullMinimum,CullMaximum;
@@ -152,6 +156,7 @@ private:
         std::vector<Mat4> SkinMatrices;
         bool Skinned=false;
         bool SkinPoseReady=false;
+        bool SkinUploadDirty=false;
         bool SkinOutsideFrustum=false;
         bool StaticShadowCaster=false;
         ShadowCastingMode ShadowMode=ShadowCastingMode::On;
@@ -306,6 +311,7 @@ private:
     void PrepareInstanceBatches(const std::vector<PreparedDraw>&,bool enabled,
         std::vector<InstanceDraw>&,std::vector<std::uint32_t>&) const;
     bool UploadResidentInstances(GRHI::ICommandBuffer&);
+    bool UploadSkinPalettes(GRHI::ICommandBuffer&);
     bool UploadInstanceStream(GRHI::ICommandBuffer&,InstanceStream&);
     bool PrepareColorInstances(GRHI::ICommandBuffer&,const RenderView&);
     bool RenderPlanarReflection(GRHI::ICommandBuffer&,const RenderView&,std::uint32_t width,std::uint32_t height,
@@ -486,7 +492,7 @@ private:
     std::vector<Bounds> _StaticShadowBounds;
     std::vector<DrawObject*> _DynamicShadowObjects;
     float _ShadowAspect=0;
-    std::uint64_t _ShadowSceneID=0,_ShadowSceneRevision=0;
+    std::uint64_t _ShadowSceneID=0,_ShadowSceneRevision=0,_ShadowSkinPoseRevision=0;
     std::uint64_t _ShadowLightObjectID=0,_ShadowLightComponentID=0,_ShadowRefreshRevision=0;
     bool _ShadowValid=false,_ShadowRecorded=false,_ShadowNavigationApproximate=false;
     GRHI::ITexture* _SpotShadowAtlas=nullptr;
@@ -499,11 +505,16 @@ private:
     std::array<SpotShadowCacheKey,MaxSpotShadows> _SpotShadowKeys{};
     std::array<std::uint32_t,MaxSpotShadows> _SpotShadowIndices{};
     std::array<std::vector<StaticShadowCasterKey>,MaxSpotShadows> _SpotShadowCasters;
-    std::uint64_t _SpotShadowSceneID=0,_SpotShadowSceneRevision=0;
+    std::uint64_t _SpotShadowSceneID=0,_SpotShadowSceneRevision=0,_SpotShadowSkinPoseRevision=0;
     std::uint32_t _SpotShadowViewMask=0,_SpotShadowTileStride=0;
     std::size_t _SpotShadowCount=0;
     bool _SpotShadowValid=false,_SpotShadowRecorded=false,_SpotShadowHasSkinned=false;
     GRHI::IBuffer* _InstanceTransformsBuffer=nullptr;
+    GRHI::IBuffer* _SkinPaletteOffsetsBuffer=nullptr;
+    GRHI::IBuffer* _SkinPaletteBuffer=nullptr;
+    std::vector<std::uint32_t> _SkinPaletteOffsets,_SkinPaletteOffsetScratch;
+    std::vector<Mat4> _SkinPaletteMatrices;
+    bool _SkinPaletteLayoutDirty=true;
     std::vector<InstanceVertex> _InstanceTransforms;
     std::vector<std::uint32_t> _ChangedInstanceTransforms;
     std::vector<InstanceDraw> _ColorInstanceDraws;

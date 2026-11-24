@@ -123,7 +123,7 @@ bool Renderer::Render(const RenderView& view) {
             if(!RenderSpotShadows(*command.Command,view,viewProjection))return false;
             if(!RenderPlanarReflection(*command.Command,view,width,height,environment,sky,reflections))return false;
             EndTexturePrefetchFrame();
-            for(auto* buffer:{_InstanceTransformsBuffer,_ColorInstances.Buffer,_StaticShadowInstances.Buffer,
+            for(auto* buffer:{_InstanceTransformsBuffer,_SkinPaletteOffsetsBuffer,_SkinPaletteBuffer,_ColorInstances.Buffer,_StaticShadowInstances.Buffer,
                 _DynamicShadowInstances.Buffer,_SpotShadowInstances.Buffer})
                 if(buffer)_Statistics.ResidentInstanceBytes+=buffer->GetSize();
         }

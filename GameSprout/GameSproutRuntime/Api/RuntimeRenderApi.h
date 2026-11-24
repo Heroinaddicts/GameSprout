@@ -165,6 +165,8 @@ struct RenderStatistics {
     std::uint32_t PlanarReflectionDrawCalls = 0;
     std::uint32_t PlanarReflectionWidth = 0, PlanarReflectionHeight = 0;
     std::uint32_t ReflectionProbeDrawCalls = 0; // Color batches using a local cubemap.
+    std::uint64_t InstanceSkinPaletteUploadBytes = 0;
+    std::uint32_t SkinnedInstancedDrawCalls = 0, SkinnedInstancedInstances = 0;
 };
 
 class IRuntimeRenderer {

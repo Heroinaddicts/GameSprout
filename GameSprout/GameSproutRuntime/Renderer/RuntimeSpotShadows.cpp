@@ -112,11 +112,13 @@ bool Renderer::RenderSpotShadows(GRHI::ICommandBuffer& command,const RenderView&
     };
     std::array<Tile,MaxSpotShadows> tiles;
     const auto sceneID=view.Scene->GetInstanceID();
-    const auto revision=static_cast<const Scene&>(*view.Scene).GetRenderRevision();
+    const auto& scene=static_cast<const Scene&>(*view.Scene);
+    const auto revision=scene.GetRenderRevision(),skinPoseRevision=scene.GetSkinPoseRevision();
     const auto cameraMask=view.Camera.Projection.CullingMask;
     const bool validAtlas=_SpotShadowValid&&_SpotShadowSceneID==sceneID&&_SpotShadowTileStride==tileStride&&
         ((_SpotShadowCount>1)==(previousCount>1));
-    const bool sameScene=validAtlas&&_SpotShadowSceneRevision==revision&&_SpotShadowViewMask==cameraMask;
+    const bool sameScene=validAtlas&&_SpotShadowSceneRevision==revision&&_SpotShadowSkinPoseRevision==skinPoseRevision&&
+        _SpotShadowViewMask==cameraMask;
     bool hasSkinned=sameScene&&_SpotShadowHasSkinned;
     _SpotShadowInstances.Indices.clear();
     for(std::size_t slot=0;slot<_SpotShadowCount;++slot) {
@@ -156,7 +158,7 @@ bool Renderer::RenderSpotShadows(GRHI::ICommandBuffer& command,const RenderView&
                 if(!material->Shader.Guid.empty())continue;
                 const bool doubleSided=material->DoubleSided||object.ShadowMode==ShadowCastingMode::TwoSided;
                 tile.Casters.push_back({&object,mesh,{},section.FirstIndex,section.IndexCount,doubleSided,
-                    material->EnableGPUInstancing&&!object.Skinned});
+                    material->EnableGPUInstancing});
                 casters.push_back({object.ObjectID,mesh,object.Model,{},section.FirstIndex,section.IndexCount,doubleSided});
                 skinned|=object.Skinned;
             }
@@ -170,6 +172,7 @@ bool Renderer::RenderSpotShadows(GRHI::ICommandBuffer& command,const RenderView&
             AppendShadowBatch(caster,view.EnableGPUInstancing,tile.Batches,_SpotShadowInstances.Indices);
     }
     _SpotShadowKeys=keys;_SpotShadowSceneID=sceneID;_SpotShadowSceneRevision=revision;
+    _SpotShadowSkinPoseRevision=skinPoseRevision;
     _SpotShadowViewMask=cameraMask;_SpotShadowHasSkinned=hasSkinned;_SpotShadowTileStride=tileStride;
     if(std::none_of(tiles.begin(),tiles.end(),[](const Tile& tile){return tile.Dirty;}))return true;
 

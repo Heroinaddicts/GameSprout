@@ -10,6 +10,8 @@
 #include <cstring>
 #include <limits>
 #include <stdexcept>
+#include <string_view>
+#include <unordered_set>
 
 namespace {
 bool Attribute(std::uint32_t stride,std::int64_t offset,std::uint32_t size) {
@@ -78,6 +80,53 @@ bool ValidateMesh(GameSproutRuntime::MeshRenderData& data,std::string& error) {
 }
 namespace GameSproutRuntime {
 namespace {
+std::unique_ptr<GRHI::IBuffer> CreateSkinIndexBuffer(GRHI::IDevice& device,
+    const MeshRenderData& mesh,const std::vector<std::uint32_t>& indices,bool depthOnly) {
+    // Imported skins can have separate vertices for triangles that read the
+    // same attributes. Keep their original CPU/custom-shader topology, but
+    // let the built-in vertex stages reuse an index when all inputs match.
+    struct Input {std::int64_t Offset; std::size_t Size;};
+    const std::array inputs{Input{mesh.PositionOffset,12},Input{mesh.BoneIndicesOffset,16},
+        Input{mesh.BoneWeightsOffset,16},Input{depthOnly?-1:std::int64_t(mesh.NormalOffset),12},
+        Input{depthOnly?-1:mesh.ColorOffset,16},Input{depthOnly?-1:mesh.UVOffset,8}};
+    const auto vertex=[&](std::uint32_t index) {return mesh.Bytes.data()+std::size_t(index)*mesh.VertexStride;};
+    const auto hash=[&](std::uint32_t index) {
+        std::size_t result=0;
+        const auto* bytes=reinterpret_cast<const char*>(vertex(index));
+        for(const auto& input:inputs) {
+            if(input.Offset<0)continue;
+            const auto field=std::hash<std::string_view>{}({bytes+input.Offset,input.Size});
+            result^=field+std::size_t{0x9e3779b9u}+(result<<6)+(result>>2);
+        }
+        return result;
+    };
+    const auto equal=[&](std::uint32_t a,std::uint32_t b) {
+        const auto* first=vertex(a);
+        const auto* second=vertex(b);
+        return std::all_of(inputs.begin(),inputs.end(),[&](const Input& input) {
+            return input.Offset<0||std::memcmp(first+input.Offset,second+input.Offset,input.Size)==0;
+        });
+    };
+    constexpr auto unresolved=std::numeric_limits<std::uint32_t>::max();
+    std::vector<std::uint32_t> representatives(mesh.VertexCount,unresolved);
+    std::unordered_set<std::uint32_t,decltype(hash),decltype(equal)> unique(0,hash,equal);
+    bool changed=false;
+    for(const auto index:indices) {
+        auto& representative=representatives[index];
+        if(representative==unresolved)representative=*unique.insert(index).first;
+        changed|=representative!=index;
+    }
+    if(!changed)return {};
+    std::vector<std::uint32_t> remapped;
+    remapped.reserve(indices.size());
+    for(const auto index:indices)remapped.push_back(representatives[index]);
+    GRHI::BufferDesc description;
+    description.Size=remapped.size()*sizeof(std::uint32_t);
+    description.Usage=GRHI::BufferUsage::Index;
+    const GRHI::BufferInitialData initial{remapped.data(),description.Size};
+    return std::unique_ptr<GRHI::IBuffer>(device.CreateBuffer(description,&initial));
+}
+
 GRHI::SamplerDesc ToGRHISampler(const SamplerSettings& settings) {
     GRHI::SamplerDesc result;
     result.MinFilter=settings.MinFilter==TextureFilter::Nearest?GRHI::FilterMode::Nearest:GRHI::FilterMode::Linear;
@@ -154,8 +203,10 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
             if(loaded && ValidateMesh(entry.Data,entry.Error)) {
                 // 仅在载入/修订变化时解包一次；GPU 上传后丢弃交错原始字节，保留紧密拾取数据。
                 entry.Positions.reserve(entry.Data.VertexCount);
+                struct JointVertexBounds {Vector3 Minimum,Maximum;bool Used=false;};
+                std::vector<JointVertexBounds> jointVertices;
                 if(!entry.Data.Bones.empty()&&entry.Data.Bones.size()<=MaxSkinBones)
-                    entry.JointBounds.resize(entry.Data.Bones.size());
+                    jointVertices.resize(entry.Data.Bones.size());
                 for(std::uint32_t vertex=0;vertex<entry.Data.VertexCount;++vertex) {
                     const auto* bytes=entry.Data.Bytes.data()+std::uint64_t(vertex)*entry.Data.VertexStride+entry.Data.PositionOffset;
                     const Vector3 point{std::bit_cast<float>(Read32(bytes)),std::bit_cast<float>(Read32(bytes+4)),std::bit_cast<float>(Read32(bytes+8))};
@@ -175,8 +226,8 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
                             skin.Bones[influence]=joint;
                             skin.Weights[influence]=weight;
                             weightSum+=weight;
-                            if(weight==0||entry.JointBounds.empty())continue;
-                            auto& bounds=entry.JointBounds[joint];
+                            if(weight==0||jointVertices.empty())continue;
+                            auto& bounds=jointVertices[joint];
                             if(bounds.Used) {
                                 bounds.Minimum={std::min(bounds.Minimum.X,point.X),std::min(bounds.Minimum.Y,point.Y),std::min(bounds.Minimum.Z,point.Z)};
                                 bounds.Maximum={std::max(bounds.Maximum.X,point.X),std::max(bounds.Maximum.Y,point.Y),std::max(bounds.Maximum.Z,point.Z)};
@@ -190,6 +241,20 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
                         entry.Skin.push_back(skin);
                     }
                 }
+                for(std::size_t joint=0;joint<jointVertices.size();++joint) {
+                    const auto& source=jointVertices[joint];
+                    if(!source.Used)continue;
+                    const double minimum[]{source.Minimum.X,source.Minimum.Y,source.Minimum.Z};
+                    const double maximum[]{source.Maximum.X,source.Maximum.Y,source.Maximum.Z};
+                    MeshGPU::SkinInfluenceBounds bounds;
+                    bounds.Joint=joint;
+                    for(std::size_t axis=0;axis<3;++axis) {
+                        bounds.Center[axis]=(minimum[axis]+maximum[axis])*.5;
+                        bounds.Extent[axis]=(maximum[axis]-minimum[axis])*.5;
+                        bounds.Magnitude[axis]=std::fabs(bounds.Center[axis])+bounds.Extent[axis];
+                    }
+                    entry.JointBounds.push_back(bounds);
+                }
                 entry.CullBoundsKnown=true;
                 entry.Indices.reserve(entry.Data.IndexCount);
                 for(std::uint32_t index=0;index<entry.Data.IndexCount;++index)
@@ -198,6 +263,10 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
                 GRHI::BufferInitialData initial{entry.Data.Bytes.data(),entry.Data.Bytes.size()};
                 entry.Buffer=_Device.CreateBuffer(description,&initial);
                 if(!entry.Buffer) entry.Error=DeviceError("Create prepared mesh buffer");
+                else if(!entry.JointBounds.empty()) {
+                    entry.SkinColorIndices=CreateSkinIndexBuffer(_Device,entry.Data,entry.Indices,false);
+                    entry.SkinDepthIndices=CreateSkinIndexBuffer(_Device,entry.Data,entry.Indices,true);
+                }
             }
         } catch(const std::exception& exception) {entry.Error=exception.what();}
         catch(...) {entry.Error="Resource provider threw while loading mesh";}

@@ -24,7 +24,7 @@ GameLogic 工厂通过接收 IGameSproutRuntime* 的构造函数创建 Script �
 实例借用当前执行会话的 Runtime。脚本工厂在调用构造函数前绑定所属 GameObject。
 构造函数只绑定实例状态。脚本依赖同批装配结果的逻辑放在 OnInitialized，
 模块查找其他模块的逻辑放在 Initialize 或之后的阶段。
-GameLogic 的创建回调显式接收 Runtime 指针。当前 ABI 为 11，宿主和项目动态库须使用匹配的 SDK 重新构建。
+GameLogic 的创建回调显式接收 Runtime 指针。当前 ABI 为 12，宿主和项目动态库须使用匹配的 SDK 重新构建。
 
 所有权与节点树
 Runtime 持有场景，场景持有对象，对象持有组件；外部指针只借用，不自行 delete。
@@ -204,6 +204,13 @@ Editor 方向光 Inspector 的「实时阴影」提供缓存开关及高级设�
 IMeshRendererComponent 和 ISkinnedMeshRendererComponent 提供 GetShadowCastingMode / SetShadowCastingMode 和 GetReceiveShadows / SetReceiveShadows。SkinnedMeshRenderer 访问同一对象的 MeshRenderer 设置，场景与 Prefab 只保存一份。
 投射默认 On，沿用材质的面剔除。Off 跳过投影绘制，TwoSided 在阴影通道绘制两面，ShadowsOnly 只保留投影并从相机绘制及视口拾取中移除。仍可通过 Hierarchy 选中对象。
 接收默认开启，关闭时内置 Lit 仍计算光照并跳过阴影采样。自定义 Shader 需要相应的投射与接收通道。Visible 控制整个网格渲染器，关闭后也停止投影。
+
+骨骼网格实例化
+动画和装备沿用现有 Mesh、MeshRenderer、SkinnedMeshRenderer 和 Animator。模型导入后可直接播放 Clip 或 Controller，并用 SetAnimatorObjectID 将共用骨架的装备绑定到同一个 Animator。
+运行中通过 IMeshComponent::SetMesh 和 IMeshRendererComponent::SetMaterials 更换装备网格与材质。各网格按自己的骨骼顺序和逆绑定矩阵求值。
+内置不透明颜色和实时阴影分别对兼容的网格分段做实例化。每个实例读取独立的姿态；材质的 EnableGPUInstancing 或视口的 RenderView::EnableGPUInstancing 可关闭该路径。
+自定义动画求值器可用 ISkinnedMeshRendererComponent::SetSkinPose 写入网格局部空间的骨骼矩阵。数据按 Mesh 骨骼顺序排列，需包含逆绑定矩阵，最多 128 根骨骼，传空值恢复 Animator 绑定。Runtime 拷贝矩阵并仅在运行期间保留。
+RenderStatistics 的 SkinnedInstancedDrawCalls 和 SkinnedInstancedInstances 统计颜色通道中的蒙皮合批与实例数。InstanceSkinPaletteUploadBytes 统计本帧骨骼矩阵和寻址数据的上传字节数。
 
 宿主控制阴影复用
 RenderView::ReuseShadowsWhileNavigating 默认 false，镜头改变时按当前视角更新阴影。

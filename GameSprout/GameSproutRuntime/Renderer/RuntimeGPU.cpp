@@ -69,12 +69,17 @@ GRHI::IGraphicsPipeline* Renderer::Pipeline(const PipelineKey& key) {
             attributes[count++]={5,0,GRHI::VertexFormat::Float4,static_cast<std::uint32_t>(key.BoneWeights)};
         }
     }
-    if(key.Instanced)attributes[count++]={4,1,GRHI::VertexFormat::UInt32,0};
+    const bool skinned=key.BoneIndices>=0;
+    if(key.Instanced)attributes[count++]={skinned?6u:4u,1,GRHI::VertexFormat::UInt32,0};
     const std::size_t variant=key.Color<0?(key.UV<0?3:2):(key.UV<0?1:0);
-    const auto shadowVertex=key.Instanced?PreviewShader::InstancedShadowVertex:
-        (key.BoneIndices>=0?PreviewShader::SkinnedShadowVertex:PreviewShader::ShadowVertex);
-    const std::size_t shader=key.Grid?5:(key.Shadow?static_cast<std::size_t>(shadowVertex):
-        variant+(key.Instanced?12:(key.BoneIndices>=0?7:0)));
+    const auto shadowVertex=key.Instanced?
+        (skinned?PreviewShader::InstancedSkinnedShadowVertex:PreviewShader::InstancedShadowVertex):
+        (skinned?PreviewShader::SkinnedShadowVertex:PreviewShader::ShadowVertex);
+    const auto meshVertex=key.Instanced?
+        (skinned?PreviewShader::InstancedSkinnedMeshVertex:PreviewShader::InstancedMeshVertex):
+        (skinned?PreviewShader::SkinnedMeshVertex:PreviewShader::MeshVertex);
+    const std::size_t shader=key.Grid?static_cast<std::size_t>(PreviewShader::GridVertex):
+        (key.Shadow?static_cast<std::size_t>(shadowVertex):static_cast<std::size_t>(meshVertex)+variant);
     if(!_Shaders[shader]) {
         _Shaders[shader]=CreatePreviewShader(_Device,static_cast<PreviewShader>(shader));
         if(!_Shaders[shader]) {Fail(DeviceError("Create Runtime mesh vertex shader"));return nullptr;}

@@ -23,10 +23,16 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
     if(key.Instanced) {
         pass.SetVertexBuffer(1,_ColorInstances.Buffer,firstInstance*sizeof(std::uint32_t));
         pass.SetVertexStorageBuffer(0,_InstanceTransformsBuffer);
+        if(draw.Object->Skinned) {
+            pass.SetVertexStorageBuffer(1,_SkinPaletteOffsetsBuffer);
+            pass.SetVertexStorageBuffer(2,_SkinPaletteBuffer);
+        }
     }
-    pass.SetIndexBuffer(draw.Mesh->Buffer,GRHI::IndexFormat::UInt32,static_cast<std::size_t>(data.IndexOffset));
+    auto* skinIndices=draw.Object->Skinned?draw.Mesh->SkinColorIndices.get():nullptr;
+    pass.SetIndexBuffer(skinIndices?skinIndices:draw.Mesh->Buffer,GRHI::IndexFormat::UInt32,
+        skinIndices?0:static_cast<std::size_t>(data.IndexOffset));
     pass.SetVertexUniform(0,&uniform,sizeof(uniform));
-    if(draw.Object->Skinned) {
+    if(draw.Object->Skinned&&!key.Instanced) {
         SkinUniform skin;
         std::copy(draw.Object->SkinMatrices.begin(),draw.Object->SkinMatrices.end(),skin.Bones);
         pass.SetVertexUniform(1,&skin,sizeof(skin));

@@ -21,7 +21,7 @@ std::vector<Runtime::FrameComponent> Runtime::SnapshotFrameComponents(bool fixed
         if(!IsInScene(node)||!node->SceneOwner->IsSimulationEnabled()||!node->IsActiveInHierarchy())continue;
         for(const auto& entry:node->Components) {
             if(entry.PendingRemove||!entry.Initialized||entry.InitializationFailed)continue;
-            const bool animation=!fixedOnly&&dynamic_cast<AnimatorComponent*>(entry.Pointer);
+            const bool animation=!fixedOnly&&entry.Pointer->GetComponentType()==typeid(IAnimatorComponent);
             const auto mask=fixedOnly?std::uint8_t(entry.TickMask&FixedTick):entry.TickMask;
             if(mask||animation)result.push_back({id,entry.Serial,mask,animation,false});
         }

@@ -1,6 +1,7 @@
 #pragma once
 #include "GameSproutRuntimeApi.h"
 #include "RuntimeAnimationData.h"
+#include <span>
 
 namespace GameSproutRuntime {
 class GAMESPROUT_RUNTIME_PUBLIC_TYPE IAnimatorComponent : public IComponent {
@@ -78,6 +79,9 @@ public:
     // Borrowed palette order is Mesh bone order, not Skeleton or Clip order.
     virtual bool GetSkinMatrices(const std::vector<SkinBinding>& bones,
         std::vector<Mat4>& matrices, std::string& error) const = 0;
+    // Copy a mesh-local palette in Mesh bone order, including inverse bind matrices.
+    // An empty span restores the Animator path. The override is transient.
+    virtual bool SetSkinPose(std::span<const Mat4>) { return false; }
     // Shadow settings are shared with the same object's MeshRenderer. Until it
     // exists, reads return defaults, SetShadowCastingMode fails and SetReceiveShadows is a no-op.
     ShadowCastingMode GetShadowCastingMode() const {
