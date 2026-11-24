@@ -97,6 +97,14 @@ void Runtime::FinishTickNotifications() {
     DispatchObjectPropertyChanges();
 }
 void Runtime::AdvanceFrame(float deltaSeconds,std::uint32_t fixedStepCount,float fixedDeltaSeconds) {
+    AdvanceFrameInternal(deltaSeconds,fixedStepCount,fixedDeltaSeconds,1.0f,true);
+}
+void Runtime::AdvanceFrame(float deltaSeconds,std::uint32_t fixedStepCount,float fixedDeltaSeconds,float alpha) {
+    if(!std::isfinite(alpha))return;
+    AdvanceFrameInternal(deltaSeconds,fixedStepCount,fixedDeltaSeconds,std::clamp(alpha,0.f,1.f),false);
+}
+void Runtime::AdvanceFrameInternal(float deltaSeconds,std::uint32_t fixedStepCount,float fixedDeltaSeconds,
+                                   float alpha,bool collapseHistory) {
     if(_ShuttingDown||IsExecuting()||_ConstructionDepth||!std::isfinite(deltaSeconds)||deltaSeconds<0||
        !std::isfinite(fixedDeltaSeconds)||fixedDeltaSeconds<0||(fixedStepCount&&fixedDeltaSeconds<=0))return;
     struct UpdatingScope {bool& Updating;explicit UpdatingScope(bool& updating):Updating(updating){Updating=true;}~UpdatingScope(){Updating=false;}} updating(_Updating);
@@ -112,6 +120,7 @@ void Runtime::AdvanceFrame(float deltaSeconds,std::uint32_t fixedStepCount,float
         TickComponentPhase(batch,FixedTick,fixedDeltaSeconds);
         if(!_ConstructionDepth)StepPhysics(fixedDeltaSeconds);
     }
+    PresentPhysicsTransforms(alpha,collapseHistory);
     TickGameModulePhase(UpdateTick,deltaSeconds);
     TickComponentPhase(batch,UpdateTick,deltaSeconds);
     TickAnimationPhase(batch,deltaSeconds);
@@ -140,6 +149,7 @@ void Runtime::FixedUpdate(float fixedDeltaSeconds) {
     TickGameModulePhase(FixedTick,fixedDeltaSeconds);
     TickComponentPhase(batch,FixedTick,fixedDeltaSeconds);
     if(!_ConstructionDepth)StepPhysics(fixedDeltaSeconds);
+    PresentPhysicsTransforms(1.0f,true);
     DispatchAnimationEvents();
     InitializePendingComponents(error,true);
     FinishTickNotifications();

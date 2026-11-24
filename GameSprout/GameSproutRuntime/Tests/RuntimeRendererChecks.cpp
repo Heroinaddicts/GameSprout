@@ -1,4 +1,5 @@
 #include "GameSproutRuntimeExport.h"
+#include "RuntimePhysicsApi.h"
 #include "RuntimeRenderApi.h"
 #include "RuntimeUIApi.h"
 #include <array>
@@ -154,6 +155,46 @@ static void CheckUI(GameSproutRuntime::IGameSproutRuntime& runtime,GameSproutRun
     view.DrawUI=false;
     Check(renderer.Render(view)&&renderer.GetStatistics().UIDrawCalls==0,"UI was drawn when disabled on this view");
 }
+
+static void CheckPhysicsPresentation(GameSproutRuntime::IGameSproutRuntime& runtime,
+        GameSproutRuntime::IRuntimeViewport& renderer) {
+    using namespace GameSproutRuntime;
+    auto* scene=runtime.CreateScene("Display interpolation");
+    auto* actor=scene->CreateGameObject("Physics root");
+    actor->GetTransform()->SetLocalPosition({-1.25f,0,0});
+    auto* body=actor->AddComponent<IRigidbodyComponent>();
+    auto settings=body->GetSettings();
+    settings.GravityFactor=0;
+    settings.LinearDamping=0;
+    settings.Interpolate=true;
+    Check(actor->AddComponent<IBoxColliderComponent>()&&body->SetSettings(settings),"Interpolation body");
+    auto* child=scene->CreateGameObject("Drawn child",actor);
+    child->GetTransform()->SetLocalScale({.3f,.3f,.3f});
+    child->AddComponent<IMeshComponent>()->SetMesh({"0123456789abcdef0123456789abcdef",1});
+    child->AddComponent<IMeshRendererComponent>();
+    auto* camera=scene->CreateGameObject("Child camera",actor)->AddComponent<ICameraComponent>();
+
+    RenderView view;view.Scene=scene;view.Camera.Position={0,0,3};view.DrawGrid=false;
+    view.ClearColor={0,0,0,1};
+    Check(TryMakeLookAt(view.Camera.Position,{0,0,0},{0,1,0},view.Camera.View),"Test camera");
+    std::string error;
+    Check(runtime.BeginExecution(error),error);
+    Check(body->SetLinearVelocity({10,0,0}),"Test body velocity");
+    runtime.AdvanceFrame(.25f,2,.125f,0);
+    Check(renderer.Render(view)&&Center(renderer)[0]>32,"The mesh skipped the first interpolated position");
+    SceneRaycastHit hit;
+    Check(renderer.Raycast(scene,{{0,0,3},{0,0,-1}},hit)&&hit.ObjectID==child->GetInstanceID(),
+        "Viewport raycast missed the displayed position");
+    runtime.AdvanceFrame(.0875f,0,.125f,.7f);
+    Check(renderer.Render(view)&&Center(renderer)[0]==0,"The renderer reused a stale display pose on a zero-step frame");
+    Check(renderer.GetStatistics().SceneSnapshotRebuilds==0,"Display interpolation rebuilt the scene snapshot");
+    Check(!renderer.Raycast(scene,{{0,0,3},{0,0,-1}},hit),"Picking used a stale display pose");
+    Mat4 displayView;
+    Check(camera->GetPresentationViewMatrix(displayView)&&std::abs(displayView(0,3)+.875f)<.002f,
+        "A camera child did not use the same interpolated position");
+    Check(runtime.EndExecution(error),error);
+}
+
 int main(int argc,char** argv) {
     GameSproutRuntime::IGameSproutRuntime* runtime=nullptr;
     GameSproutRuntime::IRuntimeViewport* renderer=nullptr;
@@ -271,6 +312,8 @@ int main(int argc,char** argv) {
         Check(renderer->Render(view)&&renderer->GetStatistics().Width==64,"Failed viewport resize destroyed its previous target");
         Check(renderer->Resize(128,128,error),error);Check(renderer->Render(view),renderer->GetLastError());
         CheckUI(*runtime,*renderer);
+        provider.Missing=false;++provider.Revision;
+        CheckPhysicsPresentation(*runtime,*renderer);
         runtime->UnregisterListener(&probe);
         delete renderer;renderer=nullptr;delete runtime;runtime=nullptr;
         std::cout<<"PASS actual GPU Runtime Renderer: mesh and depth, viewport, resource cache, screen UI blending, texture placement and font glyphs\n";

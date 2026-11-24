@@ -308,6 +308,9 @@ namespace GameSproutRuntime {
         virtual bool IsAnimationDriven() const { return false; }
         virtual Mat4 GetLocalMatrix() const = 0; // T * R * S。
         virtual Mat4 GetWorldMatrix() const = 0; // ParentWorld * Local。
+        // Display pose, including any interpolated Rigidbody ancestor. Physics
+        // and gameplay queries continue to use GetWorldMatrix().
+        virtual Mat4 GetPresentationWorldMatrix() const { return GetWorldMatrix(); }
     protected:
         using IComponent::IComponent;
     };
@@ -431,6 +434,7 @@ namespace GameSproutRuntime {
         // Unity: Scale(1,1,-1) * inverse(world position + rotation), ignoring scale.
         virtual bool GetViewMatrix(Mat4& output) const = 0;
         virtual bool GetProjectionMatrix(float aspect, Mat4& output) const = 0;
+        virtual bool GetPresentationViewMatrix(Mat4& output) const { return GetViewMatrix(output); }
         // Aim local +Z at a world-space point without moving the camera.
         // Degenerate input or an animation-driven camera transform leaves the pose unchanged.
         bool LookAt(Vector3 worldTarget, Vector3 worldUp = {0.0f, 1.0f, 0.0f}) {
@@ -714,6 +718,14 @@ namespace GameSproutRuntime {
         virtual bool CaptureUIPointer(RuntimePointerId,std::uint64_t) { return false; }
         virtual bool ReleaseUIPointer(RuntimePointerId,std::uint64_t) { return false; }
         virtual std::uint64_t GetUIPointerCapture(RuntimePointerId) const { return 0; }
+        // Hosts pass their remaining fixed-step time divided by the fixed step.
+        // Interpolates previous to current physics pose, with one fixed step of
+        // display latency. The three-argument overload shows the current pose.
+        virtual void AdvanceFrame(float deltaSeconds, std::uint32_t fixedStepCount,
+                                  float fixedDeltaSeconds, float physicsInterpolationAlpha) {
+            (void)physicsInterpolationAlpha;
+            AdvanceFrame(deltaSeconds,fixedStepCount,fixedDeltaSeconds);
+        }
         bool SetCursorMode(InputCursorMode mode) {
             InputOutputCommand command{InputOutputType::SetCursorMode};
             command.CursorMode=mode;

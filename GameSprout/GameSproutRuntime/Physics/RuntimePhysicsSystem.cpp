@@ -44,7 +44,7 @@ bool RuntimePhysicsSystem::Prepare(std::string &error) {
                 return false;
             }
         }
-        if (!Synchronize(scene, *world, 0, error) || !PublishTransforms(*world, error))
+        if (!Synchronize(scene, *world, 0, error) || !PublishTransforms(*world, false, error))
             return false;
     }
     return true;
@@ -74,7 +74,7 @@ bool RuntimePhysicsSystem::Step(float delta, std::string &error) {
         // Stable static-only pairs cannot generate contacts or moving poses.
         if(world->DynamicBodies.empty() && !world->BackendNeedsStep)continue;
         std::vector<GPhysics::Contact> events;
-        if (!world->Backend.Step(delta, events, error) || !PublishTransforms(*world, error))
+        if (!world->Backend.Step(delta, events, error) || !PublishTransforms(*world, true, error))
             return false;
         world->BackendNeedsStep = false;
         notifications.insert(notifications.end(), std::make_move_iterator(events.begin()),

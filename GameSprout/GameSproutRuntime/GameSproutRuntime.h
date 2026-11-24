@@ -47,6 +47,11 @@ public:
     // deferred Editor events, so every query observes the committed hierarchy.
     std::uint64_t GetTransformEpoch() const {return _TransformEpoch;}
     void InvalidateTransforms();
+    bool HasPresentationOverrides() const {return _PresentationOverrideCount!=0;}
+    void TrackPresentationOverride(bool active) {
+        if(active)++_PresentationOverrideCount;
+        else --_PresentationOverrideCount;
+    }
     // Shared once per host frame; rendering two views never advances this clock.
     Vector4 GetShaderTime() const;
     // Internal factory metadata: inherited IComponent no-op hooks do not need
@@ -169,6 +174,7 @@ public:
     void UnregisterLogListener(IRuntimeLogListener* listener) override;
     bool IsExecuting() const override { return _Depth != 0 || _Updating || _Flushing || _InitializingComponents || _EndingFrame; }
     void AdvanceFrame(float deltaSeconds,std::uint32_t fixedStepCount,float fixedDeltaSeconds) override;
+    void AdvanceFrame(float deltaSeconds,std::uint32_t fixedStepCount,float fixedDeltaSeconds,float physicsInterpolationAlpha) override;
     void Update(float deltaSeconds) override;
     void FixedUpdate(float fixedDeltaSeconds) override;
     void Render() override;
@@ -204,8 +210,12 @@ public:
     bool PreparePhysics(std::string& error);
     void ResetPhysics(bool releaseSystem = false);
     void InvalidatePhysicsTransform(IGameObject* object);
+    void ResetPhysicsPresentation(std::uint64_t scene, const GameObjectState* subtree=nullptr);
 
 private:
+    void AdvanceFrameInternal(float deltaSeconds,std::uint32_t fixedStepCount,float fixedDeltaSeconds,
+                              float alpha,bool collapseHistory);
+    void PresentPhysicsTransforms(float alpha,bool collapseHistory);
     void NotifyPhysicsChange(const GameObjectState& object, SceneNodeEventType type, const char* component);
     void WriteLog(RuntimeLogLevel level, std::string_view message, const char* file,
                   std::uint_least32_t line) noexcept override;
@@ -313,6 +323,7 @@ private:
     std::map<std::uint64_t,ObjectPropertyObservation> _PropertyObservations;
     std::uint64_t _NextPropertyObserver=0;
     std::uint64_t _TransformEpoch=1;
+    std::size_t _PresentationOverrideCount=0;
     bool _ReadingObservedProperties=false;
     bool _ObservedScriptFieldsDirty=false;
     std::uint64_t _NextID = 0;

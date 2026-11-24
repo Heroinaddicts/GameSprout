@@ -143,6 +143,7 @@ class RigidbodyComponent final : public BuiltinComponent<IRigidbodyComponent> {
     bool AddImpulse(Vector3) override;
     bool MoveKinematic(Vector3, Quaternion) override;
     bool Teleport(Vector3, Quaternion, bool) override;
+    void OnRelease(IGameSproutRuntime*) override;
     void WakeUp() override {
         WakeRequested = true;
     }

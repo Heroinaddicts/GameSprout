@@ -63,6 +63,7 @@ bool Runtime::ReparentNow(GameObjectState& child,GameObjectState* parent,bool ke
     Scene* newScene=parent?parent->SceneOwner:nullptr;
     if(!willBeInScene) for(auto* node:subtree) _DetachedObjects.insert(node->ID);
     if(keepWorld && !SetLocalTransform(child.Object->GetTransform(),local)) return false;
+    if(wasInScene)ResetPhysicsPresentation(oldScene->GetInstanceID(),&child);
     const auto oldParent=child.Parent?child.Parent->ID:0;
     if(child.Parent) std::erase(child.Parent->Children,&child);
     if(wasInScene && !willBeInScene) for(auto* node:subtree) {

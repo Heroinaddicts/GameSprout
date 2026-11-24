@@ -48,7 +48,8 @@ bool Equal(const Collider& a,const Collider& b) {
 }
 bool Equal(const GameSproutRuntime::RigidbodySettings& a,const GameSproutRuntime::RigidbodySettings& b) {
     return a.Enabled==b.Enabled&&a.MotionType==b.MotionType&&a.Mass==b.Mass&&a.GravityFactor==b.GravityFactor&&
-        a.LinearDamping==b.LinearDamping&&a.AngularDamping==b.AngularDamping&&a.Constraints==b.Constraints&&a.Continuous==b.Continuous;
+        a.LinearDamping==b.LinearDamping&&a.AngularDamping==b.AngularDamping&&a.Constraints==b.Constraints&&
+        a.Continuous==b.Continuous&&a.Interpolate==b.Interpolate;
 }
 GameSproutRuntime::IComponent* Resolve(GameSproutRuntime::IGameObject& object,ISceneManager* scenes,uint64_t fileID,uint64_t liveID) {
     if(fileID&&scenes)return scenes->QueryComponentByFileID(object.GetInstanceID(),fileID);

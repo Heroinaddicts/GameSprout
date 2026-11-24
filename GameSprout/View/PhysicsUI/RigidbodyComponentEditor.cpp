@@ -7,7 +7,8 @@ RigidbodyComponentEditor::RigidbodyComponentEditor(QWidget* parent):ComponentEdi
     _Ui->setupUi(this);
     for(QLineEdit* field:{_Ui->massEdit,_Ui->gravityEdit,_Ui->linearDampingEdit,_Ui->angularDampingEdit})
         QObject::connect(field,&QLineEdit::editingFinished,this,[this,field]{CommitValues(field);});
-    for(QCheckBox* field:{_Ui->enabledCheck,_Ui->continuousCheck,_Ui->positionXCheck,_Ui->positionYCheck,_Ui->positionZCheck,_Ui->rotationXCheck,_Ui->rotationYCheck,_Ui->rotationZCheck})
+    for(QCheckBox* field:{_Ui->enabledCheck,_Ui->continuousCheck,_Ui->interpolateCheck,
+        _Ui->positionXCheck,_Ui->positionYCheck,_Ui->positionZCheck,_Ui->rotationXCheck,_Ui->rotationYCheck,_Ui->rotationZCheck})
         QObject::connect(field,&QCheckBox::clicked,this,[this,field]{CommitValues(field);});
     QObject::connect(_Ui->motionCombo,qOverload<int>(&QComboBox::activated),this,[this]{CommitValues(_Ui->motionCombo);});
     _Ui->gravityEdit->setToolTip(tr("1 使用世界重力；0 关闭重力。"));
@@ -21,6 +22,7 @@ void RigidbodyComponentEditor::ReadValues(GameSproutRuntime::IComponent& compone
     ShowNumbers({_Ui->massEdit,_Ui->gravityEdit,_Ui->linearDampingEdit,_Ui->angularDampingEdit},
         {value.Mass,value.GravityFactor,value.LinearDamping,value.AngularDamping});
     _Ui->continuousCheck->setChecked(value.Continuous);
+    _Ui->interpolateCheck->setChecked(value.Interpolate);
     const std::array<QCheckBox*,6> constraints{_Ui->positionXCheck,_Ui->positionYCheck,_Ui->positionZCheck,_Ui->rotationXCheck,_Ui->rotationYCheck,_Ui->rotationZCheck};
     for(std::size_t index=0;index<constraints.size();++index)constraints[index]->setChecked((value.Constraints&(1u<<index))!=0);
     const bool dynamic=value.MotionType==GameSproutRuntime::PhysicsMotionType::Dynamic;
@@ -36,6 +38,7 @@ void RigidbodyComponentEditor::CommitValues(QWidget* changed) {
     if(changed==_Ui->enabledCheck)next.Enabled=_Ui->enabledCheck->isChecked();
     if(changed==_Ui->motionCombo)next.MotionType=static_cast<GameSproutRuntime::PhysicsMotionType>(_Ui->motionCombo->currentIndex());
     if(changed==_Ui->continuousCheck)next.Continuous=_Ui->continuousCheck->isChecked();
+    if(changed==_Ui->interpolateCheck)next.Interpolate=_Ui->interpolateCheck->isChecked();
     const std::array<QCheckBox*,6> constraints{_Ui->positionXCheck,_Ui->positionYCheck,_Ui->positionZCheck,_Ui->rotationXCheck,_Ui->rotationYCheck,_Ui->rotationZCheck};
     for(std::size_t index=0;index<constraints.size();++index)if(changed==constraints[index]) {
         if(constraints[index]->isChecked())next.Constraints|=1u<<index;else next.Constraints&=~(1u<<index);

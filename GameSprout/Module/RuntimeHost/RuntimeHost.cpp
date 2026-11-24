@@ -95,7 +95,8 @@ void RuntimeHost::Update(GameSproutEditor::GameSproutModuleApi*){
             _FixedAccumulator=std::max(0.0,_FixedAccumulator);
             // Runtime owns the complete phase barrier, including Early before
             // all fixed steps and Late before either viewport observes the frame.
-            _Runtime->AdvanceFrame(delta,steps,static_cast<float>(fixedSeconds));
+            const auto interpolation=static_cast<float>(std::min(_FixedAccumulator/fixedSeconds,1.0));
+            _Runtime->AdvanceFrame(delta,steps,static_cast<float>(fixedSeconds),interpolation);
         }else _Runtime->ProcessPendingEvents();
     }else{
         delta=_Playing?static_cast<float>(std::clamp(elapsed,0.0,0.1)):0.f;

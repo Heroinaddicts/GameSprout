@@ -60,11 +60,32 @@ public:
     bool LoadMaterial(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::MaterialRenderData&,std::string&)override{return false;}
     bool LoadPrefab(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::PrefabData& output,std::string& error)override {output=Data;error.clear();return true;}
 };
+void CheckRigidbodyInterpolationDocument(GameSproutRuntime::IGameSproutRuntime& runtime) {
+    using GameSproutRuntime::IRigidbodyComponent;
+    auto* authored=runtime.CreateScene("Rigidbody interpolation document");
+    auto* interpolated=authored->CreateGameObject("Interpolate")->AddComponent<IRigidbodyComponent>();
+    auto* defaultBody=authored->CreateGameObject("Default")->AddComponent<IRigidbodyComponent>();
+    Check(interpolated&&interpolated->SetInterpolate(true)&&defaultBody&&!defaultBody->GetInterpolate(),
+          "Cannot configure document interpolation fixture");
+    const auto defaultData=SceneDocument::SerializeComponent(*defaultBody,{});
+    Check(!defaultData["Settings"].isMember("Interpolate"),"The default Rigidbody should keep the existing document format");
+    SceneDocument::ObjectIDs ids;
+    Json::Value document;
+    std::string error;
+    Check(SceneDocument::Serialize(*authored,ids,document,error),error);
+    GameSproutRuntime::IScene* restored=nullptr;
+    Check(SceneDocument::Instantiate(document,runtime,restored,error),error);
+    Check(restored->FindChild("Interpolate")->GetComponent<IRigidbodyComponent>()->GetInterpolate()&&
+          !restored->FindChild("Default")->GetComponent<IRigidbodyComponent>()->GetInterpolate(),
+          "Document round trip did not preserve opted-in and older uncategorized Rigidbody settings");
+    Check(runtime.DestroyScene(authored)&&runtime.DestroyScene(restored),"Cannot release interpolation fixture scenes");
+}
 }
 int main(int argc,char** argv) {
     GameSproutRuntime::IGameSproutRuntime* runtime=nullptr;Provider provider;
     try {
         Check(argc==2,"Runtime directory required");runtime=Export(argv[1]);Check(runtime,"Cannot load Runtime");
+        CheckRigidbodyInterpolationDocument(*runtime);
         GameSproutRuntime::Internal::RegisterScriptClass<PrefabProbe>("prefab-probe","PrefabProbe","PrefabProbe.hpp",Source,
             {GameSproutRuntime::Internal::MakeField<PrefabProbe>("target","Target",&PrefabProbe::Target,static_cast<GameSproutRuntime::IGameObject*>(nullptr))});
         std::string error;Check(runtime->RegisterScriptType(GameSproutRuntime::Internal::ScriptModuleTypes().back(),error),error);

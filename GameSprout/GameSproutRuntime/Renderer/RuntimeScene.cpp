@@ -49,7 +49,7 @@ bool Renderer::UpdateSceneTransforms(IScene& scene,const std::vector<std::uint64
                 const bool hadCullBox=_PreparedKnown&&draw.CullBoxKnown;
                 const bool wasInFrustum=hadCullBox&&preparedFrustum.Intersects(draw.CullBox);
                 const bool wasNegative=draw.Negative;
-                if(!SetDrawTransform(draw,node->GetTransform()->GetWorldMatrix()))return false;
+                if(!SetDrawTransform(draw,node->GetTransform()->GetPresentationWorldMatrix()))return false;
                 if(draw.Negative!=wasNegative)_OpaqueDrawOrderKnown=false;
                 if(!_InstanceTransformsDirty&&!draw.Skinned)_ChangedInstanceTransforms.push_back(draw.InstanceIndex);
                 if(hadCullBox) {
@@ -114,7 +114,7 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
         data.Skinned=object->GetComponent<ISkinnedMeshRendererComponent>()!=nullptr;
         data.StaticShadowCaster=!data.Skinned&&
             (object->GetStaticFlags()&StaticFlags::ShadowCasterStatic)!=StaticFlags::None;
-        if(!SetDrawTransform(data,object->GetTransform()->GetWorldMatrix())) {
+        if(!SetDrawTransform(data,object->GetTransform()->GetPresentationWorldMatrix())) {
             _SceneObjectIndices.emplace(data.ObjectID,InvalidTransformIndex);
             ++_Statistics.SkippedObjects;Diagnostic("Skipped singular/nonfinite mesh transform: "+data.Name);continue;
         }

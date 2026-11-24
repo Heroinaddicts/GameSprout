@@ -24,7 +24,7 @@ GameLogic 工厂通过接收 IGameSproutRuntime* 的构造函数创建 Script �
 实例借用当前执行会话的 Runtime。脚本工厂在调用构造函数前绑定所属 GameObject。
 构造函数只绑定实例状态。脚本依赖同批装配结果的逻辑放在 OnInitialized，
 模块查找其他模块的逻辑放在 Initialize 或之后的阶段。
-GameLogic ABI 8 的创建回调显式接收 Runtime 指针，宿主和项目动态库须使用当前 SDK 构建。
+GameLogic 的创建回调显式接收 Runtime 指针。当前 ABI 为 11，宿主和项目动态库须使用匹配的 SDK 重新构建。
 
 所有权与节点树
 Runtime 持有场景，场景持有对象，对象持有组件；外部指针只借用，不自行 delete。
@@ -44,6 +44,7 @@ AdvanceFrame(deltaSeconds, fixedStepCount, fixedDeltaSeconds) 是宿主唯一完
 EarlyUpdate 是 GameSprout 自定义的帧前置脚本回调；LateUpdate 使用 Unity 同名约定。
 Update(delta) 等价于 AdvanceFrame(delta,0,0)；FixedUpdate(delta) 是独立固定步入口，
 不执行 Early/Update/Late。宿主如需 Early 先于物理，必须调用 AdvanceFrame。
+
 只有已初始化、位于活跃且允许模拟场景中的组件参加帧回调；只遍历登记集合，不扫描静态节点。
 帧开始冻结组件身份，阶段之间提交结构命令；帧回调中新建的组件初始化后下一帧才参加帧回调。
 待删除、失活、已移除或初始化失败的组件立即失去后续阶段资格，不保留跨阶段裸指针。
@@ -54,6 +55,15 @@ Update(delta) 等价于 AdvanceFrame(delta,0,0)；FixedUpdate(delta) 是独立�
 新虚接口要求 Runtime、宿主、GameLogic 使用同一 SDK 重新构建，不改变场景/Prefab 文件格式。
 组件回调异常不打断其他组件，通知回调异常不打断其他监听者；调用方不能在回调中 delete Runtime。
 删除通过迭代完成，不递归销毁整棵子树。所有内存显式释放，不使用智能指针。
+
+刚体显示插值
+RigidbodySettings::Interpolate 默认为 false，可在 Rigidbody Inspector 中启用，或调用 IRigidbodyComponent::SetInterpolate。
+自定义宿主使用四参数 AdvanceFrame，第四参数为固定步剩余时间除以固定步长，范围 0 到 1。
+动态和运动学刚体在最近两次物理完成位姿之间插值，显示姿态延后一个固定步。三参数帧入口和独立 FixedUpdate 使用当前模拟位姿，适用于单步查看。
+GetWorldMatrix、刚体状态和物理射线仍读取模拟位姿。跟随相机、特效等显示逻辑可在 Update 或 LateUpdate 用
+ITransformComponent::GetPresentationWorldMatrix 读取与网格绘制一致的世界位姿，普通子节点继承父刚体的显示位姿。
+ICameraComponent::GetPresentationViewMatrix 提供使用显示位置和旋转的视图，缩放的处理与 GetViewMatrix 相同。
+Teleport、修改变换、移除刚体或禁用场景模拟时重置历史。显示插值不会移动碰撞体或写入场景变换。
 Transform 固有、唯一、不能移除；场景根固定为单位变换。
 保留世界变换的重挂载遇到不可逆矩阵或 TRS 无法表达的剪切时拒绝，保持原层级。
 

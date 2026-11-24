@@ -22,22 +22,20 @@ bool CameraComponent::SetSettings(const CameraSettings& value) {
     return true;
 }
 bool CameraComponent::GetViewMatrix(Mat4& output) const {
+    return BuildViewMatrix(output,false);
+}
+bool CameraComponent::GetPresentationViewMatrix(Mat4& output) const {
+    return BuildViewMatrix(output,true);
+}
+bool CameraComponent::BuildViewMatrix(Mat4& output,bool presentation) const {
     ITransformComponent* transform = _GameObject->GetTransform();
     if (!transform) return false;
     // Unity Camera::GetImplicitWorldToCameraMatrix uses world position and
     // rotation without scale, then reflects camera-space Z exactly once.
-    const Mat4 world=transform->GetWorldMatrix();
+    const Mat4 world=presentation?transform->GetPresentationWorldMatrix():transform->GetWorldMatrix();
     if (!RuntimeMath::IsFinite(world)) return false;
     Mat4 pose;
-    for (auto* node=_GameObject;node;node=node->Parent()) {
-        auto* local=node->GetTransform();
-        if (!local) return false;
-        Quaternion rotation;
-        if (const auto* current=dynamic_cast<const TransformComponent*>(local)) {
-            if (!current->GetCurrentLocalRotation(rotation)) return false;
-        } else rotation=local->GetLocalRotation();
-        pose=RuntimeMath::ComposeTRS({},rotation,{1,1,1})*pose;
-    }
+    if (!TransformComponent::GetCurrentWorldRotation(*_GameObject,pose,presentation)) return false;
     for (std::size_t row=0;row<3;++row) pose(row,3)=world(row,3);
     Mat4 view;
     if (!RuntimeMath::TryInverseAffine(pose,view)) return false;

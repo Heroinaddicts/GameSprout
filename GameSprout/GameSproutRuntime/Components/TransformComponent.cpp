@@ -2,6 +2,7 @@
 #include "ComponentFactory.h"
 #include "RuntimeMath.h"
 #include "GameObject.h"
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <vector>
@@ -23,6 +24,9 @@ namespace GameSproutRuntime {
 TransformComponent::TransformComponent(IGameObject* owner)
     : BuiltinComponent<ITransformComponent>(owner, "GameSproutRuntime.Transform") {
     if(auto* access=dynamic_cast<ObjectAccess*>(owner))_Runtime=&access->State().Owner;
+}
+TransformComponent::~TransformComponent() {
+    if(_Runtime&&_HasPresentationPhysicsWorld)_Runtime->TrackPresentationOverride(false);
 }
 
 void TransformComponent::InvalidateLocalMatrix() {
@@ -91,6 +95,27 @@ bool TransformComponent::GetCurrentLocalRotation(Quaternion& output) const {
     output=GetLocalRotation();
     return true;
 }
+bool TransformComponent::GetCurrentWorldRotation(const IGameObject& object,Mat4& output,bool presentation) {
+    Mat4 result;
+    for(const IGameObject* node=&object;node;node=node->Parent()) {
+        auto* local=node->GetTransform();
+        if(!local)return false;
+        Quaternion rotation;
+        const auto* transform=dynamic_cast<const TransformComponent*>(local);
+        if(presentation&&transform&&transform->_HasPresentationPhysicsWorld) {
+            result=RuntimeMath::ComposeTRS({},transform->_PhysicsPresentation->Rotation,{1,1,1})*result;
+            break;
+        }
+        if(transform) {
+            if(!transform->GetCurrentLocalRotation(rotation))return false;
+            // A separately simulated child body has an independent world pose.
+            if(transform->_HasPhysicsPose)presentation=false;
+        }else rotation=local->GetLocalRotation();
+        result=RuntimeMath::ComposeTRS({},rotation,{1,1,1})*result;
+    }
+    output=result;
+    return true;
+}
 
 bool TransformComponent::SetEvaluatedPose(std::uint64_t animatorID,const Mat4& matrix,Quaternion rotation) {
     Quaternion unit;
@@ -100,6 +125,7 @@ bool TransformComponent::SetEvaluatedPose(std::uint64_t animatorID,const Mat4& m
         unit.Z!=_EvaluatedRotation.Z || unit.W!=_EvaluatedRotation.W;
     for(unsigned index=0;index<16&&!changed;++index)changed=_EvaluatedMatrix.Data[index]!=matrix.Data[index];
     _EvaluatedMatrix=matrix;_EvaluatedRotation=unit;_PoseOwner=animatorID;
+    SetPresentationPhysicsPose(nullptr);
     if(changed){InvalidateLocalMatrix();NotifyRuntimePropertiesChanged(_GameObject);}
     return true;
 }
@@ -153,6 +179,23 @@ Mat4 TransformComponent::GetWorldMatrix() const {
     }
     return _WorldMatrixCache;
 }
+Mat4 TransformComponent::GetPresentationWorldMatrix() const {
+    if(_HasPresentationPhysicsWorld)return _PhysicsPresentation->World;
+    if(!_Runtime||!_Runtime->HasPresentationOverrides())return GetWorldMatrix();
+    // Only a branch below an opted-in body needs a separate matrix. Reuse
+    // the usual world cache for unrelated branches and independent bodies.
+    auto* node=this;
+    while(node&&!node->_HasPresentationPhysicsWorld) {
+        if(node->_HasPhysicsPose)return GetWorldMatrix();
+        auto* parent=node->_GameObject->Parent();
+        node=parent?dynamic_cast<const TransformComponent*>(parent->GetTransform()):nullptr;
+    }
+    if(!node)return GetWorldMatrix();
+    Mat4 local;
+    for(auto* child=_GameObject;child!=node->_GameObject;child=child->Parent())
+        local=child->GetTransform()->GetLocalMatrix()*local;
+    return node->_PhysicsPresentation->World*local;
+}
 
 bool TransformComponent::SetLocalMatrix(const Mat4& value) {
     if (IsSceneRoot()) return false;
@@ -165,12 +208,14 @@ bool TransformComponent::SetLocalMatrix(const Mat4& value) {
     _Rotation = unit;
     _Scale = scale;
     _HasPhysicsPose=false;
+    SetPresentationPhysicsPose(nullptr);
     InvalidateLocalMatrix();
     ++_AuthoringRevision;
     NotifyComponentChanged(_GameObject, this);
     return true;
 }
 void TransformComponent::PrepareAuthoringChange() {
+    SetPresentationPhysicsPose(nullptr);
     if(!_HasPhysicsPose)return;
     _Position=_PhysicsPosition;
     _Rotation=_PhysicsRotation;
@@ -189,6 +234,19 @@ bool TransformComponent::SetPhysicsPose(const Mat4& local,bool dynamic) {
 void TransformComponent::ClearPhysicsPose(){
     const bool changed=_HasPhysicsPose;
     _HasPhysicsPose=false;_PhysicsDynamic=false;
+    SetPresentationPhysicsPose(nullptr);
     if(changed){InvalidateLocalMatrix();NotifyRuntimePropertiesChanged(_GameObject);}
+}
+void TransformComponent::SetPresentationPhysicsPose(const Mat4* world,Quaternion rotation) {
+    const bool available=world!=nullptr;
+    if(_HasPresentationPhysicsWorld==available&&
+       (!available||std::equal(std::begin(world->Data),std::end(world->Data),std::begin(_PhysicsPresentation->World.Data))))return;
+    if(available) {
+        if(!_PhysicsPresentation)_PhysicsPresentation=std::make_unique<PresentationPhysicsPose>();
+        *_PhysicsPresentation={*world,rotation};
+    }
+    if(_Runtime&&_HasPresentationPhysicsWorld!=available)_Runtime->TrackPresentationOverride(available);
+    _HasPresentationPhysicsWorld=available;
+    NotifyRuntimePropertiesChanged(_GameObject,false);
 }
 }

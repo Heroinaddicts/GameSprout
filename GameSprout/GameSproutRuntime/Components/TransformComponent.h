@@ -1,11 +1,13 @@
 #pragma once
 #include "BuiltinComponent.h"
+#include <memory>
 
 namespace GameSproutRuntime {
 class Runtime;
 class TransformComponent final : public BuiltinComponent<ITransformComponent> {
 public:
     explicit TransformComponent(IGameObject* owner);
+    ~TransformComponent() override;
     Vector3 GetLocalPosition() const override { return _HasPhysicsPose ? _PhysicsPosition : _Position; }
     void SetLocalPosition(Vector3 value) override;
     Quaternion GetLocalRotation() const override { return _HasPhysicsPose ? _PhysicsRotation : _Rotation; }
@@ -15,6 +17,7 @@ public:
     bool IsAnimationDriven() const override {return _PoseOwner!=0;}
     Mat4 GetLocalMatrix() const override;
     Mat4 GetWorldMatrix() const override;
+    Mat4 GetPresentationWorldMatrix() const override;
     bool SetLocalMatrix(const Mat4& value);
     // Evaluation changes the displayed pose, never the serialized authoring TRS.
     // Keep its actual rotation separately: signed/zero scale and root-motion
@@ -26,6 +29,7 @@ public:
     // ComponentChanged events. Resetting gameplay restores the authored TRS.
     bool SetPhysicsPose(const Mat4& local,bool dynamic);
     void ClearPhysicsPose();
+    void SetPresentationPhysicsPose(const Mat4* world, Quaternion rotation={});
     std::uint64_t GetAuthoringRevision() const { return _AuthoringRevision; }
     // Accumulated animation deltas use the authored baseline, not a physics
     // result that already contains the previous frame's animation movement.
@@ -33,6 +37,7 @@ public:
     Quaternion GetAuthoringLocalRotation() const { return _Rotation; }
     // Orientation of the effective pose, without authored scale/reflection.
     bool GetCurrentLocalRotation(Quaternion& output) const;
+    static bool GetCurrentWorldRotation(const IGameObject&,Mat4& output,bool presentation);
 
 private:
     bool IsSceneRoot() const;
@@ -54,6 +59,12 @@ private:
     Vector3 _PhysicsPosition;
     Quaternion _PhysicsRotation;
     Mat4 _PhysicsMatrix;
+    struct PresentationPhysicsPose {
+        Mat4 World;
+        Quaternion Rotation;
+    };
+    std::unique_ptr<PresentationPhysicsPose> _PhysicsPresentation;
+    bool _HasPresentationPhysicsWorld=false;
     std::uint64_t _AuthoringRevision=0;
     friend class Runtime;
 };

@@ -69,6 +69,12 @@ bool Runtime::PreparePhysics(std::string &error) {
     RuntimeOperation operation(*this);
     return _PhysicsSystem->Prepare(error);
 }
+void Runtime::PresentPhysicsTransforms(float alpha,bool collapseHistory) {
+    if(_PhysicsSystem)_PhysicsSystem->PublishPresentation(alpha,collapseHistory);
+}
+void Runtime::ResetPhysicsPresentation(std::uint64_t scene,const GameObjectState* subtree) {
+    if(_PhysicsSystem)_PhysicsSystem->ResetPresentation(scene,subtree);
+}
 void Runtime::StepPhysics(float delta) {
     if (!_ScriptExecutionEnabled)
         return;

@@ -66,7 +66,11 @@ bool Scene::DestroyGameObject(IGameObject* object) {
     GameObjectState* node = State().Owner.Find(object);
     return node && node->SceneOwner == this && object != this && State().Owner.RequestDestroy(node,false);
 }
-void Scene::SetSimulationEnabled(bool enabled) { _SimulationEnabled=enabled; }
+void Scene::SetSimulationEnabled(bool enabled) {
+    if(_SimulationEnabled==enabled)return;
+    _SimulationEnabled=enabled;
+    if(!enabled)State().Owner.ResetPhysicsPresentation(GetInstanceID());
+}
 bool Scene::IsSimulationEnabled() const { return _SimulationEnabled; }
 bool Scene::SetMainCamera(ICameraComponent* camera) {
     std::uint64_t id=0;

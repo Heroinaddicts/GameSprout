@@ -34,6 +34,7 @@ struct RigidbodySettings {
     float AngularDamping = 0.05f;
     std::uint32_t Constraints = 0; // PhysicsConstraint bits, world axes.
     bool Continuous = false;
+    bool Interpolate = false; // Display-only interpolation between fixed steps.
 };
 struct ColliderSettings {
     bool Enabled = true;

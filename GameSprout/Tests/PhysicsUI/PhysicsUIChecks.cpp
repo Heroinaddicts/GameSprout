@@ -270,9 +270,15 @@ int main(int argc,char** argv){
         {
             RigidbodyComponentEditor editor(nullptr);context.ComponentID=body->GetComponentInstanceID();editor.Bind(context);editor.Load(*body);
             Finish(editor.findChild<QLineEdit*>("massEdit"),"4");Check(body->GetSettings().Mass==4,"Rigidbody mass edit failed");
+            auto* interpolate=editor.findChild<QCheckBox*>("interpolateCheck");
+            Check(interpolate&&!interpolate->isChecked(),"Interpolation must be off for a default Rigidbody");
+            interpolate->click();
+            Check(body->GetSettings().Interpolate&&body->GetMass()==4,"Interpolation edit did not preserve other Rigidbody settings");
+            std::string error;
+            Check(scenes.Reverts.back()(*object,error)&&!body->GetSettings().Interpolate,"Interpolation undo did not restore prior setting");
             for(const char* name:{"positionXCheck","positionYCheck","positionZCheck","rotationXCheck","rotationYCheck","rotationZCheck"})editor.findChild<QCheckBox*>(name)->click();
             Check(body->GetConstraints()==63&&reported.empty(),"Inspector rejected the supported FreezeAll combination");
-            std::string error;Check(scenes.Reverts.back()(*object,error)&&body->GetConstraints()==31&&body->GetMass()==4,
+            Check(scenes.Reverts.back()(*object,error)&&body->GetConstraints()==31&&body->GetMass()==4,
                                     "FreezeAll undo did not restore the preceding constraints");
         }
         {

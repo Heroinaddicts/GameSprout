@@ -28,7 +28,7 @@ bool Renderer::QueryObject(IScene* scene,std::uint64_t objectID,IGameObject*& ob
     object=_Runtime.QueryGameObject(objectID);
     auto* component=object->GetComponent<IMeshComponent>();
     if(!component) return false;
-    model=object->GetTransform()->GetWorldMatrix();Mat4 inverse;
+    model=object->GetTransform()->GetPresentationWorldMatrix();Mat4 inverse;
     if(!RuntimeMath::IsFinite(model) || !RuntimeMath::TryInverseAffine(model,inverse)) return false;
     mesh=Mesh(component->GetMesh());return mesh!=nullptr;
 }
@@ -55,7 +55,7 @@ bool Renderer::Raycast(IScene* scene,const Ray& worldRay,SceneRaycastHit& hit,st
             auto* component=object->GetComponent<IMeshComponent>();
             if(!renderer || !component || !object->IsActiveInHierarchy() || !renderer->IsVisible() ||
                 renderer->GetShadowCastingMode()==ShadowCastingMode::ShadowsOnly) continue;
-            const Mat4 model=object->GetTransform()->GetWorldMatrix();Mat4 inverse;
+            const Mat4 model=object->GetTransform()->GetPresentationWorldMatrix();Mat4 inverse;
             if(!RuntimeMath::IsFinite(model) || !RuntimeMath::TryInverseAffine(model,inverse)) continue;
             MeshGPU* mesh=nullptr;
             if(useDrawGeometry) {

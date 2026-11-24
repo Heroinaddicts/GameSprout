@@ -2,6 +2,7 @@
 #include "Api/Math/TransformMath.h"
 #include "Components/ComponentFactory.h"
 #include "Components/ScriptComponent.h"
+#include "Components/TransformComponent.h"
 #include "GameObject.h"
 #include <cmath>
 #include <limits>
@@ -226,8 +227,12 @@ bool RigidbodyComponent::SetSettings(const RigidbodySettings &value) {
     if (Settings.Enabled == value.Enabled && Settings.MotionType == value.MotionType &&
         Settings.Mass == value.Mass && Settings.GravityFactor == value.GravityFactor &&
         Settings.LinearDamping == value.LinearDamping && Settings.AngularDamping == value.AngularDamping &&
-        Settings.Constraints == value.Constraints && Settings.Continuous == value.Continuous)
+        Settings.Constraints == value.Constraints && Settings.Continuous == value.Continuous &&
+        Settings.Interpolate == value.Interpolate)
         return true;
+    if(Settings.Interpolate!=value.Interpolate||Settings.Enabled!=value.Enabled||Settings.MotionType!=value.MotionType)
+        if(auto* transform=dynamic_cast<TransformComponent*>(_GameObject->GetTransform()))
+            transform->SetPresentationPhysicsPose(nullptr);
     Settings = value;
     if (Settings.Constraints == 63u) {
         LinearVelocity = {};
@@ -290,7 +295,13 @@ bool RigidbodyComponent::Teleport(Vector3 position, Quaternion rotation, bool cl
     HasTeleport = true;
     HasKinematicTarget = false;
     ClearTeleportVelocity = clear;
+    if(auto* transform=dynamic_cast<TransformComponent*>(_GameObject->GetTransform()))
+        transform->SetPresentationPhysicsPose(nullptr);
     return true;
+}
+void RigidbodyComponent::OnRelease(IGameSproutRuntime*) {
+    if(auto* transform=dynamic_cast<TransformComponent*>(_GameObject->GetTransform()))
+        transform->SetPresentationPhysicsPose(nullptr);
 }
 namespace {
 template<typename Implementation>

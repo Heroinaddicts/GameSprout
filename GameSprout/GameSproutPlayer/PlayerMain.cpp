@@ -224,10 +224,10 @@ bool RenderFrame(PlayerSession& player, GameSproutRuntime::IScene* scene, bool& 
     view.WaitForSurface = true;
     view.EnableTexturePrefetch = true;
     if (auto* camera = scene ? scene->GetMainCamera() : nullptr; camera && camera->GetGameObject()->IsActiveInHierarchy() &&
-        camera->GetViewMatrix(view.Camera.View)) {
+        camera->GetPresentationViewMatrix(view.Camera.View)) {
         view.DrawScene = true;
         view.Camera.Projection = camera->GetSettings();
-        const auto matrix = camera->GetGameObject()->GetTransform()->GetWorldMatrix();
+        const auto matrix = camera->GetGameObject()->GetTransform()->GetPresentationWorldMatrix();
         view.Camera.Position = {matrix.Data[12], matrix.Data[13], matrix.Data[14]};
     }
     if (!player.Viewport->Render(view)) {
@@ -361,7 +361,8 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
         accumulator += elapsed;
         const auto steps = static_cast<unsigned>(std::min(6.0, accumulator / fixedSeconds));
         accumulator -= steps * fixedSeconds;
-        player.Runtime->AdvanceFrame(static_cast<float>(elapsed), steps, static_cast<float>(fixedSeconds));
+        const auto interpolation=static_cast<float>(std::clamp(accumulator/fixedSeconds,0.0,1.0));
+        player.Runtime->AdvanceFrame(static_cast<float>(elapsed), steps, static_cast<float>(fixedSeconds),interpolation);
         player.Runtime->CompleteInputFrame();
         if (player.Viewport) {
             auto* activeScene = FindActiveScene(player, startupSceneID);

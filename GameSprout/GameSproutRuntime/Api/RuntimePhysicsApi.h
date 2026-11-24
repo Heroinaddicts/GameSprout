@@ -40,6 +40,10 @@ public:
     bool SetContinuous(bool continuous) {
         auto settings=GetSettings();settings.Continuous=continuous;return SetSettings(settings);
     }
+    bool GetInterpolate() const { return GetSettings().Interpolate; }
+    bool SetInterpolate(bool enabled) {
+        auto settings=GetSettings();settings.Interpolate=enabled;return SetSettings(settings);
+    }
     std::uint32_t GetConstraints() const { return GetSettings().Constraints; }
     bool SetConstraints(std::uint32_t constraints) {
         auto settings=GetSettings();settings.Constraints=constraints;return SetSettings(settings);

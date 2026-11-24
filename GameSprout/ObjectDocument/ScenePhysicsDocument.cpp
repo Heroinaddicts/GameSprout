@@ -70,9 +70,10 @@ GameSproutRuntime::ColliderSettings Collider(const Json::Value& value,const std:
     return settings;
 }
 GameSproutRuntime::RigidbodySettings Rigidbody(const Json::Value& value,const std::string& path) {
-    Keys(value,path,{"Enabled","MotionType","Mass","GravityFactor","LinearDamping","AngularDamping","Constraints","Continuous"});
+    Keys(value,path,{"Enabled","MotionType","Mass","GravityFactor","LinearDamping","AngularDamping","Constraints","Continuous","Interpolate"});
     GameSproutRuntime::RigidbodySettings settings;
     settings.Enabled=Boolean(value,"Enabled",true,path);settings.Continuous=Boolean(value,"Continuous",false,path);
+    settings.Interpolate=Boolean(value,"Interpolate",false,path);
     if(value.isMember("MotionType")) {
         if(value["MotionType"]=="Kinematic")settings.MotionType=GameSproutRuntime::PhysicsMotionType::Kinematic;
         else if(value["MotionType"]!="Dynamic")Fail(path+".MotionType","expected Dynamic or Kinematic");
@@ -185,6 +186,7 @@ Json::Value Serialize(GameSproutRuntime::IComponent& component) {
         settings["Mass"]=data.Mass;settings["GravityFactor"]=data.GravityFactor;
         settings["LinearDamping"]=data.LinearDamping;settings["AngularDamping"]=data.AngularDamping;
         settings["Constraints"]=Json::UInt(data.Constraints);settings["Continuous"]=data.Continuous;
+        if(data.Interpolate)settings["Interpolate"]=true;
     } else {
         auto* collider=dynamic_cast<GameSproutRuntime::IColliderComponent*>(&component);if(!collider)Fail("PhysicsComponent","Collider interface mismatch");
         const auto& data=collider->GetColliderSettings();auto& settings=value["Settings"];

@@ -1,5 +1,6 @@
 #include "RuntimeRenderer.h"
 #include "RuntimeMath.h"
+#include "Components/SkinnedMeshRendererComponent.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -17,7 +18,10 @@ bool Renderer::SkinMatrices(IGameObject& object,const MeshGPU& mesh,std::vector<
         Diagnostic("Skinned mesh exceeds the 128-bone palette limit: "+object.GetName());return false;
     }
     std::string error;
-    if(!skin->GetSkinMatrices(mesh.Data.Bones,matrices,error) || matrices.size()!=mesh.Data.Bones.size()) {
+    const auto* builtin=dynamic_cast<const SkinnedMeshRendererComponent*>(skin);
+    const bool sampled=builtin?builtin->GetPresentationSkinMatrices(mesh.Data.Bones,matrices,error):
+        skin->GetSkinMatrices(mesh.Data.Bones,matrices,error);
+    if(!sampled || matrices.size()!=mesh.Data.Bones.size()) {
         Diagnostic("Cannot bind skinned mesh '"+object.GetName()+"': "+error);matrices.clear();return false;
     }
     for(const auto& matrix:matrices) if(!RuntimeMath::IsFinite(matrix)) {

@@ -296,6 +296,7 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
                 if (auto *object = _Runtime.QueryGameObject(it->first))
                     if (auto *transform = dynamic_cast<TransformComponent *>(object->GetTransform()))
                         transform->ClearPhysicsPose();
+                world.Presentation.erase(it->first);
                 it = world.Bodies.erase(it);
             } else
                 ++it;
@@ -365,6 +366,7 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
         }
         BodyRecord &record = found->second;
         if (request.Description.Motion == GPhysics::MotionType::Static) {
+            if(world.Presentation.erase(key))transform->SetPresentationPhysicsPose(nullptr);
             if (!PhysicsNear(record.LastWorld, request.World)) {
                 if (!world.Backend.SetPose(key, request.Description.Transform, false, delta)) {
                     error = "Cannot update static physics body pose";
@@ -377,6 +379,16 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
             continue;
         }
         auto &rigid = *request.Rigidbody;
+        BodyPresentation* presentation=nullptr;
+        if(rigid.Settings.Interpolate) {
+            auto& samples=world.Presentation[key];
+            if(rebuild||samples.ConfigurationRevision!=rigid.Revision) {
+                samples={};
+                samples.ConfigurationRevision=rigid.Revision;
+                transform->SetPresentationPhysicsPose(nullptr);
+            }
+            presentation=&samples;
+        }else if(world.Presentation.erase(key))transform->SetPresentationPhysicsPose(nullptr);
         if (rigid.VelocityRevision != record.VelocityRevision) {
             world.Backend.SetVelocity(key, PhysicsVector(rigid.LinearVelocity),
                                       PhysicsVector(rigid.AngularVelocity));
@@ -395,6 +407,8 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
             if (rigid.ClearTeleportVelocity)
                 world.Backend.SetVelocity(key, {}, {});
             rigid.HasTeleport = false;
+            if(presentation)presentation->Initialized=false;
+            transform->SetPresentationPhysicsPose(nullptr);
         } else if (rigid.HasKinematicTarget) {
             world.Backend.SetPose(
                 key, {PhysicsVector(rigid.TargetPosition), PhysicsRotation(rigid.TargetRotation)}, true,
@@ -406,6 +420,8 @@ bool RuntimePhysicsSystem::Synchronize(IScene *scene, SceneWorld &world, float d
             world.Backend.SetPose(key, request.Description.Transform,
                                   rigid.Settings.MotionType == PhysicsMotionType::Kinematic, delta);
             record.KinematicMoved = rigid.Settings.MotionType == PhysicsMotionType::Kinematic;
+            if(presentation)presentation->Initialized=false;
+            transform->SetPresentationPhysicsPose(nullptr);
         } else if (record.KinematicMoved) {
             world.Backend.SetVelocity(key, {}, {});
             record.KinematicMoved = false;

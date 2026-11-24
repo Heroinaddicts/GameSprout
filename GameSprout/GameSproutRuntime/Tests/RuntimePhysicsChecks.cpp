@@ -16,6 +16,79 @@ void Steps(GameSproutRuntime::IGameSproutRuntime &runtime, unsigned count) {
     for (unsigned i = 0; i < count; ++i)
         runtime.FixedUpdate(1.0f / 60.0f);
 }
+void CheckPresentationInterpolation(GameSproutRuntime::IGameSproutRuntime& runtime) {
+    using namespace GameSproutRuntime;
+    constexpr float fixed=1.f/60.f;
+    const auto near=[](float a,float b){return std::fabs(a-b)<.0002f;};
+    std::string error;
+    auto* scene=runtime.CreateScene("Rigidbody presentation");
+    auto* object=scene->CreateGameObject("Interpolated body");
+    auto* transform=object->GetTransform();
+    transform->SetLocalPosition({2,2,0});
+    auto* child=scene->CreateGameObject("Visual child",object);
+    auto* childTransform=child->GetTransform();
+    childTransform->SetLocalPosition({0,1,.5f});
+    auto* independent=scene->CreateGameObject("Independent body",object);
+    independent->GetTransform()->SetLocalPosition({0,2,-2});
+    auto* independentBody=independent->AddComponent<IRigidbodyComponent>();
+    auto* collider=object->AddComponent<IBoxColliderComponent>();
+    auto* body=object->AddComponent<IRigidbodyComponent>();
+    auto* rotating=scene->CreateGameObject("Rotating kinematic");
+    rotating->GetTransform()->SetLocalPosition({30,2,0});
+    auto* kinematic=rotating->AddComponent<IRigidbodyComponent>();
+    Check(body&&!body->GetInterpolate()&&body->SetInterpolate(true)&&body->GetInterpolate()&&
+          collider&&collider->SetShape({{.04f,.04f,.04f}})&&body->SetGravityFactor(0)&&body->SetLinearDamping(0)&&
+          body->SetLinearVelocity({0,0,7.5f})&&independentBody&&independentBody->SetGravityFactor(0),
+          "Cannot configure interpolation test bodies");
+    Check(kinematic&&kinematic->SetMotionType(PhysicsMotionType::Kinematic)&&kinematic->SetInterpolate(true),
+          "Cannot configure rotating kinematic body");
+    Check(runtime.BeginExecution(error),error);
+    const auto authoringRevision=scene->GetAuthoringRevision();
+    Check(kinematic->MoveKinematic({30,2,0},{0,.70710678f,0,.70710678f}),"Cannot apply kinematic rotation");
+    runtime.AdvanceFrame(fixed,1,fixed,0.f);
+    Check(near(transform->GetWorldMatrix()(2,3),.125f)&&near(transform->GetPresentationWorldMatrix()(2,3),0.f),
+          "Physics and display did not retain their independent fixed-step positions");
+    Check(near(independent->GetTransform()->GetPresentationWorldMatrix()(2,3),
+               independent->GetTransform()->GetWorldMatrix()(2,3)),
+          "Independent opt-out child body inherited an ancestor's presentation pose");
+    Check(near(childTransform->GetPresentationWorldMatrix()(2,3),.5f)&&near(childTransform->GetWorldMatrix()(2,3),.625f),
+          "Visible child did not follow its parent's presentation without changing the physics hierarchy");
+    PhysicsRaycastHit hit;
+    Check(runtime.Raycast(scene,{{2,3,.125f},{0,-1,0}},2.f,hit,{},error)&&hit.Collider.ObjectID==object->GetInstanceID(),
+          "Physics raycast sampled the presentation pose instead of the simulated body");
+    runtime.AdvanceFrame(fixed*.5f,0,fixed,.5f);
+    Check(near(transform->GetWorldMatrix()(2,3),.125f)&&near(transform->GetPresentationWorldMatrix()(2,3),.0625f),
+          "A frame without a fixed step did not interpolate the display pose");
+    const auto simulatedRotation=rotating->GetTransform()->GetWorldMatrix();
+    const auto displayRotation=rotating->GetTransform()->GetPresentationWorldMatrix();
+    Check(near(simulatedRotation(0,2),1.f)&&near(displayRotation(0,2),.70710678f),
+          "Kinematic display rotation did not follow the shortest arc");
+    runtime.AdvanceFrame(fixed*1.5f,2,fixed,0.f);
+    Check(near(transform->GetWorldMatrix()(2,3),.375f)&&near(transform->GetPresentationWorldMatrix()(2,3),.25f)&&
+          scene->GetAuthoringRevision()==authoringRevision,
+          "Multi-step frame interpolated from the wrong sample or dirtied scene authoring");
+    runtime.AdvanceFrame(fixed,1,fixed);
+    runtime.AdvanceFrame(fixed*.5f,0,fixed,.5f);
+    Check(near(transform->GetPresentationWorldMatrix()(2,3),.5f),"Manual step let the display rewind on resume");
+    Check(body->Teleport({2,2,20},{}),"Could not queue teleport");
+    runtime.AdvanceFrame(fixed,1,fixed,0.f);
+    Check(near(transform->GetPresentationWorldMatrix()(2,3),20.f)&&near(childTransform->GetPresentationWorldMatrix()(2,3),20.5f),
+          "Teleport blended with stale history");
+    Check(body->SetLinearVelocity({0,0,7.5f}),"Could not resume velocity");
+    runtime.AdvanceFrame(fixed,1,fixed,0.f);
+    const float simulatedBeforeReparent=transform->GetWorldMatrix()(2,3);
+    auto* newParent=scene->CreateGameObject("New parent");
+    newParent->GetTransform()->SetLocalPosition({0,0,5});
+    Check(object->SetParent(newParent,false),"Cannot move the body to another parent");
+    runtime.AdvanceFrame(fixed*.5f,0,fixed,.5f);
+    Check(near(transform->GetPresentationWorldMatrix()(2,3),simulatedBeforeReparent+5),
+          "Reparent kept an interpolated pose in the previous hierarchy");
+    Check(object->SetParent(scene,false),"Cannot restore the body parent");
+    Check(body->SetInterpolate(false)&&near(transform->GetPresentationWorldMatrix()(2,3),transform->GetWorldMatrix()(2,3)),
+          "Disabling interpolation did not restore the authoritative visual pose immediately");
+    Check(runtime.EndExecution(error)&&near(transform->GetPresentationWorldMatrix()(2,3),0.f)&&runtime.DestroyScene(scene),
+          "Stopping gameplay did not clear the presentation history");
+}
 class Materials final : public GameSproutRuntime::IRuntimeResourceProvider {
   public:
     unsigned Reads = 0;
@@ -534,6 +607,8 @@ int main(int argc, char **argv) {
         CheckRigidbodyWithoutColliderAndParents(*runtime);
         std::cout << "physics public properties/freeze\n";
         CheckPublicRigidbodyPropertiesAndFreeze(*runtime);
+        std::cout << "physics presentation interpolation\n";
+        CheckPresentationInterpolation(*runtime);
         std::cout << "physics script subscriptions\n";
         CheckScriptSubscriptionLifetime(*runtime);
         delete runtime;

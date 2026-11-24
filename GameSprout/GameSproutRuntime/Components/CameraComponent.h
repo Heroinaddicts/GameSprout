@@ -8,9 +8,11 @@ public:
     const CameraSettings& GetSettings() const override { return _Settings; }
     bool SetSettings(const CameraSettings& value) override;
     bool GetViewMatrix(Mat4& output) const override;
+    bool GetPresentationViewMatrix(Mat4& output) const override;
     bool GetProjectionMatrix(float aspect, Mat4& output) const override;
 
 private:
+    bool BuildViewMatrix(Mat4& output, bool presentation) const;
     CameraSettings _Settings;
 };
 }

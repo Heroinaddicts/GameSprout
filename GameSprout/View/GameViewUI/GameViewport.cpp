@@ -269,10 +269,10 @@ void GameViewport::RenderGame(GameSproutRuntime::IScene* scene,bool continuous,b
     auto* camera=scene?scene->GetMainCamera():nullptr;
     if(!scene)diagnostic="尚无活动场景。";
     else if(!camera||!camera->GetGameObject()->IsActiveInHierarchy())diagnostic="场景中没有启用的 Main Camera。";
-    else if(!camera->GetViewMatrix(view.Camera.View))diagnostic="Main Camera 姿态无法生成有效视图。";
+    else if(!camera->GetPresentationViewMatrix(view.Camera.View))diagnostic="Main Camera 姿态无法生成有效视图。";
     else {
         view.Camera.Projection=camera->GetSettings();
-        const auto world=camera->GetGameObject()->GetTransform()->GetWorldMatrix();
+        const auto world=camera->GetGameObject()->GetTransform()->GetPresentationWorldMatrix();
         view.Camera.Position={world.Data[12],world.Data[13],world.Data[14]};
     }
     // Runtime owns target clearing as well as scene drawing; the View never records content commands.

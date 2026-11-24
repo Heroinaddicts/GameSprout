@@ -241,7 +241,7 @@ void NotifyComponentChanged(IGameObject* owner,IComponent* component) {
         if (state.Owner.IsUsable(&state)) state.Owner.Notify(state,SceneNodeEventType::ComponentChanged,component->GetTypeName());
     }
 }
-void NotifyRuntimePropertiesChanged(IGameObject* owner) {
+void NotifyRuntimePropertiesChanged(IGameObject* owner,bool notifyObservers) {
     if(auto* access=dynamic_cast<ObjectAccess*>(owner)) {
         auto& state=access->State();
         if(state.Owner.IsInScene(&state)) {
@@ -249,7 +249,7 @@ void NotifyRuntimePropertiesChanged(IGameObject* owner) {
             // Let each viewport refresh only the affected scene data.
             state.SceneOwner->InvalidateRenderSnapshot(state.ID);
             if (FindUIScreenCanvasRoot(*owner)) state.SceneOwner->InvalidateUI();
-            state.Owner.MarkObjectPropertiesChanged(state.ID,RuntimePropertyChange::TransformPose);
+            if(notifyObservers)state.Owner.MarkObjectPropertiesChanged(state.ID,RuntimePropertyChange::TransformPose);
         }
     }
 }

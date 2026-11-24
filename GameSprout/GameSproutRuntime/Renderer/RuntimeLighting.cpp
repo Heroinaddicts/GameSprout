@@ -10,7 +10,7 @@ namespace GameSproutRuntime {
 namespace {
 double Luminance(Color color) {return double(color.R)*.2126+double(color.G)*.7152+double(color.B)*.0722;}
 Vector3 LightPosition(const IGameObject& object) {
-    const auto world=object.GetTransform()->GetWorldMatrix();
+    const auto world=object.GetTransform()->GetPresentationWorldMatrix();
     return {world(0,3),world(1,3),world(2,3)};
 }
 }
@@ -43,15 +43,12 @@ bool Renderer::ExtractLights(IScene* scene,std::vector<DirectionalLight>& lights
         // Compose authored rotations only: ancestor scale, including reflections
         // and zero scales, must never change the orientation of an emitter.
         Vector3 direction{0,0,1};
-        for(auto* node=object;node;node=node->Parent()) {
+        for(auto* node=object;node;node=node->Parent())
             _LightTransformSources.insert(node->GetInstanceID());
-            if(settings.Type==LightType::Point)continue;
-            auto* transform=node->GetTransform();
-            Quaternion orientation;
-            if(const auto* current=dynamic_cast<const TransformComponent*>(transform)) {
-                if(!current->GetCurrentLocalRotation(orientation))return Fail("Invalid animated light orientation");
-            } else orientation=transform->GetLocalRotation();
-            const Mat4 rotation=RuntimeMath::ComposeTRS({},orientation,{1,1,1});
+        if(settings.Type!=LightType::Point) {
+            Mat4 rotation;
+            if(!TransformComponent::GetCurrentWorldRotation(*object,rotation,true))
+                return Fail("Invalid light orientation");
             const auto rotated=rotation*Vector4{direction.X,direction.Y,direction.Z,0};
             direction={rotated.X,rotated.Y,rotated.Z};
         }

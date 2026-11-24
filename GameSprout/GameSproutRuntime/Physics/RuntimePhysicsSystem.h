@@ -14,6 +14,8 @@ class RuntimePhysicsSystem {
     ~RuntimePhysicsSystem();
     bool Prepare(std::string &error);
     bool Step(float deltaSeconds, std::string &error);
+    void PublishPresentation(float alpha,bool collapseHistory);
+    void ResetPresentation(uint64_t scene,const GameObjectState* subtree);
     void Reset();
     void InvalidateScene(uint64_t scene);
     void InvalidateTransform(uint64_t scene, uint64_t object);
@@ -28,11 +30,17 @@ class RuntimePhysicsSystem {
         Mat4 LastWorld;
         bool KinematicMoved = false;
     };
+    struct BodyPresentation {
+        GPhysics::Pose Previous, Current;
+        uint64_t ConfigurationRevision=0, TransformRevision=0;
+        bool Initialized=false;
+    };
     struct SceneWorld {
         GPhysics::World Backend;
         std::map<uint64_t, BodyRecord> Bodies;
         std::vector<uint64_t> DynamicObjects;
         std::vector<uint64_t> DynamicBodies;
+        std::map<uint64_t,BodyPresentation> Presentation;
         std::map<uint64_t, std::vector<uint64_t>> StaticBodiesByTransform;
         std::set<uint64_t> DirtyStaticTransforms;
         std::map<uint64_t, std::vector<uint64_t>> CollidersByObject;
@@ -83,7 +91,7 @@ class RuntimePhysicsSystem {
                        std::map<uint64_t, BodyRequest> &, std::string &);
     bool Synchronize(IScene *, SceneWorld &, float, std::string &);
     bool AppendCollider(BodyRequest &, PhysicsColliderState &, std::string &);
-    bool PublishTransforms(SceneWorld &, std::string &);
+    bool PublishTransforms(SceneWorld &, bool completedStep,std::string &);
     void Dispatch(const std::vector<GPhysics::Contact> &);
     void ForgetMissingScenes();
 };
