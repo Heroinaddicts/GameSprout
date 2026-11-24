@@ -524,6 +524,16 @@ void CheckLayeredShadows(IGameSproutRuntime& runtime,IRuntimeViewport& viewport,
     const auto staticMoved=Render(viewport,view);
     Check(staticMoved.Statistics.StaticShadowMapUpdates==1&&staticMoved.Statistics.StaticShadowDrawCalls>0&&
         Difference(beforeStaticMove,staticMoved)>100,"Editing a static caster left stale cached depth");
+    auto* buildingMesh=building->GetComponent<IMeshComponent>();
+    const auto buildingReference=buildingMesh->GetMesh();
+    buildingMesh->SetMesh({});
+    const auto emptyBuilding=Render(viewport,view);
+    Check(!emptyBuilding.Statistics.SceneSnapshotRebuilds&&emptyBuilding.Statistics.StaticShadowMapUpdates==1&&
+        Difference(staticMoved,emptyBuilding)>100,"Removing a static mesh left stale cached depth");
+    buildingMesh->SetMesh(buildingReference);
+    const auto restoredBuilding=Render(viewport,view);
+    Check(!restoredBuilding.Statistics.SceneSnapshotRebuilds&&restoredBuilding.Statistics.StaticShadowMapUpdates==1&&
+        Difference(emptyBuilding,restoredBuilding)>100,"Restoring a mesh did not invalidate the static caster membership");
 
     // Moving along the light ray leaves the footprint on the receiver fixed,
     // but puts the dynamic cube far outside the static atlas's light depth range.

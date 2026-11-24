@@ -3,6 +3,13 @@
 #include <deque>
 
 namespace GameSproutRuntime {
+enum class RenderObjectChangeKind { Transform, Mesh };
+struct RenderObjectChange {
+    std::uint64_t ObjectID;
+    std::uint64_t Revision;
+    RenderObjectChangeKind Kind;
+};
+
 class Scene final : public GameObjectBase<IScene> {
 public:
     Scene(Runtime& runtime, const std::string& name, std::uint64_t id)
@@ -19,12 +26,14 @@ public:
     // Runtime-internal snapshot invalidation. Changes are visible before queued
     // listener dispatch, including direct Set* -> Render calls in editor/tests.
     std::uint64_t GetRenderRevision() const {return _RenderRevision;}
-    void InvalidateRenderSnapshot(std::uint64_t transformObjectID=0);
+    bool HasSameRenderStructure(std::uint64_t after) const {return after>=_RenderStructureRevision;}
+    bool HasRenderMeshChanges(std::uint64_t after) const {return after<_RenderMeshRevision;}
+    void InvalidateRenderSnapshot(std::uint64_t objectID=0,RenderObjectChangeKind kind=RenderObjectChangeKind::Transform);
     void InvalidateVisual() { _VisualPending = true; }
     std::uint64_t GetUIRevision() const { return _UIRevision; }
     void InvalidateUI() { ++_UIRevision; _VisualPending = true; }
-    // False if another kind of change or a journal gap requires a full snapshot.
-    bool GetRenderTransformChanges(std::uint64_t after,std::vector<std::uint64_t>& changes) const;
+    // False after a structural change or when the bounded journal no longer covers the revision.
+    bool GetRenderObjectChanges(std::uint64_t after,std::vector<RenderObjectChange>& changes) const;
     bool TakeVisualInvalidation() {const bool pending=_VisualPending;_VisualPending=false;return pending;}
     std::uint64_t GetAuthoringRevision() const override {return _AuthoringRevision;}
     bool GetAuthoringChanges(std::uint64_t after,std::vector<SceneAuthoringChange>& changes) const override {
@@ -59,8 +68,11 @@ private:
     bool _ParkedForPlay = false;
     EnvironmentLightingSettings _EnvironmentLighting;
     std::uint64_t _RenderRevision=1;
+    std::uint64_t _RenderStructureRevision=1;
+    std::uint64_t _RenderMeshRevision=1;
+    std::uint64_t _DiscardedRenderObjectRevision=1;
     std::uint64_t _UIRevision=1;
-    std::deque<std::uint64_t> _RenderTransformChanges;
+    std::deque<RenderObjectChange> _RenderObjectChanges;
     std::uint64_t _AuthoringRevision=1;
     struct AuthoringRecord {SceneAuthoringChange Change;std::uint64_t Batch;};
     std::deque<AuthoringRecord> _AuthoringChanges;

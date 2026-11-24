@@ -134,6 +134,20 @@ int main(int argc,char** argv){
         animator->StopClip();stats=Render(*viewport,view);
         Check(!stats.SceneSnapshotRebuilds&&!stats.LightSnapshotRebuilds&&Pixel(*viewport)[0]>100,
             "Stopping animation rebuilt the scene or left the evaluated pose in the snapshot");
+        Check(animator->PlayClip({Guid,22},0,1,false),animator->GetLastError());
+        Render(*viewport,view);
+        // An animation burst can overrun the bounded transform history. A
+        // missing pose record must not discard cached geometry membership.
+        auto* animationSource=animator->GetGameObject();
+        for(unsigned write=0;write<2200;++write) {
+            Check(animator->SeekClip(float(write%2)),animator->GetLastError());
+            animationSource->GetTransform()->SetLocalPosition({float(write%2),0,0});
+        }
+        stats=Render(*viewport,view);
+        Check(!stats.SceneSnapshotRebuilds&&Pixel(*viewport,.75f)[0]>100&&Pixel(*viewport)[0]==0&&
+            provider.MeshLoads==meshLoads&&provider.MaterialLoads==materialLoads,
+            "Overflowing pose history rebuilt the scene or retained a stale rendered transform");
+        animator->StopClip();Render(*viewport,view);
 
         auto* body=parent->AddComponent<IRigidbodyComponent>();
         Check(body&&body->SetEnabled(true)&&body->SetGravityFactor(0),"Cannot initialize the mesh parent's Rigidbody");
@@ -161,8 +175,27 @@ int main(int argc,char** argv){
         // No ProcessPendingEvents/Update between these setters and Render: the
         // cache must invalidate synchronously, independently of Editor dispatch.
         auto* mesh=object->GetComponent<IMeshComponent>();auto* renderer=object->GetComponent<IMeshRendererComponent>();
-        mesh->SetMesh({Guid,2});stats=Render(*viewport,view);Rebuilt(stats,"Mesh binding");
-        Check(Pixel(*viewport)[0]==0&&Pixel(*viewport,.7f)[0]>100,"Changed mesh binding kept cached geometry");
+        const auto meshLoadsBeforeSwap=provider.MeshLoads;
+        mesh->SetMesh({Guid,2});
+        SceneRaycastHit hit;
+        Check(!viewport->Raycast(scene,{{0,0,3},{0,0,-1}},hit)&&
+            viewport->Raycast(scene,{{.7f,0,3},{0,0,-1}},hit)&&hit.ObjectID==object->GetInstanceID(),
+            "Picking retained the old geometry before the next render");
+        stats=Render(*viewport,view);
+        Check(!stats.SceneSnapshotRebuilds&&!stats.LightSnapshotRebuilds&&provider.MeshLoads==meshLoadsBeforeSwap+1&&
+            Pixel(*viewport)[0]==0&&Pixel(*viewport,.7f)[0]>100&&std::abs(mesh->GetLocalBounds().Center.X-.7f)<.001f,
+            "Mesh binding rebuilt snapshots or retained stale geometry/bounds");
+        for(unsigned index=0;index<2200;++index) {
+            mesh->SetMesh({Guid,1+index%2});
+            object->GetTransform()->SetLocalPosition({0,0,float(index%2)});
+        }
+        object->GetTransform()->SetLocalPosition({0,0,0});
+        mesh->SetMesh({});stats=Render(*viewport,view);
+        Check(!stats.SceneSnapshotRebuilds&&stats.DrawCalls==0&&Pixel(*viewport,.7f)[0]==0,
+            "Dense mesh changes must retain draw membership and clear the old geometry");
+        mesh->SetMesh({Guid,2});stats=Render(*viewport,view);
+        Check(!stats.SceneSnapshotRebuilds&&provider.MeshLoads==meshLoadsBeforeSwap+1&&Pixel(*viewport,.7f)[0]>100,
+            "Restoring a mesh did not reuse its existing upload");
         mesh->SetMesh({Guid,1});renderer->SetMaterial(0,{Guid,12});stats=Render(*viewport,view);Rebuilt(stats,"Material binding");
         Check(Pixel(*viewport)[2]>100&&Pixel(*viewport)[0]==0,"Changed material binding kept cached material");
         provider.Green=true;++provider.Revision;stats=Render(*viewport,view);Rebuilt(stats,"Provider material revision");
@@ -185,6 +218,13 @@ int main(int argc,char** argv){
             "Transforming a light's ancestor left stale lighting or rebuilt unrelated mesh data");
         sunParent->GetTransform()->SetLocalRotation({});stats=Render(*viewport,view);
         Check(stats.LightSnapshotRebuilds==1&&Pixel(*viewport)[2]>50,"Restoring light ancestry did not restore its direction");
+        sunParent->GetTransform()->SetLocalRotation({0,1,0,0});
+        for(unsigned write=0;write<2200;++write)parent->GetTransform()->SetLocalPosition({(write%2)?.25f:0.f,0,0});
+        parent->GetTransform()->SetLocalPosition({0,0,0});
+        stats=Render(*viewport,view);
+        Check(!stats.SceneSnapshotRebuilds&&stats.LightSnapshotRebuilds==1&&Pixel(*viewport)[2]==0,
+            "Overflowing transform history lost an existing light's ancestor change");
+        sunParent->GetTransform()->SetLocalRotation({});
         sunObject->SetActive(false);stats=Render(*viewport,view);Check(Pixel(*viewport)[2]==0,"Inactive light retained cached radiance");
         EnvironmentLightingSettings environment;environment.Mode=AmbientLightMode::Color;environment.AmbientColor={.1f,.2f,.3f};
         Check(scene->SetEnvironmentLighting(environment),"Cannot set snapshot environment");stats=Render(*viewport,view);

@@ -7,7 +7,7 @@
 #include <numeric>
 
 namespace GameSproutRuntime {
-void Renderer::RefreshSkinPoses() {
+void Renderer::RefreshSkinPoses(const RenderFrustum::Frustum& frustum) {
     for(auto& skin:_SkinnedDraws) {
         auto& object=_SceneObjects[skin.ObjectIndex];
         if(!object.Geometry)object.Geometry=Mesh(object.Mesh);
@@ -21,27 +21,32 @@ void Renderer::RefreshSkinPoses() {
                     return !std::memcmp(a.Data,b.Data,sizeof(a.Data));
                 });
             if(!samePose) {
-                if(component&&component->GetMesh()==object.Mesh) {
-                    skin.LocalBounds=mesh->Data.LocalBounds;
-                    ready=SkinPoseBounds(*mesh,_SkinScratch,skin.LocalBounds);
-                }
+                ready=SkinPoseBounds(*mesh,_SkinScratch,skin.LocalBounds);
                 if(ready)object.SkinMatrices.swap(_SkinScratch);
             }
-            if(component&&component->GetMesh()==object.Mesh)component->_Bounds=skin.LocalBounds;
+            if(ready&&component&&component->GetMesh()==object.Mesh)component->_Bounds=skin.LocalBounds;
         } else if(!mesh&&component&&component->GetMesh()==object.Mesh)component->_Bounds={};
         if(object.SkinPoseReady!=ready) {
             _PreparedKnown=false;
             _OpaqueDrawOrderKnown=false;
         }
         object.SkinPoseReady=ready;
-        if(!ready)object.SkinMatrices.clear();
+        if(!ready) {object.SkinMatrices.clear();continue;}
+        // Bounds are derived from the current skin palette, including vertices
+        // that move across the frustum independently of their object transform.
+        // The shadow passes still read every caster's palette and pose bounds.
+        const auto& bounds=skin.LocalBounds;
+        const bool outside=!frustum.Intersects(bounds.Center-bounds.Extents,bounds.Center+bounds.Extents,object.Model);
+        if(outside!=object.SkinOutsideFrustum)_PreparedKnown=false;
+        object.SkinOutsideFrustum=outside;
     }
 }
 
 void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
-    // Draw packets point to live renderer-owned matrices. Refresh the skin
-    // palette independently of visibility, resources and opaque draw order.
-    RefreshSkinPoses();
+    // The color list can be kept as long as the sampled poses stay on the
+    // same side of the view frustum. Planar captures have their own frustum.
+    const RenderFrustum::Frustum frustum(viewProjection);
+    RefreshSkinPoses(frustum);
     const auto& position=view.Camera.Position;
     const auto& current=view.Camera.Projection;const auto& previous=_PreparedCamera.Projection;
     if(_PreparedKnown&&
@@ -59,7 +64,6 @@ void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
     _PreparedKnown=false;_PreparedDraws.clear();_ColorInstanceBatchesKnown=false;
     const auto visibleBefore=_Statistics.VisibleObjects,skippedBefore=_Statistics.SkippedObjects;
     const auto diagnosticBefore=_Error.size();
-    const RenderFrustum::Frustum frustum(viewProjection);
     auto& objects=_SceneObjects;
     static const ResourceReference defaultMaterialReference;
     auto& visible=_VisibleDrawScratch;
@@ -85,7 +89,7 @@ void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
             }
         }
         if(!mesh) {++_Statistics.SkippedObjects;continue;}
-        bool outside=false;
+        bool outside=object.Skinned&&object.SkinOutsideFrustum;
         if(!object.Skinned&&mesh->CullBoundsKnown) {
             if(!object.CullBoxKnown) {
                 object.CullBox=RenderFrustum::Box(mesh->CullMinimum,mesh->CullMaximum,object.Model);
@@ -126,8 +130,7 @@ void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
                 }
             }
             // User vertex shaders have no displacement-bounds contract yet;
-            // never reject them using undeformed mesh bounds. Skinned meshes
-            // are likewise retained regardless of their bind-pose position.
+            // only cull built-in materials with known vertex bounds.
             if(outside&&cachedMaterial&&_TexturePrefetchEnabled&&!cachedMaterial->TexturePrefetchConsidered) {
                 // A nearby object just outside the view can appear on the
                 // next turn. Prefetch its material once per resource revision.

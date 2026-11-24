@@ -299,17 +299,25 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
             for(std::size_t index=0;index<object->GetChildCount();++index)pending.push_back(object->GetChild(index));
         }
     }
-    std::vector<std::uint64_t> moved;
-    // Read the transform journal once. Play can move the player, camera and
-    // bones in the same interval as the editor's transform preview.
-    const bool transformsKnown=(settings.CacheStaticCasters||(preview&&reuseFit))&&sameFitSettings&&!_Statistics.SceneSnapshotRebuilds&&
-        scene.GetRenderTransformChanges(_ShadowSceneRevision,moved);
-    const bool previewChangesOnly=preview&&reuseFit&&transformsKnown&&
-        std::all_of(moved.begin(),moved.end(),[&](auto id){return previewSubtree.contains(id);});
+    std::vector<RenderObjectChange> changes;
+    // Play can update meshes, bones, and transforms in the same interval as
+    // the editor's transform preview.
+    const bool changesKnown=(settings.CacheStaticCasters||(preview&&reuseFit))&&sameFitSettings&&!_Statistics.SceneSnapshotRebuilds&&
+        scene.GetRenderObjectChanges(_ShadowSceneRevision,changes);
+    const bool previewChangesOnly=preview&&reuseFit&&changesKnown&&
+        std::all_of(changes.begin(),changes.end(),[&](const auto& change){return previewSubtree.contains(change.ObjectID);});
     const bool onlyPreviewMoved=previewChangesOnly&&samePreview;
-    const bool cachedStaticUntouched=settings.CacheStaticCasters&&transformsKnown&&
-        std::none_of(moved.begin(),moved.end(),[&](auto id){
-            return _StaticShadowTransformObjects.contains(id)&&!previewSubtree.contains(id);
+    const bool cachedStaticUntouched=settings.CacheStaticCasters&&changesKnown&&
+        std::none_of(changes.begin(),changes.end(),[&](const auto& change){
+            if(previewSubtree.contains(change.ObjectID))return false;
+            if(change.Kind==RenderObjectChangeKind::Transform)return _StaticShadowTransformObjects.contains(change.ObjectID);
+            // An empty mesh can become a new caster even if its ID is absent
+            // from the previous static caster bounds.
+            const auto found=_SceneObjectIndices.find(change.ObjectID);
+            if(found==_SceneObjectIndices.end()||found->second>=_SceneObjects.size())return false;
+            const auto& object=_SceneObjects[found->second];
+            return object.StaticShadowCaster&&object.ShadowMode!=ShadowCastingMode::Off&&
+                (light.CullingMask&(std::uint32_t{1}<<object.Layer));
         });
     const bool unchangedStatic=cachedStaticUntouched&&samePreview;
     const bool skipStatic=onlyPreviewMoved||unchangedStatic;

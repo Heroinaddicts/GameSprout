@@ -4,6 +4,7 @@
 #include "Scene.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 namespace GameSproutRuntime {
@@ -27,11 +28,58 @@ bool Renderer::SetDrawTransform(DrawObject& object,const Mat4& model) {
     return true;
 }
 
-bool Renderer::UpdateSceneTransforms(IScene& scene,const std::vector<std::uint64_t>& roots,std::vector<DrawObject>& objects) {
+bool Renderer::UpdateDrawTransform(DrawObject& draw,const Mat4& model,const RenderFrustum::Frustum& frustum) {
+    if(!std::memcmp(draw.Model.Data,model.Data,sizeof(model.Data)))return true;
+    const bool hadCullBox=_PreparedKnown&&draw.CullBoxKnown;
+    const bool wasInFrustum=hadCullBox&&frustum.Intersects(draw.CullBox);
+    const bool wasNegative=draw.Negative;
+    if(!SetDrawTransform(draw,model))return false;
+    if(draw.Negative!=wasNegative)_OpaqueDrawOrderKnown=false;
+    if(!_InstanceTransformsDirty&&!draw.Skinned)_ChangedInstanceTransforms.push_back(draw.InstanceIndex);
+    if(hadCullBox) {
+        draw.CullBox=RenderFrustum::Box(draw.Geometry->CullMinimum,draw.Geometry->CullMaximum,draw.Model);
+        draw.CullBoxKnown=true;
+    }
+    // Prepared draws borrow this object. Its packets survive a movement that
+    // keeps winding, frustum membership and the built-in material path.
+    if(_PreparedKnown&&(draw.Negative!=wasNegative||(hadCullBox&&frustum.Intersects(draw.CullBox)!=wasInFrustum)||
+        std::any_of(draw.MaterialCache.begin(),draw.MaterialCache.end(),[](const Material* material){
+            return material&&!material->Data.Shader.Guid.empty();
+        })))_PreparedKnown=false;
+    return true;
+}
+
+bool Renderer::UpdateDrawMesh(DrawObject& draw,const IGameObject& node) {
+    const auto* mesh=node.GetComponent<IMeshComponent>();
+    if(!mesh)return false;
+    if(draw.Mesh==mesh->GetMesh())return true;
+    draw.Mesh=mesh->GetMesh();
+    draw.Geometry=nullptr;
+    draw.BoundsInitialized=false;
+    draw.CullBoxKnown=false;
+    draw.SkinPoseReady=false;
+    draw.SkinOutsideFrustum=false;
+    draw.SkinMatrices.clear();
+    draw.LocalLightGeneration=0;
+    draw.ReflectionProbeGeneration=0;
+    _PreparedKnown=false;
+    _OpaqueDrawOrderKnown=false;
+    return true;
+}
+
+bool Renderer::UpdateSceneObjects(IScene& scene,const std::vector<RenderObjectChange>& changes,std::vector<DrawObject>& objects) {
     std::vector<IGameObject*> pending;
     std::unordered_set<std::uint64_t> visited;
     const RenderFrustum::Frustum preparedFrustum(_PreparedViewProjection);
-    for(const auto id:roots) {
+    for(const auto& change:changes) {
+        const auto id=change.ObjectID;
+        if(change.Kind==RenderObjectChangeKind::Mesh) {
+            const auto found=_SceneObjectIndices.find(id);
+            if(found==_SceneObjectIndices.end()||found->second==InvalidTransformIndex)continue;
+            const auto* node=_Runtime.QueryGameObject(id);
+            if(!node||node->GetScene()!=&scene||!UpdateDrawMesh(objects[found->second],*node))return false;
+            continue;
+        }
         if(visited.contains(id))continue;
         auto* root=_Runtime.QueryGameObject(id);
         if(!root||root->GetScene()!=&scene)return false;
@@ -45,26 +93,32 @@ bool Renderer::UpdateSceneTransforms(IScene& scene,const std::vector<std::uint64
                 // Crossing the singular-transform boundary changes extraction
                 // membership and diagnostics. Rebuild only for that case.
                 if(found->second==InvalidTransformIndex)return false;
-                auto& draw=objects[found->second];
-                const bool hadCullBox=_PreparedKnown&&draw.CullBoxKnown;
-                const bool wasInFrustum=hadCullBox&&preparedFrustum.Intersects(draw.CullBox);
-                const bool wasNegative=draw.Negative;
-                if(!SetDrawTransform(draw,node->GetTransform()->GetPresentationWorldMatrix()))return false;
-                if(draw.Negative!=wasNegative)_OpaqueDrawOrderKnown=false;
-                if(!_InstanceTransformsDirty&&!draw.Skinned)_ChangedInstanceTransforms.push_back(draw.InstanceIndex);
-                if(hadCullBox) {
-                    draw.CullBox=RenderFrustum::Box(draw.Geometry->CullMinimum,draw.Geometry->CullMaximum,draw.Model);
-                    draw.CullBoxKnown=true;
-                }
-                // Prepared draws refer to this DrawObject. A same-visibility
-                // built-in draw can keep its sorted slot while its matrices change.
-                if(_PreparedKnown&&(draw.Negative!=wasNegative||
-                    (hadCullBox&&preparedFrustum.Intersects(draw.CullBox)!=wasInFrustum)||
-                    std::any_of(draw.MaterialCache.begin(),draw.MaterialCache.end(),[](const Material* material){
-                        return material&&!material->Data.Shader.Guid.empty();
-                    })))_PreparedKnown=false;
+                if(!UpdateDrawTransform(objects[found->second],node->GetTransform()->GetPresentationWorldMatrix(),preparedFrustum))return false;
             }
             for(std::size_t index=0;index<node->GetChildCount();++index)pending.push_back(node->GetChild(index));
+        }
+    }
+    return true;
+}
+
+bool Renderer::RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects,bool meshChanges) {
+    // A burst of animation may outgrow the bounded journal without changing
+    // membership. Read only previously extracted renderables and keep their
+    // resources, skin data and batch slots attached to the existing objects.
+    const RenderFrustum::Frustum preparedFrustum(_PreparedViewProjection);
+    for(auto& draw:objects) {
+        auto* node=_Runtime.QueryGameObject(draw.ObjectID);
+        if(!node||node->GetScene()!=&scene||
+           (meshChanges&&!UpdateDrawMesh(draw,*node))||
+           !UpdateDrawTransform(draw,node->GetTransform()->GetPresentationWorldMatrix(),preparedFrustum))return false;
+    }
+    if(_SceneObjectIndices.size()!=objects.size()) {
+        for(const auto& [id,index]:_SceneObjectIndices)if(index==InvalidTransformIndex) {
+            const auto* node=_Runtime.QueryGameObject(id);
+            if(!node||node->GetScene()!=&scene)return false;
+            const Mat4 model=node->GetTransform()->GetPresentationWorldMatrix();
+            Mat4 inverse;
+            if(RuntimeMath::IsFinite(model)&&RuntimeMath::TryInverseAffine(model,inverse))return false;
         }
     }
     return true;
@@ -76,10 +130,12 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
     const auto revision=scene.GetRenderRevision();
     const auto mask=view.Camera.Projection.CullingMask;
     if(_ObjectSnapshotKnown&&_ObjectSceneID==sceneID&&_ObjectCullingMask==mask&&
-       _ObjectRequiredStaticFlags==view.RequiredStaticFlags) {
-        std::vector<std::uint64_t> changes;
+       _ObjectRequiredStaticFlags==view.RequiredStaticFlags&&scene.HasSameRenderStructure(_ObjectSceneRevision)) {
+        std::vector<RenderObjectChange> changes;
         if(_ObjectSceneRevision==revision||
-            (scene.GetRenderTransformChanges(_ObjectSceneRevision,changes)&&UpdateSceneTransforms(*view.Scene,changes,objects))) {
+           (scene.GetRenderObjectChanges(_ObjectSceneRevision,changes)
+                ? UpdateSceneObjects(*view.Scene,changes,objects)
+                : RefreshDrawObjects(*view.Scene,objects,scene.HasRenderMeshChanges(_ObjectSceneRevision)))) {
             _ObjectSceneRevision=revision;
             _Statistics.SkippedObjects+=_ExtractionSkipped;
             Diagnostic(_ExtractionDiagnostic);

@@ -13,6 +13,7 @@
 namespace GameSproutRuntime {
 class Runtime;
 class RenderResourceCache;
+struct RenderObjectChange;
 namespace RuntimeShadowMath { struct CascadeSet; }
 namespace RenderEnvironment { struct Uniform; }
 class Renderer final : public IRuntimeViewport {
@@ -151,6 +152,7 @@ private:
         std::vector<Mat4> SkinMatrices;
         bool Skinned=false;
         bool SkinPoseReady=false;
+        bool SkinOutsideFrustum=false;
         bool StaticShadowCaster=false;
         ShadowCastingMode ShadowMode=ShadowCastingMode::On;
         bool ReceiveShadows=true;
@@ -346,10 +348,13 @@ private:
     void ClearUIDraws();
     bool Initialize();
     bool Extract(const RenderView& view,std::vector<DrawObject>& objects);
-    bool UpdateSceneTransforms(IScene& scene,const std::vector<std::uint64_t>& roots,std::vector<DrawObject>& objects);
+    bool UpdateSceneObjects(IScene& scene,const std::vector<RenderObjectChange>& changes,std::vector<DrawObject>& objects);
+    bool RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects,bool meshChanges);
+    bool UpdateDrawTransform(DrawObject& object,const Mat4& model,const RenderFrustum::Frustum& frustum);
+    bool UpdateDrawMesh(DrawObject& object,const IGameObject& node);
     static bool SetDrawTransform(DrawObject& object,const Mat4& model);
     void PrepareDraws(const RenderView&,const Mat4& viewProjection);
-    void RefreshSkinPoses();
+    void RefreshSkinPoses(const RenderFrustum::Frustum& frustum);
     MeshGPU* Mesh(const ResourceReference& reference);
     ColliderMeshWire* ColliderMesh(IColliderComponent& collider,const ResourceReference& reference,bool convex,const Mat4& relative);
     TextureGPU* Texture(const ResourceReference& reference,bool* pending=nullptr);
@@ -428,6 +433,7 @@ private:
     std::vector<ReflectionProbeSettings> _ReflectionProbeSettings;
     std::vector<ReflectionProbeBinding> _ReflectionProbeBindings;
     std::uint64_t _ReflectionProbeGeneration=1,_ReflectionProbeEnvironmentGeneration=0;
+    std::vector<std::uint64_t> _LightObjectIDs;
     std::unordered_set<std::uint64_t> _LightTransformSources;
     FrameUniform _ShaderFrame;
     std::vector<PreparedDraw> _PreparedDraws;

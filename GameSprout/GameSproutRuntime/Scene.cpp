@@ -1,4 +1,5 @@
 #include "Scene.h"
+#include <algorithm>
 
 namespace GameSproutRuntime {
 void Scene::RecordAuthoringChange(std::uint64_t objectID,SceneNodeEventType type,const char* component,std::uint64_t batch) {
@@ -17,22 +18,39 @@ void Scene::RecordAuthoringChange(std::uint64_t objectID,SceneNodeEventType type
     } catch(...) {_AuthoringChanges.clear();}
 }
 
-void Scene::InvalidateRenderSnapshot(std::uint64_t transformObjectID) {
+void Scene::InvalidateRenderSnapshot(std::uint64_t objectID,RenderObjectChangeKind kind) {
     ++_RenderRevision;
     _VisualPending=true;
-    if(!transformObjectID) {
-        _RenderTransformChanges.clear();
+    if(!objectID) {
+        _RenderStructureRevision=_RenderRevision;
+        _RenderObjectChanges.clear();
+        return;
+    }
+    if(kind==RenderObjectChangeKind::Mesh)_RenderMeshRevision=_RenderRevision;
+    // Position and rotation setters often touch the same object consecutively.
+    // Readers see the final values and can catch up from any earlier revision.
+    if(!_RenderObjectChanges.empty()&&_RenderObjectChanges.back().ObjectID==objectID&&
+       _RenderObjectChanges.back().Kind==kind) {
+        _RenderObjectChanges.back().Revision=_RenderRevision;
         return;
     }
     try {
-        _RenderTransformChanges.push_back(transformObjectID);
-        if(_RenderTransformChanges.size()>2048)_RenderTransformChanges.pop_front();
-    } catch(...) {_RenderTransformChanges.clear();}
+        constexpr std::size_t historyWindow=4096;
+        _RenderObjectChanges.push_back({objectID,_RenderRevision,kind});
+        if(_RenderObjectChanges.size()>historyWindow) {
+            _DiscardedRenderObjectRevision=_RenderObjectChanges.front().Revision;
+            _RenderObjectChanges.pop_front();
+        }
+    } catch(...) {
+        _DiscardedRenderObjectRevision=_RenderRevision;
+        _RenderObjectChanges.clear();
+    }
 }
-bool Scene::GetRenderTransformChanges(std::uint64_t after,std::vector<std::uint64_t>& changes) const {
-    if(after>_RenderRevision||_RenderRevision-after>_RenderTransformChanges.size())return false;
-    const auto count=static_cast<std::ptrdiff_t>(_RenderRevision-after);
-    changes.assign(_RenderTransformChanges.end()-count,_RenderTransformChanges.end());
+bool Scene::GetRenderObjectChanges(std::uint64_t after,std::vector<RenderObjectChange>& changes) const {
+    if(after>_RenderRevision||after<_RenderStructureRevision||after<_DiscardedRenderObjectRevision)return false;
+    const auto start=std::upper_bound(_RenderObjectChanges.begin(),_RenderObjectChanges.end(),after,
+        [](auto revision,const auto& change){return revision<change.Revision;});
+    changes.assign(start,_RenderObjectChanges.end());
     return true;
 }
 bool Scene::SetEnvironmentLighting(const EnvironmentLightingSettings& settings) {

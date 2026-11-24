@@ -18,32 +18,42 @@ bool Renderer::ExtractLights(IScene* scene,std::vector<DirectionalLight>& lights
     const auto sceneID=scene->GetInstanceID();
     const auto& runtimeScene=static_cast<const Scene&>(*scene);
     const auto revision=runtimeScene.GetRenderRevision();
-    if(_LightSnapshotKnown&&_LightSceneID==sceneID) {
-        std::vector<std::uint64_t> changes;
-        if(_LightSceneRevision==revision||(runtimeScene.GetRenderTransformChanges(_LightSceneRevision,changes)&&
-            std::none_of(changes.begin(),changes.end(),[this](auto id){return _LightTransformSources.contains(id);}))) {
+    const bool sameStructure=_LightSnapshotKnown&&_LightSceneID==sceneID&&runtimeScene.HasSameRenderStructure(_LightSceneRevision);
+    if(sameStructure) {
+        std::vector<RenderObjectChange> changes;
+        if(_LightSceneRevision==revision||(runtimeScene.GetRenderObjectChanges(_LightSceneRevision,changes)&&
+            std::none_of(changes.begin(),changes.end(),[this](const auto& change){
+                return change.Kind==RenderObjectChangeKind::Transform&&_LightTransformSources.contains(change.ObjectID);
+            }))) {
             _LightSceneRevision=revision;
             Diagnostic(_LightDiagnostic);return true;
         }
     }
     _LightSnapshotKnown=false;lights.clear();_LocalLights.clear();
     ++_LocalLightGeneration;
-    _LightTransformSources.clear();
     const auto diagnosticBefore=_Error.size();
     ++_Statistics.LightSnapshotRebuilds;
-    std::vector<IGameObject*> pending{scene};
-    while(!pending.empty()) {
-        auto* object=pending.back();pending.pop_back();
-        for(std::size_t index=object->GetChildCount();index>0;--index)pending.push_back(object->GetChild(index-1));
+    if(!sameStructure) {
+        _LightObjectIDs.clear();_LightTransformSources.clear();
+        std::vector<IGameObject*> pending{scene};
+        while(!pending.empty()) {
+            auto* object=pending.back();pending.pop_back();
+            for(std::size_t index=object->GetChildCount();index>0;--index)pending.push_back(object->GetChild(index-1));
+            if(object->GetComponent<ILightComponent>())_LightObjectIDs.push_back(object->GetInstanceID());
+        }
+    }
+    for(const auto id:_LightObjectIDs) {
+        auto* object=_Runtime.QueryGameObject(id);
+        if(!object||object->GetScene()!=scene)continue;
         auto* light=object->GetComponent<ILightComponent>();
         if(!light||!object->IsActiveInHierarchy())continue;
         const auto& settings=light->GetSettings();
         if(!settings.Enabled||settings.Intensity==0||!settings.CullingMask)continue;
         // Unity light rays follow local +Z; surface-to-light is local -Z.
-        // Compose authored rotations only: ancestor scale, including reflections
-        // and zero scales, must never change the orientation of an emitter.
+        // Presentation rotations exclude ancestor scale, including reflections
+        // and zero scales.
         Vector3 direction{0,0,1};
-        for(auto* node=object;node;node=node->Parent())
+        if(!sameStructure)for(auto* node=object;node;node=node->Parent())
             _LightTransformSources.insert(node->GetInstanceID());
         if(settings.Type!=LightType::Point) {
             Mat4 rotation;

@@ -113,7 +113,7 @@ void Renderer::ClearResources() {
     for(auto& casters:_SpotShadowCasters)casters.clear();
     _StaticShadowTransformObjects.clear();
     _StaticShadowCandidates.clear();_StaticShadowBounds.clear();_DynamicShadowObjects.clear();
-    _PreparedDraws.clear();_SceneObjects.clear();_SceneObjectIndices.clear();_SceneLights.clear();_LightTransformSources.clear();
+    _PreparedDraws.clear();_SceneObjects.clear();_SceneObjectIndices.clear();_SceneLights.clear();_LightObjectIDs.clear();_LightTransformSources.clear();
     _LocalLights.clear();_HadLocalLighting=false;
     _VisibleDrawScratch.clear();_OpaqueDrawOrder.clear();
     _VisibleOpaqueSlots.clear();_VisibleTransparentSlots.clear();_OpaqueDrawOrderKnown=false;

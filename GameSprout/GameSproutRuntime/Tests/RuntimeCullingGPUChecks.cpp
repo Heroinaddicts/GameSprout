@@ -75,7 +75,13 @@ int main(int argc,char** argv){
         Check(animator->SetNodeBindings({{"Bone",bone->GetInstanceID()}}),"Skin node binding failed");
         Check(object->AddComponent<ISkinnedMeshRendererComponent>()->SetAnimatorObjectID(object->GetInstanceID()),"Skin animator failed");
         Check(render()==1&&Center(*viewport)>100,"A visible skinned pose was culled using outside bind-pose bounds");
+        bone->GetTransform()->SetLocalPosition({-104,0,0});
+        Check(render()==0&&viewport->GetStatistics().SkippedObjects==1&&!viewport->GetStatistics().SceneSnapshotRebuilds,
+            "A skinned pose outside the unchanged frustum retained a cached draw");
+        bone->GetTransform()->SetLocalPosition({-100,0,0});
+        Check(render()==1&&Center(*viewport)>100&&!viewport->GetStatistics().SceneSnapshotRebuilds,
+            "A skinned pose crossing back into view stayed culled");
         delete viewport;viewport=nullptr;delete runtime;runtime=nullptr;
-        std::cout<<"PASS static culling GPU: draws removed, vertex-derived bounds, editor queries, per-view camera/aspect, planes, resource revision, custom shader and skinned exemptions\n";return 0;
+        std::cout<<"PASS culling GPU: draws removed, vertex and pose bounds, editor queries, per-view camera/aspect, planes, resource revision and custom shader exemption\n";return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';delete viewport;delete runtime;return 1;}
 }

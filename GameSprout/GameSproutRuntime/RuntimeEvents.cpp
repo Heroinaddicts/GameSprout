@@ -64,6 +64,7 @@ void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char*
     if(type!=SceneNodeEventType::Rename && type!=SceneNodeEventType::TagChanged && type!=SceneNodeEventType::OperationFailed) {
         const std::string_view componentType = component ? component : "";
         const bool transform=type==SceneNodeEventType::ComponentChanged&&componentType=="GameSproutRuntime.Transform";
+        const bool mesh=type==SceneNodeEventType::ComponentChanged&&componentType=="GameSproutRuntime.Mesh";
         const auto* screenCanvas = transform && !_UICanvasObjects.empty() ? FindUIScreenCanvasRoot(*object.Object) : nullptr;
         if (screenCanvas && screenCanvas != object.Object)
             object.SceneOwner->InvalidateUI();
@@ -82,7 +83,8 @@ void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char*
                 worldChanged=AffectsAnimationBindings(object,screenCanvas||type==SceneNodeEventType::Reparent);
             }
             if (worldChanged)
-                object.SceneOwner->InvalidateRenderSnapshot(transform ? object.ID : 0);
+                object.SceneOwner->InvalidateRenderSnapshot(transform||mesh ? object.ID : 0,
+                    mesh ? RenderObjectChangeKind::Mesh : RenderObjectChangeKind::Transform);
             else object.SceneOwner->InvalidateVisual();
             if (!_UICanvasObjects.empty() &&
                 (type==SceneNodeEventType::Create || type==SceneNodeEventType::Destroy ||
