@@ -235,10 +235,11 @@ bool GameObjectState::RemoveComponentNow(IComponent* component,std::uint64_t ser
     delete component;
     return true;
 }
-void NotifyComponentChanged(IGameObject* owner,IComponent* component) {
+void NotifyComponentChanged(IGameObject* owner,IComponent* component,bool rendererMaterialsOnly) {
     if (auto* access=dynamic_cast<ObjectAccess*>(owner)) {
         auto& state=access->State();
-        if (state.Owner.IsUsable(&state)) state.Owner.Notify(state,SceneNodeEventType::ComponentChanged,component->GetTypeName());
+        if(state.Owner.IsUsable(&state))
+            state.Owner.Notify(state,SceneNodeEventType::ComponentChanged,component->GetTypeName(),0,rendererMaterialsOnly);
     }
 }
 void NotifyRuntimePropertiesChanged(IGameObject* owner,bool notifyObservers) {

@@ -8,6 +8,7 @@ public:
     explicit MeshRendererComponent(IGameObject* owner);
     std::size_t GetMaterialCount() const override { return _Materials.size(); }
     ResourceReference GetMaterial(std::size_t slot) const override;
+    const std::vector<ResourceReference>& GetMaterialBindings() const { return _Materials; }
     bool SetMaterial(std::size_t slot, const ResourceReference& material) override;
     bool SetMaterials(const std::vector<ResourceReference>& materials) override;
     void SetVisible(bool value) override;

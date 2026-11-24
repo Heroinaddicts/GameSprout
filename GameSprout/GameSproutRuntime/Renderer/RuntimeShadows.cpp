@@ -329,8 +329,8 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
         std::none_of(changes.begin(),changes.end(),[&](const auto& change){
             if(previewSubtree.contains(change.ObjectID))return false;
             if(change.Kind==RenderObjectChangeKind::Transform)return _StaticShadowTransformObjects.contains(change.ObjectID);
-            // An empty mesh can become a new caster even if its ID is absent
-            // from the previous static caster bounds.
+            // A mesh or material replacement can introduce a new caster, or
+            // change its sidedness, without changing scene structure.
             const auto found=_SceneObjectIndices.find(change.ObjectID);
             if(found==_SceneObjectIndices.end()||found->second>=_SceneObjects.size())return false;
             const auto& object=_SceneObjects[found->second];

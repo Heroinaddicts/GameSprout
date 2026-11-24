@@ -185,6 +185,7 @@ int main(int argc,char** argv){
         Check(!stats.SceneSnapshotRebuilds&&!stats.LightSnapshotRebuilds&&provider.MeshLoads==meshLoadsBeforeSwap+1&&
             Pixel(*viewport)[0]==0&&Pixel(*viewport,.7f)[0]>100&&std::abs(mesh->GetLocalBounds().Center.X-.7f)<.001f,
             "Mesh binding rebuilt snapshots or retained stale geometry/bounds");
+        Check(renderer->SetMaterials({{Guid,12}}),"Cannot replace the render material list");
         for(unsigned index=0;index<2200;++index) {
             mesh->SetMesh({Guid,1+index%2});
             object->GetTransform()->SetLocalPosition({0,0,float(index%2)});
@@ -194,10 +195,14 @@ int main(int argc,char** argv){
         Check(!stats.SceneSnapshotRebuilds&&stats.DrawCalls==0&&Pixel(*viewport,.7f)[0]==0,
             "Dense mesh changes must retain draw membership and clear the old geometry");
         mesh->SetMesh({Guid,2});stats=Render(*viewport,view);
-        Check(!stats.SceneSnapshotRebuilds&&provider.MeshLoads==meshLoadsBeforeSwap+1&&Pixel(*viewport,.7f)[0]>100,
-            "Restoring a mesh did not reuse its existing upload");
-        mesh->SetMesh({Guid,1});renderer->SetMaterial(0,{Guid,12});stats=Render(*viewport,view);Rebuilt(stats,"Material binding");
-        Check(Pixel(*viewport)[2]>100&&Pixel(*viewport)[0]==0,"Changed material binding kept cached material");
+        Check(!stats.SceneSnapshotRebuilds&&provider.MeshLoads==meshLoadsBeforeSwap+1&&Pixel(*viewport,.7f)[2]>100,
+            "Restoring a mesh lost its existing upload or a material change evicted from the journal");
+        mesh->SetMesh({Guid,1});renderer->SetMaterial(0,{Guid,11});stats=Render(*viewport,view);
+        Check(!stats.SceneSnapshotRebuilds&&!stats.LightSnapshotRebuilds&&Pixel(*viewport)[0]>100&&Pixel(*viewport)[2]==0,
+            "Combined mesh and material edits rebuilt the snapshot or retained stale draw data");
+        renderer->SetMaterial(0,{Guid,12});stats=Render(*viewport,view);
+        Check(!stats.SceneSnapshotRebuilds&&!stats.LightSnapshotRebuilds&&Pixel(*viewport)[2]>100&&Pixel(*viewport)[0]==0,
+            "A material-only edit rebuilt the snapshot or retained stale draw data");
         provider.Green=true;++provider.Revision;stats=Render(*viewport,view);Rebuilt(stats,"Provider material revision");
         Check(Pixel(*viewport)[1]>100&&Pixel(*viewport)[2]==0,"Provider revision retained released/cached material pointers");
         provider.MeshOffset=.6f;++provider.Revision;stats=Render(*viewport,view);Rebuilt(stats,"Provider geometry revision");

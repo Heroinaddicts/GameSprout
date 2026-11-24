@@ -360,9 +360,10 @@ private:
     bool Initialize();
     bool Extract(const RenderView& view,std::vector<DrawObject>& objects);
     bool UpdateSceneObjects(IScene& scene,const std::vector<RenderObjectChange>& changes,std::vector<DrawObject>& objects);
-    bool RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects,bool meshChanges);
+    bool RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects,bool meshChanges,bool materialChanges);
     bool UpdateDrawTransform(DrawObject& object,const Mat4& model,const RenderFrustum::Frustum& frustum);
     bool UpdateDrawMesh(DrawObject& object,const IGameObject& node);
+    bool UpdateDrawMaterials(DrawObject& object,const IGameObject& node);
     static bool SetDrawTransform(DrawObject& object,const Mat4& model);
     void PrepareDraws(const RenderView&,const Mat4& viewProjection);
     void RefreshSkinPoses(const RenderFrustum::Frustum& frustum);

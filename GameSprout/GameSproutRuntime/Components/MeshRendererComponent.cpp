@@ -19,7 +19,7 @@ bool MeshRendererComponent::SetMaterial(std::size_t slot, const ResourceReferenc
             std::swap(_Materials[slot], replacement);
         }
     } catch (...) { return false; }
-    NotifyComponentChanged(_GameObject, this);
+    NotifyComponentChanged(_GameObject,this,true);
     return true;
 }
 bool MeshRendererComponent::SetMaterials(const std::vector<ResourceReference>& materials) {
@@ -29,7 +29,7 @@ bool MeshRendererComponent::SetMaterials(const std::vector<ResourceReference>& m
         std::vector<ResourceReference> replacement = materials;
         _Materials.swap(replacement);
     } catch (...) { return false; }
-    NotifyComponentChanged(_GameObject, this);
+    NotifyComponentChanged(_GameObject,this,true);
     return true;
 }
 void MeshRendererComponent::SetVisible(bool value) {

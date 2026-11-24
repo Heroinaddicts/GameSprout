@@ -3,7 +3,7 @@
 #include <deque>
 
 namespace GameSproutRuntime {
-enum class RenderObjectChangeKind { Transform, Mesh };
+enum class RenderObjectChangeKind { Transform, Mesh, Materials };
 struct RenderObjectChange {
     std::uint64_t ObjectID;
     std::uint64_t Revision;
@@ -28,6 +28,7 @@ public:
     std::uint64_t GetRenderRevision() const {return _RenderRevision;}
     bool HasSameRenderStructure(std::uint64_t after) const {return after>=_RenderStructureRevision;}
     bool HasRenderMeshChanges(std::uint64_t after) const {return after<_RenderMeshRevision;}
+    bool HasRenderMaterialChanges(std::uint64_t after) const {return after<_RenderMaterialRevision;}
     void InvalidateRenderSnapshot(std::uint64_t objectID=0,RenderObjectChangeKind kind=RenderObjectChangeKind::Transform);
     void InvalidateVisual() { _VisualPending = true; }
     std::uint64_t GetUIRevision() const { return _UIRevision; }
@@ -70,6 +71,7 @@ private:
     std::uint64_t _RenderRevision=1;
     std::uint64_t _RenderStructureRevision=1;
     std::uint64_t _RenderMeshRevision=1;
+    std::uint64_t _RenderMaterialRevision=1;
     std::uint64_t _DiscardedRenderObjectRevision=1;
     std::uint64_t _UIRevision=1;
     std::deque<RenderObjectChange> _RenderObjectChanges;

@@ -27,6 +27,7 @@ void Scene::InvalidateRenderSnapshot(std::uint64_t objectID,RenderObjectChangeKi
         return;
     }
     if(kind==RenderObjectChangeKind::Mesh)_RenderMeshRevision=_RenderRevision;
+    if(kind==RenderObjectChangeKind::Materials)_RenderMaterialRevision=_RenderRevision;
     // Position and rotation setters often touch the same object consecutively.
     // Readers see the final values and can catch up from any earlier revision.
     if(!_RenderObjectChanges.empty()&&_RenderObjectChanges.back().ObjectID==objectID&&

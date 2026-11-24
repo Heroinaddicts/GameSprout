@@ -45,7 +45,8 @@ bool AffectsWorldSnapshot(const GameObjectState& object, SceneNodeEventType type
 }
 }
 
-void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char* component,std::uint64_t oldParent) {
+void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char* component,std::uint64_t oldParent,
+    bool rendererMaterialsOnly) {
     if(_ShuttingDown || object.Initializing || !object.SceneOwner) return;
     if(type==SceneNodeEventType::Destroy) {
         // Explicit destruction has already set PendingDestroy, and detachment
@@ -65,6 +66,8 @@ void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char*
         const std::string_view componentType = component ? component : "";
         const bool transform=type==SceneNodeEventType::ComponentChanged&&componentType=="GameSproutRuntime.Transform";
         const bool mesh=type==SceneNodeEventType::ComponentChanged&&componentType=="GameSproutRuntime.Mesh";
+        const bool materials=rendererMaterialsOnly&&type==SceneNodeEventType::ComponentChanged&&
+            componentType=="GameSproutRuntime.MeshRenderer";
         const auto* screenCanvas = transform && !_UICanvasObjects.empty() ? FindUIScreenCanvasRoot(*object.Object) : nullptr;
         if (screenCanvas && screenCanvas != object.Object)
             object.SceneOwner->InvalidateUI();
@@ -82,10 +85,11 @@ void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char*
                 // The bound bone may only have its intrinsic Transform.
                 worldChanged=AffectsAnimationBindings(object,screenCanvas||type==SceneNodeEventType::Reparent);
             }
-            if (worldChanged)
-                object.SceneOwner->InvalidateRenderSnapshot(transform||mesh ? object.ID : 0,
-                    mesh ? RenderObjectChangeKind::Mesh : RenderObjectChangeKind::Transform);
-            else object.SceneOwner->InvalidateVisual();
+            if(worldChanged) {
+                const auto kind=mesh?RenderObjectChangeKind::Mesh:
+                    (materials?RenderObjectChangeKind::Materials:RenderObjectChangeKind::Transform);
+                object.SceneOwner->InvalidateRenderSnapshot(transform||mesh||materials?object.ID:0,kind);
+            } else object.SceneOwner->InvalidateVisual();
             if (!_UICanvasObjects.empty() &&
                 (type==SceneNodeEventType::Create || type==SceneNodeEventType::Destroy ||
                  type==SceneNodeEventType::Reparent || type==SceneNodeEventType::ActiveChanged ||

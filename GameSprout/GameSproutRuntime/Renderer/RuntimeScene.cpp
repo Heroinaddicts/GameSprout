@@ -1,4 +1,5 @@
 #include "RuntimeRenderer.h"
+#include "Components/MeshRendererComponent.h"
 #include "GameSproutRuntime.h"
 #include "RuntimeMath.h"
 #include "Scene.h"
@@ -67,17 +68,33 @@ bool Renderer::UpdateDrawMesh(DrawObject& draw,const IGameObject& node) {
     return true;
 }
 
+bool Renderer::UpdateDrawMaterials(DrawObject& draw,const IGameObject& node) {
+    const auto* renderer=dynamic_cast<const MeshRendererComponent*>(node.GetComponent<IMeshRendererComponent>());
+    if(!renderer)return false;
+    const auto& bindings=renderer->GetMaterialBindings();
+    if(draw.Materials==bindings)return true;
+    // Prepared packets borrow individual entries from the binding vector.
+    // The geometry, transforms and skin palette remain resident.
+    _PreparedKnown=false;
+    _OpaqueDrawOrderKnown=false;
+    draw.Materials=bindings;
+    draw.MaterialCache.assign(bindings.size(),nullptr);
+    return true;
+}
+
 bool Renderer::UpdateSceneObjects(IScene& scene,const std::vector<RenderObjectChange>& changes,std::vector<DrawObject>& objects) {
     std::vector<IGameObject*> pending;
     std::unordered_set<std::uint64_t> visited;
     const RenderFrustum::Frustum preparedFrustum(_PreparedViewProjection);
     for(const auto& change:changes) {
         const auto id=change.ObjectID;
-        if(change.Kind==RenderObjectChangeKind::Mesh) {
+        if(change.Kind!=RenderObjectChangeKind::Transform) {
             const auto found=_SceneObjectIndices.find(id);
             if(found==_SceneObjectIndices.end()||found->second==InvalidTransformIndex)continue;
             const auto* node=_Runtime.QueryGameObject(id);
-            if(!node||node->GetScene()!=&scene||!UpdateDrawMesh(objects[found->second],*node))return false;
+            if(!node||node->GetScene()!=&scene)return false;
+            auto& draw=objects[found->second];
+            if(change.Kind==RenderObjectChangeKind::Mesh?!UpdateDrawMesh(draw,*node):!UpdateDrawMaterials(draw,*node))return false;
             continue;
         }
         if(visited.contains(id))continue;
@@ -101,7 +118,7 @@ bool Renderer::UpdateSceneObjects(IScene& scene,const std::vector<RenderObjectCh
     return true;
 }
 
-bool Renderer::RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects,bool meshChanges) {
+bool Renderer::RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects,bool meshChanges,bool materialChanges) {
     // A burst of animation may outgrow the bounded journal without changing
     // membership. Read only previously extracted renderables and keep their
     // resources, skin data and batch slots attached to the existing objects.
@@ -109,7 +126,7 @@ bool Renderer::RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects
     for(auto& draw:objects) {
         auto* node=_Runtime.QueryGameObject(draw.ObjectID);
         if(!node||node->GetScene()!=&scene||
-           (meshChanges&&!UpdateDrawMesh(draw,*node))||
+           (meshChanges&&!UpdateDrawMesh(draw,*node))||(materialChanges&&!UpdateDrawMaterials(draw,*node))||
            !UpdateDrawTransform(draw,node->GetTransform()->GetPresentationWorldMatrix(),preparedFrustum))return false;
     }
     if(_SceneObjectIndices.size()!=objects.size()) {
@@ -135,7 +152,8 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
         if(_ObjectSceneRevision==revision||
            (scene.GetRenderObjectChanges(_ObjectSceneRevision,changes)
                 ? UpdateSceneObjects(*view.Scene,changes,objects)
-                : RefreshDrawObjects(*view.Scene,objects,scene.HasRenderMeshChanges(_ObjectSceneRevision)))) {
+                : RefreshDrawObjects(*view.Scene,objects,scene.HasRenderMeshChanges(_ObjectSceneRevision),
+                    scene.HasRenderMaterialChanges(_ObjectSceneRevision)))) {
             _ObjectSceneRevision=revision;
             _Statistics.SkippedObjects+=_ExtractionSkipped;
             Diagnostic(_ExtractionDiagnostic);

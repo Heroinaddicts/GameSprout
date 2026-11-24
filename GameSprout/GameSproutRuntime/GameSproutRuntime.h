@@ -207,7 +207,8 @@ public:
     void QueueScriptInitialization(ScriptComponent&);
     void BeginOperation() { ++_Depth; }
     void EndOperation() noexcept;
-    void Notify(GameObjectState& object, SceneNodeEventType type, const char* component = "", std::uint64_t oldParent = 0);
+    void Notify(GameObjectState& object,SceneNodeEventType type,const char* component="",std::uint64_t oldParent=0,
+        bool rendererMaterialsOnly=false);
     bool IsShuttingDown() const { return _ShuttingDown; }
     bool IsConstructing() const { return _ConstructionDepth!=0; }
     bool PreparePhysics(std::string& error);
