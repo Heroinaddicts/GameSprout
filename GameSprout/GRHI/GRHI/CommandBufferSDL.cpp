@@ -1,5 +1,6 @@
 #include "CommandBufferSDL.h"
 #include "Resource/BufferSDL.h"
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstring>
@@ -98,7 +99,7 @@ bool CommandBufferSDL::UploadBuffers(const BufferUpload* uploads,uint32_t count)
     if(!count)return true;
     if(!uploads)return Fail("Missing buffer upload descriptions.");
 
-    auto total=_UploadBytes.size();
+    auto total=_UploadSize;
     for(uint32_t i=0;i<count;++i) {
         const auto& upload=uploads[i];
         const auto* buffer=Owner->Resource<BufferSDL>(upload.Buffer,ResourceKindSDL::Buffer);
@@ -110,17 +111,27 @@ bool CommandBufferSDL::UploadBuffers(const BufferUpload* uploads,uint32_t count)
         total+=upload.Size;
     }
 
-    auto offset=_UploadBytes.size();
     _Uploads.reserve(_Uploads.size()+count);
-    _UploadBytes.resize(total);
+    if (total > _UploadCapacity) {
+        const auto growth = std::min(_UploadCapacity, UINT32_MAX - _UploadCapacity);
+        const auto capacity = std::max(total, _UploadCapacity + growth);
+        // Every appended byte is immediately written by the upload copy.
+        auto bytes = std::make_unique_for_overwrite<uint8_t[]>(capacity);
+        if (_UploadSize) std::memcpy(bytes.get(), _UploadBytes.get(), _UploadSize);
+        _UploadBytes = std::move(bytes);
+        _UploadCapacity = capacity;
+    }
+
+    auto offset=_UploadSize;
     for(uint32_t i=0;i<count;++i) {
         const auto& upload=uploads[i];
         const auto* buffer=Owner->Resource<BufferSDL>(upload.Buffer,ResourceKindSDL::Buffer);
-        std::memcpy(_UploadBytes.data()+offset,upload.Data,upload.Size);
+        std::memcpy(_UploadBytes.get()+offset,upload.Data,upload.Size);
         _Uploads.push_back({{upload.Buffer,buffer->_Guid},Passes.size(),static_cast<uint32_t>(upload.Offset),
             static_cast<uint32_t>(offset),static_cast<uint32_t>(upload.Size),upload.Cycle});
         offset+=upload.Size;
     }
+    _UploadSize=total;
     return true;
 }
 bool RenderPassSDL::Usable() {

@@ -2,6 +2,7 @@
 #include "DeviceSDL.h"
 #include "ReplayStateSDL.h"
 #include "UniformArenaSDL.h"
+#include <memory>
 #include <variant>
 #include <vector>
 
@@ -53,7 +54,9 @@ public:
     std::unordered_set<const void*> Surfaces;
 private:
     std::vector<BufferUploadSDL> _Uploads;
-    std::vector<uint8_t> _UploadBytes;
+    std::unique_ptr<uint8_t[]> _UploadBytes;
+    size_t _UploadSize = 0;
+    size_t _UploadCapacity = 0;
 };
 class RenderPassSDL final : public IRenderPass {
 public:

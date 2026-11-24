@@ -38,11 +38,11 @@ void RenderPassSDL::Encode(SDL_GPURenderPass* pass) const {
 bool CommandBufferSDL::Encode() {
     SDL_GPUTransferBuffer* transfer=nullptr;
     if(!_Uploads.empty()) {
-        transfer=Owner->UploadTransfer(static_cast<uint32_t>(_UploadBytes.size()));
+        transfer=Owner->UploadTransfer(static_cast<uint32_t>(_UploadSize));
         if(!transfer)return Fail(SDL_GetError());
         void* mapped=SDL_MapGPUTransferBuffer(Owner->Native(),transfer,true);
         if(!mapped)return Fail(SDL_GetError());
-        std::memcpy(mapped,_UploadBytes.data(),_UploadBytes.size());
+        std::memcpy(mapped,_UploadBytes.get(),_UploadSize);
         SDL_UnmapGPUTransferBuffer(Owner->Native(),transfer);
     }
 
