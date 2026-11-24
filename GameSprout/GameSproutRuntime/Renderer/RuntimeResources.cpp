@@ -2,6 +2,7 @@
 #include "RuntimeRenderResourceCache.h"
 #include "RuntimeMath.h"
 #include "Resources/BuiltinMeshes.h"
+#include <algorithm>
 #include <cmath>
 #include <bit>
 #include <cstring>
@@ -146,6 +147,8 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
             if(loaded && ValidateMesh(entry.Data,entry.Error)) {
                 // 仅在载入/修订变化时解包一次；GPU 上传后丢弃交错原始字节，保留紧密拾取数据。
                 entry.Positions.reserve(entry.Data.VertexCount);
+                if(!entry.Data.Bones.empty()&&entry.Data.Bones.size()<=MaxSkinBones)
+                    entry.JointBounds.resize(entry.Data.Bones.size());
                 for(std::uint32_t vertex=0;vertex<entry.Data.VertexCount;++vertex) {
                     const auto* bytes=entry.Data.Bytes.data()+std::uint64_t(vertex)*entry.Data.VertexStride+entry.Data.PositionOffset;
                     const Vector3 point{std::bit_cast<float>(Read32(bytes)),std::bit_cast<float>(Read32(bytes+4)),std::bit_cast<float>(Read32(bytes+8))};
@@ -158,10 +161,25 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
                     if(!entry.Data.Bones.empty()) {
                         MeshGPU::SkinVertex skin;
                         const auto* source=entry.Data.Bytes.data()+std::uint64_t(vertex)*entry.Data.VertexStride;
+                        double weightSum=0;
                         for(std::size_t influence=0;influence<4;++influence) {
-                            skin.Bones[influence]=Read32(source+entry.Data.BoneIndicesOffset+influence*4);
-                            skin.Weights[influence]=std::bit_cast<float>(Read32(source+entry.Data.BoneWeightsOffset+influence*4));
+                            const auto joint=Read32(source+entry.Data.BoneIndicesOffset+influence*4);
+                            const auto weight=std::bit_cast<float>(Read32(source+entry.Data.BoneWeightsOffset+influence*4));
+                            skin.Bones[influence]=joint;
+                            skin.Weights[influence]=weight;
+                            weightSum+=weight;
+                            if(weight==0||entry.JointBounds.empty())continue;
+                            auto& bounds=entry.JointBounds[joint];
+                            if(bounds.Used) {
+                                bounds.Minimum={std::min(bounds.Minimum.X,point.X),std::min(bounds.Minimum.Y,point.Y),std::min(bounds.Minimum.Z,point.Z)};
+                                bounds.Maximum={std::max(bounds.Maximum.X,point.X),std::max(bounds.Maximum.Y,point.Y),std::max(bounds.Maximum.Z,point.Z)};
+                            } else {
+                                bounds.Minimum=bounds.Maximum=point;
+                                bounds.Used=true;
+                            }
                         }
+                        entry.MinimumSkinWeightSum=std::min(entry.MinimumSkinWeightSum,weightSum);
+                        entry.MaximumSkinWeightSum=std::max(entry.MaximumSkinWeightSum,weightSum);
                         entry.Skin.push_back(skin);
                     }
                 }
@@ -177,7 +195,7 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
         } catch(const std::exception& exception) {entry.Error=exception.what();}
         catch(...) {entry.Error="Resource provider threw while loading mesh";}
         std::vector<std::uint8_t>().swap(entry.Data.Bytes);
-        if(!entry.Buffer) {entry.Positions.clear();entry.Skin.clear();entry.Indices.clear();}
+        if(!entry.Buffer) {entry.Positions.clear();entry.Skin.clear();entry.JointBounds.clear();entry.Indices.clear();}
     }
     if(!entry.Buffer) {Diagnostic("Mesh "+reference.Guid+"_"+std::to_string(reference.LocalID)+": "+entry.Error);return nullptr;}
     return &entry;

@@ -43,9 +43,12 @@ private:
         std::uint64_t ResourceRevision=0;
         std::uint64_t SortRank=0;
         struct SkinVertex { std::uint32_t Bones[4]{}; float Weights[4]{}; };
+        struct SkinInfluenceBounds {Vector3 Minimum,Maximum;bool Used=false;};
         MeshRenderData Data;
         std::vector<Vector3> Positions;
         std::vector<SkinVertex> Skin;
+        std::vector<SkinInfluenceBounds> JointBounds;
+        double MinimumSkinWeightSum=1.0,MaximumSkinWeightSum=1.0;
         std::vector<std::uint32_t> Indices;
         GRHI::IBuffer* Buffer=nullptr;
         GRHI::IBuffer* ShaderVertexBuffer=nullptr; // Canonical P/N/C/UV, only allocated for user shaders.
@@ -304,6 +307,7 @@ private:
     bool BeginQuery(IScene* scene);
     bool QueryObject(IScene* scene,std::uint64_t objectID,IGameObject*& object,MeshGPU*& mesh,Mat4& model);
     bool SkinMatrices(IGameObject& object,const MeshGPU& mesh,std::vector<Mat4>& matrices);
+    bool SkinPoseBounds(const MeshGPU& mesh,const std::vector<Mat4>& matrices,Bounds& bounds);
     bool PosedPositions(IGameObject& object,const MeshGPU& mesh,std::vector<Vector3>& positions);
     bool PosedPositions(const MeshGPU& mesh,const std::vector<Mat4>& matrices,std::vector<Vector3>& positions);
     void SyncRevision();
@@ -338,7 +342,6 @@ private:
     bool _OpaqueDrawOrderKnown=false;
     std::vector<SkinnedDrawState> _SkinnedDraws;
     std::vector<Mat4> _SkinScratch;
-    std::vector<Vector3> _PosedPositionScratch;
     Mat4 _PreparedViewProjection;
     RenderCamera _PreparedCamera;
     MaterialRenderData _DefaultMaterial;

@@ -16,7 +16,7 @@ class SkinProvider final : public GameSproutRuntime::IRuntimeResourceProvider {
 public:
     std::uint64_t Revision=1;
     std::uint32_t BoneCount=2;
-    bool Color=false,UV=false,BadIndex=false,BadWeight=false,DiagonalNormal=false;
+    bool Color=false,UV=false,BadIndex=false,BadWeight=false,DiagonalNormal=false,MixedWeights=false;
     int MeshLoads=0;
     std::uint64_t GetRevision() const override {return Revision;}
     bool LoadMesh(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::MeshRenderData& data,std::string&) override {
@@ -29,8 +29,9 @@ public:
             Float(data.Bytes,DiagonalNormal?1:0);Float(data.Bytes,DiagonalNormal?1:0);Float(data.Bytes,DiagonalNormal?0:1);
             if(Color) for(int component=0;component<4;++component) Float(data.Bytes,1);
             if(UV) {Float(data.Bytes,.5f);Float(data.Bytes,.5f);}
-            for(int influence=0;influence<4;++influence) UInt(data.Bytes,BadIndex?BoneCount:1);
-            Float(data.Bytes,BadWeight?-.5f:1);Float(data.Bytes,0);Float(data.Bytes,0);Float(data.Bytes,0);
+            for(int influence=0;influence<4;++influence) UInt(data.Bytes,BadIndex?BoneCount:influence==0?1:0);
+            Float(data.Bytes,BadWeight?-.5f:MixedWeights?.50025f:1);
+            Float(data.Bytes,MixedWeights?.50025f:0);Float(data.Bytes,0);Float(data.Bytes,0);
         }
         data.IndexOffset=data.Bytes.size();data.IndexCount=3;
         for(std::uint32_t index=0;index<3;++index) UInt(data.Bytes,index);
@@ -43,16 +44,18 @@ public:
 struct Character {
     GameSproutRuntime::IGameObject* Root=nullptr;
     GameSproutRuntime::IGameObject* Bone=nullptr;
+    GameSproutRuntime::IGameObject* UnusedBone=nullptr;
     GameSproutRuntime::IGameObject* Mesh=nullptr;
 };
 static Character CreateCharacter(GameSproutRuntime::IScene& scene,float x) {
     Character character;character.Root=scene.CreateGameObject("Character");
     character.Root->GetTransform()->SetLocalPosition({x,0,0});
-    auto* unused=scene.CreateGameObject("Unused",character.Root);unused->GetTransform()->SetLocalPosition({-10,0,0});
+    character.UnusedBone=scene.CreateGameObject("Unused",character.Root);
+    character.UnusedBone->GetTransform()->SetLocalPosition({-10,0,0});
     character.Bone=scene.CreateGameObject("Bone",character.Root);
     character.Mesh=scene.CreateGameObject("Mesh",character.Root);
     auto* animator=character.Root->AddComponent<GameSproutRuntime::IAnimatorComponent>();Check(animator,"Animator factory failed");
-    Check(animator->SetNodeBindings({{"Unused0",unused->GetInstanceID()},{"Bone",character.Bone->GetInstanceID()}}),"Cannot bind the palette to this character");
+    Check(animator->SetNodeBindings({{"Unused0",character.UnusedBone->GetInstanceID()},{"Bone",character.Bone->GetInstanceID()}}),"Cannot bind the palette to this character");
     character.Mesh->AddComponent<GameSproutRuntime::IMeshComponent>()->SetMesh({"0123456789abcdef0123456789abcdef",1});
     character.Mesh->AddComponent<GameSproutRuntime::IMeshRendererComponent>();
     auto* skin=character.Mesh->AddComponent<GameSproutRuntime::ISkinnedMeshRendererComponent>();Check(skin,"Skin renderer factory failed");
@@ -92,6 +95,21 @@ int main(int argc,char** argv) {
         GameSproutRuntime::DebugDrawList outline;
         Check(renderer->AppendSelectionOutline(scene,first.Mesh->GetInstanceID(),outline,{1,1,0,1},false) && outline.Lines.size()==3,"Skinned selection outline missing");
         for(const auto& line:outline.Lines) Check(line.From.X>-.35f && line.From.X<-.05f && line.To.X>-.35f && line.To.X<-.05f,"Outline retained bind pose vertices");
+        const auto* meshComponent=first.Mesh->GetComponent<GameSproutRuntime::IMeshComponent>();
+        const auto singleJoint=meshComponent->GetLocalBounds();
+        Check(singleJoint.Min().X>.15f && singleJoint.Max().X<.45f,"A zero-weight joint expanded the rendered bounds");
+        provider.MixedWeights=true;++provider.Revision;
+        first.Bone->GetTransform()->SetLocalPosition({10,0,0});
+        first.UnusedBone->GetTransform()->SetLocalPosition({10,0,0});
+        Check(renderer->Render(view),renderer->GetLastError());
+        Check(renderer->GetWorldBounds(scene,first.Mesh->GetInstanceID(),bounds),"Cannot read exact mixed-weight bounds");
+        const auto mixed=meshComponent->GetLocalBounds();
+        Check(mixed.Min().X-.5f<=bounds.Min().X && mixed.Max().X-.5f>=bounds.Max().X &&
+            mixed.Min().Y<=bounds.Min().Y && mixed.Max().Y>=bounds.Max().Y,
+            "Rendered bounds clipped the exact pose when blend weights summed slightly over one");
+        provider.MixedWeights=false;
+        first.Bone->GetTransform()->SetLocalPosition({.3f,0,0});
+        first.UnusedBone->GetTransform()->SetLocalPosition({-10,0,0});
         for(int variant=0;variant<4;++variant) {
             provider.Color=(variant&1)!=0;provider.UV=(variant&2)!=0;++provider.Revision;
             Check(renderer->Render(view),renderer->GetLastError());Check(renderer->ReadPixels(pixels,error),error);

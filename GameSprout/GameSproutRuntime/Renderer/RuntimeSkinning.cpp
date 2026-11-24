@@ -1,5 +1,8 @@
 #include "RuntimeRenderer.h"
 #include "RuntimeMath.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace GameSproutRuntime {
 bool Renderer::SkinMatrices(IGameObject& object,const MeshGPU& mesh,std::vector<Mat4>& matrices) {
@@ -20,6 +23,66 @@ bool Renderer::SkinMatrices(IGameObject& object,const MeshGPU& mesh,std::vector<
     for(const auto& matrix:matrices) if(!RuntimeMath::IsFinite(matrix)) {
         Diagnostic("Skinned mesh has a nonfinite pose matrix: "+object.GetName());matrices.clear();return false;
     }
+    return true;
+}
+
+bool Renderer::SkinPoseBounds(const MeshGPU& mesh,const std::vector<Mat4>& matrices,Bounds& bounds) {
+    if(matrices.empty()) {
+        bounds={mesh.CullMinimum*.5f+mesh.CullMaximum*.5f,mesh.CullMaximum*.5f-mesh.CullMinimum*.5f};
+        return true;
+    }
+
+    constexpr auto infinity=std::numeric_limits<double>::infinity();
+    double minimum[3]={infinity,infinity,infinity};
+    double maximum[3]={-infinity,-infinity,-infinity};
+    double magnitude[3]={};
+    // Each weighted source point is inside its influencing joint's box.
+    // Nonnegative weights make the posed point, divided by its total weight,
+    // a convex combination inside the union AABB of the transformed boxes.
+    for(std::size_t joint=0;joint<mesh.JointBounds.size();++joint) {
+        const auto& source=mesh.JointBounds[joint];
+        if(!source.Used)continue;
+        const RenderFrustum::Box transformed(source.Minimum,source.Maximum,matrices[joint]);
+        for(std::size_t axis=0;axis<3;++axis) {
+            const double radius=std::fabs(transformed.Axis[0][axis])+std::fabs(transformed.Axis[1][axis])+
+                std::fabs(transformed.Axis[2][axis]);
+            minimum[axis]=std::min(minimum[axis],transformed.Center[axis]-radius);
+            maximum[axis]=std::max(maximum[axis],transformed.Center[axis]+radius);
+            magnitude[axis]=std::max(magnitude[axis],transformed.Magnitude[axis]);
+        }
+    }
+
+    constexpr auto floatLimit=std::numeric_limits<float>::max();
+    constexpr double roundingGuard=32.0*std::numeric_limits<float>::epsilon();
+    float center[3],extent[3];
+    bool representable=true;
+    for(std::size_t axis=0;axis<3;++axis) {
+        // Validation allows a small normalization error. Include the actual
+        // interval of per-vertex weight sums and guard float arithmetic.
+        const double scaledMagnitude=magnitude[axis]*mesh.MaximumSkinWeightSum;
+        const double padding=roundingGuard*scaledMagnitude;
+        const double low=minimum[axis]*(minimum[axis]<0?mesh.MaximumSkinWeightSum:mesh.MinimumSkinWeightSum)-padding;
+        const double high=maximum[axis]*(maximum[axis]>0?mesh.MaximumSkinWeightSum:mesh.MinimumSkinWeightSum)+padding;
+        if(scaledMagnitude>floatLimit*.5||!(low<=high)) {representable=false;break;}
+        center[axis]=static_cast<float>((low+high)*.5);
+        extent[axis]=std::nextafter(static_cast<float>(std::max(center[axis]-low,high-center[axis])),
+            std::numeric_limits<float>::infinity());
+    }
+    if(representable) {
+        bounds={{center[0],center[1],center[2]},{extent[0],extent[1],extent[2]}};
+        return true;
+    }
+
+    // Very large finite inputs can overflow a conservative box even when the
+    // real vertices are valid. Retain the exact path and its diagnostics then.
+    std::vector<Vector3> positions;
+    if(!PosedPositions(mesh,matrices,positions))return false;
+    Vector3 low=positions.front(),high=low;
+    for(const auto& point:positions) {
+        low={std::min(low.X,point.X),std::min(low.Y,point.Y),std::min(low.Z,point.Z)};
+        high={std::max(high.X,point.X),std::max(high.Y,point.Y),std::max(high.Z,point.Z)};
+    }
+    bounds={low*.5f+high*.5f,high*.5f-low*.5f};
     return true;
 }
 

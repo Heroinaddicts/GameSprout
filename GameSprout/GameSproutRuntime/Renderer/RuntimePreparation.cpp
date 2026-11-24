@@ -23,15 +23,7 @@ void Renderer::RefreshSkinPoses() {
             if(!samePose) {
                 if(component&&component->GetMesh()==object.Mesh) {
                     skin.LocalBounds=mesh->Data.LocalBounds;
-                    ready=PosedPositions(*mesh,_SkinScratch,_PosedPositionScratch);
-                    if(ready&&!_PosedPositionScratch.empty()) {
-                        Vector3 minimum=_PosedPositionScratch.front(),maximum=minimum;
-                        for(const auto& point:_PosedPositionScratch) {
-                            minimum={std::min(minimum.X,point.X),std::min(minimum.Y,point.Y),std::min(minimum.Z,point.Z)};
-                            maximum={std::max(maximum.X,point.X),std::max(maximum.Y,point.Y),std::max(maximum.Z,point.Z)};
-                        }
-                        skin.LocalBounds={minimum*0.5f+maximum*0.5f,maximum*0.5f-minimum*0.5f};
-                    }
+                    ready=SkinPoseBounds(*mesh,_SkinScratch,skin.LocalBounds);
                 }
                 if(ready)object.SkinMatrices.swap(_SkinScratch);
             }
