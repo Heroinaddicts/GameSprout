@@ -1,5 +1,5 @@
 #include "PreparedResourceDecode.h"
-#include "Internal/PreparedTextureLayout.h"
+#include "EnvironmentAssetFormat.h"
 
 namespace {
 using namespace GameSproutRuntime;
@@ -88,6 +88,27 @@ bool PreparedResources::ResourceProvider::LoadTexture(const ResourceReference& r
         return false;
     }
     MarkReadFailed(reference,false);
+    output=std::move(data);
+    return true;
+}
+
+bool PreparedResources::ResourceProvider::LoadEnvironment(const ResourceReference& reference,EnvironmentRenderData& output,std::string& error) {
+    output={};
+    Json::Value descriptor;
+    std::vector<std::uint8_t> bytes;
+    if(!Read(reference,eAssetType::Environment,descriptor,bytes,error))return false;
+    EnvironmentRenderData data;
+    if(descriptor["Encoding"]!="RawBytes"||descriptor["Format"]!="GSENV001"||
+       !EnvironmentAssetFormat::Describe(bytes,data)) {
+        error="Invalid prepared environment";
+        return false;
+    }
+    const auto skyBytes=std::uint64_t(data.Sky.Width)*data.Sky.Height*8*6;
+    const auto specularOffset=EnvironmentAssetFormat::HeaderBytes+skyBytes;
+    data.Sky.Pixels.resize(static_cast<std::size_t>(skyBytes));
+    data.Specular.Pixels.resize(bytes.size()-static_cast<std::size_t>(specularOffset));
+    std::memcpy(data.Sky.Pixels.data(),bytes.data()+EnvironmentAssetFormat::HeaderBytes,data.Sky.Pixels.size());
+    std::memcpy(data.Specular.Pixels.data(),bytes.data()+specularOffset,data.Specular.Pixels.size());
     output=std::move(data);
     return true;
 }

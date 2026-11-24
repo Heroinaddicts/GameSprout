@@ -24,9 +24,11 @@ bool ParseNativeDocument(const QByteArray& bytes,Json::Value& document) {
 bool References(AssetImportJob & job,const Json::Value & value,std::set<std::string>& seenGuids) {
     if (value.isObject()) {
         if (value.isMember("Guid") && value.isMember("LocalID")) {
-            if (!value["Guid"].isString() || !Guid(value["Guid"].asString()).IsValid()
-                || !value["LocalID"].isUInt64() || value["LocalID"].asUInt64()==0) return job.Fail("Invalid resource reference");
-            const std::string guid=value["Guid"].asString();
+            if (!value["Guid"].isString() || !value["LocalID"].isUInt64() || value["LocalID"].asUInt64()==0)
+                return job.Fail("Invalid resource reference");
+            const Guid identity(value["Guid"].asString());
+            if (!identity.IsValid()) return job.Fail("Invalid resource reference");
+            const std::string guid=identity.GetGuidString();
             const GameSproutRuntime::ResourceReference reference{guid,value["LocalID"].asUInt64()};
             if(GameSproutRuntime::IsBuiltinResource(reference)) {
                 if(!GameSproutRuntime::GetBuiltinMeshName(reference))return job.Fail("Unknown built-in mesh reference");

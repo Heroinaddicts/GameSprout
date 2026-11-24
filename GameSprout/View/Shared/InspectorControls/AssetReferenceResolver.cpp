@@ -31,6 +31,7 @@ std::string TypeName(eAssetType type) {
     case eAssetType::Avatar:return "Avatar";
     case eAssetType::AvatarMask:return "Avatar Mask";
     case eAssetType::PhysicsMaterial:return "Physics Material";
+    case eAssetType::Environment:return "Environment";
     default:return "Unsupported";
     }
 }
@@ -44,7 +45,13 @@ bool Resolve(IAssetsManager* assets,ILibraryManager* library,const GameSproutRun
         result={reference,name,"Built-in",false};return true;
     }
     if(!assets || !library) {error="资源服务尚未就绪。";return false;}
-    if(expected!=eAssetType::Unknown && expected!=eAssetType::Audio && expected!=eAssetType::Mesh && expected!=eAssetType::Texture && expected!=eAssetType::Material && expected!=eAssetType::Shader && expected!=eAssetType::Model && expected!=eAssetType::Skeleton && expected!=eAssetType::AnimationClip && expected!=eAssetType::AnimatorController && expected!=eAssetType::Avatar && expected!=eAssetType::AvatarMask && expected!=eAssetType::PhysicsMaterial) {error="此字段尚未支持该资源类型。";return false;}
+    if(expected!=eAssetType::Unknown && expected!=eAssetType::Audio && expected!=eAssetType::Mesh &&
+       expected!=eAssetType::Texture && expected!=eAssetType::Material && expected!=eAssetType::Shader &&
+       expected!=eAssetType::Model && expected!=eAssetType::Skeleton && expected!=eAssetType::AnimationClip &&
+       expected!=eAssetType::AnimatorController && expected!=eAssetType::Avatar && expected!=eAssetType::AvatarMask &&
+       expected!=eAssetType::PhysicsMaterial && expected!=eAssetType::Environment) {
+        error="此字段尚未支持该资源类型。";return false;
+    }
     const Guid guid(reference.Guid);
     if(!guid.IsValid() || !reference.LocalID) {error="资源身份无效，需要有效 GUID 和非零 LocalID。";return false;}
     IAssetMeta* meta=assets->QueryAsset(guid);

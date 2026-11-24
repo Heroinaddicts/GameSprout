@@ -123,6 +123,7 @@ inline eAssetImporterType GetAssetImporterType(const std::string & extension) {
         {"physicmaterial", eAssetImporterType::PhysicsMaterial},
         {"physicsmaterial2d", eAssetImporterType::PhysicsMaterial2D},
         {"rendertexture", eAssetImporterType::RenderTexture},
+        {"environment", eAssetImporterType::Environment},
         {"cubemap", eAssetImporterType::Cubemap},
         {"spriteatlas", eAssetImporterType::SpriteAtlas},
         // 本项目的显式地形数据扩展名；Unity 通常将 TerrainData 保存在 .asset。

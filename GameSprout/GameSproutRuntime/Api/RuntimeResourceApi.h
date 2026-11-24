@@ -4,6 +4,7 @@
 #include "RuntimeAnimationData.h"
 #include "RuntimeShaderData.h"
 #include "Memory/ByteBuffer.h"
+#include <array>
 #include <span>
 
 namespace GameSproutRuntime {
@@ -92,6 +93,13 @@ struct TexturePrefetchSource {
     std::vector<TextureSubresource> Subresources;
 };
 
+struct EnvironmentRenderData {
+    TextureRenderData Sky;
+    TextureRenderData Specular;
+    // Radiance convolved with cosine and divided by pi. Polynomial basis:
+    // 1, y, z, x, xy, yz, 3zz-1, xz, xx-yy in cubemap coordinates.
+    std::array<Vector3,9> DiffuseSH{};
+};
 struct FontGlyph {
     std::uint32_t Codepoint = 0;
     std::uint32_t X = 0, Y = 0, Width = 0, Height = 0; // Atlas pixels, top-left origin.
@@ -179,6 +187,9 @@ public:
     // data. Returning false retains LoadTexture().
     virtual bool ResolveTexturePrefetch(const ResourceReference&, TexturePrefetchSource& source) {
         source={};return false;
+    }
+    virtual bool LoadEnvironment(const ResourceReference&,EnvironmentRenderData& data,std::string& error) {
+        data={};error="Environment loading is unavailable";return false;
     }
 };
 

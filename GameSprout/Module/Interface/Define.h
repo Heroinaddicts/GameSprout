@@ -46,6 +46,7 @@ enum class eAssetImporterType : uint16_t {
     DataAsset = 27,
     LightingSettings = 28,
     LightmapParameters = 29,
+    Environment = 33,
 
     Folder = 254, // 目录的身份和 Meta 管理，不生成可渲染的模型等产物。
     Prefab = 255  // 单根模板；Nested/Variant组合字段预留。

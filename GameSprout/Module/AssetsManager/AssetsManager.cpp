@@ -22,6 +22,7 @@
 #include "PhysicsMaterial2DAssetFactory.hpp"
 #include "RenderTextureAssetFactory.hpp"
 #include "CubemapAssetFactory.hpp"
+#include "EnvironmentAssetFactory.hpp"
 #include "SpriteAtlasAssetFactory.hpp"
 #include "TerrainDataAssetFactory.hpp"
 #include "TerrainLayerAssetFactory.hpp"
@@ -80,6 +81,7 @@ bool AssetsManager::Initialize(GameSproutModuleApi * const api) {
     AssetsManager::RegistFactory(eAssetImporterType::PhysicsMaterial, OnPhysicsMaterialAssetCreate);
     AssetsManager::RegistFactory(eAssetImporterType::PhysicsMaterial2D, OnPhysicsMaterial2DAssetCreate);
     AssetsManager::RegistFactory(eAssetImporterType::RenderTexture, OnRenderTextureAssetCreate);
+    AssetsManager::RegistFactory(eAssetImporterType::Environment, OnEnvironmentAssetCreate);
     AssetsManager::RegistFactory(eAssetImporterType::Cubemap, OnCubemapAssetCreate);
     AssetsManager::RegistFactory(eAssetImporterType::SpriteAtlas, OnSpriteAtlasAssetCreate);
     AssetsManager::RegistFactory(eAssetImporterType::TerrainData, OnTerrainDataAssetCreate);

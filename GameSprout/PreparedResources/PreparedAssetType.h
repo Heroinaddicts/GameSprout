@@ -49,6 +49,7 @@ enum class eAssetType : uint16_t {
     ShaderVariantCollection = 26,
     LightingSettings = 28,
     LightmapParameters = 29,
+    Environment = 33,
 
     // 编辑器侧资源类别，不作为可执行 Shader 或游戏运行时目录产物。
     ShaderInclude = 8,
