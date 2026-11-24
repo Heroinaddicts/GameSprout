@@ -5,14 +5,22 @@
 
 namespace GRHI {
 bool DeviceSDL::ReadTexture(ITexture* value,std::vector<uint8_t>& pixels) {
+    return ReadColorTexture(value,false,pixels);
+}
+
+bool DeviceSDL::ReadTextureRGBA16F(ITexture* value,std::vector<uint8_t>& pixels) {
+    return ReadColorTexture(value,true,pixels);
+}
+
+bool DeviceSDL::ReadColorTexture(ITexture* value,bool halfFloat,std::vector<uint8_t>& pixels) {
     pixels.clear();ClearError();
     auto* texture=Resource<TextureSDL>(value,ResourceKindSDL::Texture);
     if(!_Device || !OnMainThread() || !_Commands.empty() || !texture || !texture->Native ||
        texture->Desc.Dimension!=TextureDimension::Texture2D || texture->Desc.Format==TextureFormat::D32_Float ||
-       texture->Desc.Format==TextureFormat::RGBA16_Float) {
-        return Fail("ReadTexture requires a live local RGBA8/BGRA8 2D texture, the device thread and no outstanding commands.");
+       (texture->Desc.Format==TextureFormat::RGBA16_Float)!=halfFloat) {
+        return Fail("ReadTexture requires a live 2D texture in the requested color format, the device thread and no outstanding commands.");
     }
-    const uint64_t size=uint64_t(texture->Desc.Width)*texture->Desc.Height*4;
+    const uint64_t size=uint64_t(texture->Desc.Width)*texture->Desc.Height*(halfFloat?8:4);
     if(!size || size>UINT32_MAX)return Fail("ReadTexture exceeds transfer-buffer limits.");
     SDL_GPUTransferBufferCreateInfo info{};info.usage=SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;info.size=static_cast<uint32_t>(size);
     auto* transfer=SDL_CreateGPUTransferBuffer(_Device,&info);

@@ -57,12 +57,14 @@ void RenderResourceCache::Synchronize() {
     // their complete identity; a sibling LocalID is never an invalidation key.
     changed(Meshes,meshes);changed(Textures,textures);
     changed(Materials,materials);changed(UserShaders,shaders);
-    // Environment addresses are only borrowed within a Render invocation;
-    // changing a sky asset needs no scene/mesh/material snapshot invalidation.
+    // Environment changes invalidate per-viewport probe bindings. They do not
+    // affect scene/mesh/material snapshots.
     for(auto entry=Environments.begin();entry!=Environments.end();) {
         const ResourceReference reference{entry->first.Guid,entry->first.LocalID};
-        if(Provider.GetResourceRevision(reference)!=entry->second.ResourceRevision)entry=Environments.erase(entry);
-        else ++entry;
+        if(Provider.GetResourceRevision(reference)!=entry->second.ResourceRevision) {
+            entry=Environments.erase(entry);
+            if(++EnvironmentGeneration==0)++EnvironmentGeneration;
+        } else ++entry;
     }
     _Revision=revision;_RevisionKnown=true;
     if(meshes.empty()&&textures.empty()&&materials.empty()&&shaders.empty())return;

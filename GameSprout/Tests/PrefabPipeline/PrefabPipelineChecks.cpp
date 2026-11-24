@@ -254,6 +254,7 @@ void CheckSceneEnvironmentReference() {
     scene["EnvironmentLighting"]["Mode"]="SkyEnvironment";
     const std::string sourceGuid="567890ABCDEF1234567890ABCDEF1234";
     scene["EnvironmentLighting"]["SkyEnvironment"]=Reference(sourceGuid,73);
+    scene["EnvironmentLighting"]["ReflectionProbes"][0]["Environment"]=Reference(sourceGuid,73);
     const auto imported=fixture.Import(scene,true);
     Check(imported.Success,imported.Result.Error);
     const auto& manifest=imported.Result.Manifest;
@@ -263,8 +264,9 @@ void CheckSceneEnvironmentReference() {
           "Sky environment did not contribute a build dependency from its scene");
     Json::Value wrapper;
     Check(ObjectDocumentBinary::Decode(imported.Bytes,wrapper)&&
-          SameReference(wrapper["Data"]["EnvironmentLighting"]["SkyEnvironment"],sourceGuid,73),
-          "Prepared Scene lost the sky environment reference");
+          SameReference(wrapper["Data"]["EnvironmentLighting"]["SkyEnvironment"],sourceGuid,73)&&
+          SameReference(wrapper["Data"]["EnvironmentLighting"]["ReflectionProbes"][0]["Environment"],sourceGuid,73),
+          "Prepared Scene lost a sky or reflection probe environment reference");
 }
 void CheckSceneRecomposition(Fixture& fixture,std::uint64_t prefabLocalID) {
     auto oldSource=Source();auto& baseline=oldSource["Data"];

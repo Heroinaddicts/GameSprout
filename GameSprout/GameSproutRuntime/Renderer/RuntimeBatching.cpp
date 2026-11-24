@@ -114,7 +114,8 @@ void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,boo
                 if(next.ShadowDoubleSided!=draw.ShadowDoubleSided)break;
             }else if(next.Material!=draw.Material||next.Object->Layer!=draw.Object->Layer||
                 (draw.Material->ShadingModel==MaterialShadingModel::Lit&&
-                    (next.Object->ReceiveShadows!=draw.Object->ReceiveShadows||next.LocalLightIndices!=draw.LocalLightIndices)))break;
+                    (next.Object->ReceiveShadows!=draw.Object->ReceiveShadows||next.LocalLightIndices!=draw.LocalLightIndices||
+                     next.ReflectionProbeIndex!=draw.ReflectionProbeIndex)))break;
             ++end;
         }
         const auto count=static_cast<std::uint32_t>(end-begin);

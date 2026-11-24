@@ -13,7 +13,8 @@ bool Same(const EnvironmentLightingSnapshot& a,const EnvironmentLightingSnapshot
        a.Settings.SkyRotationDegrees!=b.Settings.SkyRotationDegrees||
        a.Settings.SkyIntensity!=b.Settings.SkyIntensity||a.Settings.ReflectionIntensity!=b.Settings.ReflectionIntensity||
        a.Settings.HDREnabled!=b.Settings.HDREnabled||a.Settings.ExposureEV!=b.Settings.ExposureEV||
-       a.Settings.Tonemap!=b.Settings.Tonemap||a.Settings.SpotShadows!=b.Settings.SpotShadows)return false;
+       a.Settings.Tonemap!=b.Settings.Tonemap||a.Settings.SpotShadows!=b.Settings.SpotShadows||
+       a.Settings.ReflectionProbes!=b.Settings.ReflectionProbes)return false;
     const auto color=[](GameSproutRuntime::Color x,GameSproutRuntime::Color y){return x.R==y.R&&x.G==y.G&&x.B==y.B&&x.A==y.A;};
     if(!color(a.Settings.AmbientColor,b.Settings.AmbientColor)||!color(a.Settings.SkyColor,b.Settings.SkyColor)||
        !color(a.Settings.EquatorColor,b.Settings.EquatorColor)||!color(a.Settings.GroundColor,b.Settings.GroundColor))return false;

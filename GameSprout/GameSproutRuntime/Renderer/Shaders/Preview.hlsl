@@ -215,6 +215,9 @@ cbuffer EnvironmentUniform : register(b1, space3)
     float4 AtmosphereZenithColor;
     float4 AtmosphereHorizonColor;
     float4 SkyTransform;
+    float4 ProbeCenter;
+    float4 ProbeExtent;
+    float4 ProbePosition;
 };
 #include "Atmosphere.hlsl"
 #include "ToneMapping.hlsl"
@@ -435,17 +438,27 @@ float3 DiffuseEnvironment(float3 normal)
 }
 TextureCube<float4> SpecularEnvironment : register(t5, space2);
 SamplerState SpecularEnvironmentSampler : register(s5, space2);
+#include "ReflectionProbes.hlsl"
 
-float3 ReflectedEnvironment(float3 normal, float3 view, float nDotV, float3 f0)
+float3 ReflectedEnvironment(float3 world, float3 normal, float3 view, float nDotV, float3 f0, bool spatial)
 {
-    float roughness = saturate(LitParameters.y);
-    float3 ray = InverseSkyYaw(reflect(-view, normal), SkyTransform.xy);
-    float3 radiance = SpecularEnvironment.SampleLevel(SpecularEnvironmentSampler, ray, roughness * SkyTransform.z).rgb;
+    const float roughness = saturate(LitParameters.y);
+    const float3 ray = reflect(-view, normal);
+    const float weight = spatial ? ReflectionProbeWeight(world) : 0.0;
+    float3 radiance = 0.0;
+    if (weight < 1.0 && SkyTransform.w > 0.0)
+    {
+        float3 skyRay = InverseSkyYaw(ray, SkyTransform.xy);
+        radiance = SpecularEnvironment.SampleLevel(SpecularEnvironmentSampler, skyRay, roughness * SkyTransform.z).rgb * SkyTransform.w;
+    }
+    if (spatial && weight > 0.0)
+        radiance = lerp(radiance, SampleReflectionProbe(world, ray, roughness), weight);
+
     // Analytic integrated GGX fit (Karis) for the split sum with the prefiltered cube.
     float4 fit = roughness * float4(-1.0, -0.0275, -0.572, 0.022) + float4(1.0, 0.0425, 1.04, -0.04);
     float a = min(fit.x * fit.x, exp2(-9.28 * nDotV)) * fit.x + fit.y;
     float2 scaleBias = float2(-1.04, 1.04) * a + fit.zw;
-    return radiance * max(f0 * scaleBias.x + scaleBias.y, 0.0) * SkyTransform.w;
+    return radiance * max(f0 * scaleBias.x + scaleBias.y, 0.0);
 }
 void AccumulateDirectLight(float3 light, float3 radiance, float shadow, float stylizedScale, float nDotL, float3 normal,
     float3 view, float nDotV, float alphaSquared, float3 f0, float3 diffuse,
@@ -479,7 +492,7 @@ void AccumulateDirectLight(float3 light, float3 radiance, float shadow, float st
     }
 }
 
-float4 EvaluateLit(MeshOutput input, bool useReflections)
+float4 EvaluateLit(MeshOutput input, bool useReflections, bool useSpatialLighting)
 {
     float4 base = BaseTexture.Sample(BaseSampler, input.UV) * input.Color;
     float3 albedo = saturate(base.rgb);
@@ -497,7 +510,7 @@ float4 EvaluateLit(MeshOutput input, bool useReflections)
     // URP's metallic workflow keeps the dielectric 4% reflected fraction out of
     // the diffuse lobe: oneMinusReflectivity = .96 * (1 - metallic). Diffuse
     // irradiance remains independent of the viewing camera.
-    float3 ambient = DiffuseEnvironment(normal) * albedo * (0.96 * (1.0 - metallic));
+    float3 ambient = DiffuseEnvironment(normal) * diffuse;
     color += ambient;
     float3 stylizedDirect = 0.0;
     float stylizedIllumination = 0.0;
@@ -543,18 +556,24 @@ float4 EvaluateLit(MeshOutput input, bool useReflections)
         stylized = max(lerp(luminance.xxx, stylized, StyleParameters.w), 0.0);
         color = lerp(color, stylized, StyleParameters.x);
     }
-    if (useReflections) color += ReflectedEnvironment(normal, view, nDotV, f0);
+    if (useReflections || useSpatialLighting)
+        color += ReflectedEnvironment(input.WorldPosition, normal, view, nDotV, f0, useSpatialLighting);
     return float4(ApplySceneFog(color, input.WorldPosition), base.a);
 }
 
 float4 LitFragment(MeshOutput input) : SV_Target0
 {
-    return EvaluateLit(input, false);
+    return EvaluateLit(input, false, false);
 }
 
 float4 LitEnvironmentFragment(MeshOutput input) : SV_Target0
 {
-    return EvaluateLit(input, true);
+    return EvaluateLit(input, true, false);
+}
+
+float4 LitSpatialFragment(MeshOutput input) : SV_Target0
+{
+    return EvaluateLit(input, false, true);
 }
 
 struct GridInput {

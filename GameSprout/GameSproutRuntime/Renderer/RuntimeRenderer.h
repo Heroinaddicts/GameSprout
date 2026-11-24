@@ -23,6 +23,7 @@ public:
     Renderer& operator=(const Renderer&)=delete;
     bool Render(const RenderView& view) override;
     bool ReadPixels(std::vector<std::uint8_t>&,std::string&) override;
+    bool ReadLinearColorHalf(std::vector<std::uint8_t>&,std::string&) override;
     bool Resize(std::uint32_t,std::uint32_t,std::string&) override;
     void BindSurface(GRHI::ISurface* surface) {_Surface=surface;}
 
@@ -68,6 +69,7 @@ private:
         std::unique_ptr<GRHI::ITexture> Sky,Specular;
         std::array<Vector3,9> DiffuseSH{};
         float SpecularMaxLOD=0;
+        bool SkyAttempted=false;
         std::string Error;
     };
     struct ColliderMeshWire {
@@ -113,9 +115,10 @@ private:
         std::int32_t Color=-1,UV=-1,BoneIndices=-1,BoneWeights=-1;
         bool Grid=false,DoubleSided=false,Negative=false,DebugTriangles=false,DepthTest=true,Lit=false,Instanced=false,Shadow=false;
         bool EnvironmentReflections=false;
+        bool SpatialLighting=false;
         bool operator<(const PipelineKey& other) const {
-            return std::tie(Format,Stride,Position,Normal,Color,UV,BoneIndices,BoneWeights,Grid,DoubleSided,Negative,DebugTriangles,DepthTest,Lit,Instanced,Shadow,EnvironmentReflections)<
-                std::tie(other.Format,other.Stride,other.Position,other.Normal,other.Color,other.UV,other.BoneIndices,other.BoneWeights,other.Grid,other.DoubleSided,other.Negative,other.DebugTriangles,other.DepthTest,other.Lit,other.Instanced,other.Shadow,other.EnvironmentReflections);
+            return std::tie(Format,Stride,Position,Normal,Color,UV,BoneIndices,BoneWeights,Grid,DoubleSided,Negative,DebugTriangles,DepthTest,Lit,Instanced,Shadow,EnvironmentReflections,SpatialLighting)<
+                std::tie(other.Format,other.Stride,other.Position,other.Normal,other.Color,other.UV,other.BoneIndices,other.BoneWeights,other.Grid,other.DoubleSided,other.Negative,other.DebugTriangles,other.DepthTest,other.Lit,other.Instanced,other.Shadow,other.EnvironmentReflections,other.SpatialLighting);
         }
     };
     struct Depth {GRHI::ITexture* Texture=nullptr;std::uint64_t LastUsed=0;};
@@ -143,6 +146,8 @@ private:
         bool Negative=false;
         std::uint8_t Layer=0;
         std::uint64_t LocalLightGeneration=0,LocalLightFrame=0;
+        std::uint64_t ReflectionProbeFrame=0,ReflectionProbeGeneration=0;
+        std::size_t ReflectionProbeIndex=0;
         std::array<std::uint32_t,MaxLocalLights> LocalLightIndices{};
     };
     struct SkinnedDrawState {std::size_t ObjectIndex;Bounds LocalBounds;};
@@ -232,6 +237,7 @@ private:
         std::uint64_t SectionOrdinal=0;
         bool ShadowDoubleSided=false;
         std::array<std::uint32_t,MaxLocalLights> LocalLightIndices{}; // One-based indices, zero terminator.
+        std::size_t ReflectionProbeIndex=0; // One-based authored index, zero selects the global sky.
     };
     struct ShadowCandidate { PreparedDraw Draw; Bounds World; };
     struct StaticShadowCasterKey {
@@ -285,6 +291,10 @@ private:
     void ClearInstanceBuffers();
     bool ExtractLights(IScene*,std::vector<DirectionalLight>&);
     void PrepareLocalLights();
+    void PrepareReflectionProbes(const RenderView&,const EnvironmentLightingSettings&);
+    GRHI::ITexture* BlackEnvironmentCube();
+    bool BindSpatialEnvironment(GRHI::IRenderPass&,const PreparedDraw&,const EnvironmentLightingSettings&,
+        const EnvironmentGPU*,RenderEnvironment::Uniform&);
     LitUniform MakeLitUniform(const RenderView&,const PreparedDraw&,const std::vector<DirectionalLight>&);
     RenderFrustum::Box LocalLightObjectBounds(const DrawObject&,const MeshGPU&) const;
     bool RenderSpotShadows(GRHI::ICommandBuffer&,const RenderView&,const Mat4& viewProjection);
@@ -343,7 +353,7 @@ private:
     GRHI::IGraphicsPipeline* FullscreenPipeline(PreviewShader vertex,PreviewShader fragment,
         GRHI::TextureFormat color,GRHI::TextureFormat depth);
     bool ResolveHDR(GRHI::IRenderPass&,GRHI::TextureFormat color,GRHI::TextureFormat depth,const EnvironmentLightingSettings&);
-    const EnvironmentGPU* Environment(const ResourceReference&);
+    const EnvironmentGPU* Environment(const ResourceReference&,bool loadSky=true);
     GRHI::ISampler* EnvironmentSampler();
     bool DrawGrid(GRHI::IRenderPass& pass,const Mat4& viewProjection,GRHI::TextureFormat format);
     bool DrawSky(GRHI::IRenderPass&,const RenderView&,GRHI::TextureFormat,float aspect,
@@ -385,6 +395,10 @@ private:
     std::vector<bool> _VisibleLocalShadowReceivers;
     std::uint64_t _LocalLightGeneration=1;
     bool _HadLocalLighting=false;
+    struct ReflectionProbeBinding {const EnvironmentGPU* Resource=nullptr;bool Resolved=false;};
+    std::vector<ReflectionProbeSettings> _ReflectionProbeSettings;
+    std::vector<ReflectionProbeBinding> _ReflectionProbeBindings;
+    std::uint64_t _ReflectionProbeGeneration=1,_ReflectionProbeEnvironmentGeneration=0;
     std::unordered_set<std::uint64_t> _LightTransformSources;
     FrameUniform _ShaderFrame;
     std::vector<PreparedDraw> _PreparedDraws;
@@ -471,6 +485,8 @@ private:
     RenderStatistics _Statistics;
     RenderedCamera _RenderedCamera;
     bool _HasRenderedCamera=false;
+    bool _LinearCaptureReady=false;
+    StaticFlags _ObjectRequiredStaticFlags=StaticFlags::None;
     std::string _Error;
 };
 }

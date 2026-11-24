@@ -35,10 +35,12 @@ struct DebugBufferScope {
 }
 namespace GameSproutRuntime {
 bool Renderer::Render(const RenderView& view) {
-    _HasRenderedCamera=false;_RenderedCamera={};
+    _HasRenderedCamera=false;_RenderedCamera={};_LinearCaptureReady=false;
     if(_Rendering || _Runtime.IsExecuting() || _Runtime.IsShuttingDown() || _Runtime.IsConstructing()) return Fail("Runtime Renderer cannot run inside a Runtime callback, construction or another Render");
     _Error.clear();_Statistics={};_ShadowRecorded=false;_SpotShadowRecorded=false;
     if(!_Surface&&!_ColorTarget){_Statistics={};return true;}
+    if(view.CaptureLinearColor&&(_Surface||!view.DrawScene))return Fail("Linear capture requires an offscreen 3D render");
+    if(!IsValidStaticFlags(view.RequiredStaticFlags))return Fail("RenderView mesh static flag filter is invalid");
     if(_Surface&&_ColorTarget)return Fail("Viewport has conflicting render targets");
     if(view.DrawScene||view.DrawUI) {
         auto* scene=_Runtime.Find(view.Scene);
@@ -114,6 +116,7 @@ bool Renderer::Render(const RenderView& view) {
             PrepareDraws(view,viewProjection);
             EndTexturePrefetchFrame();
             PrepareLocalLights();
+            PrepareReflectionProbes(view,*settings);
             if(!_ColorInstanceBatchesKnown||_ColorInstancingEnabled!=view.EnableGPUInstancing) {
                 _ColorInstances.Indices.clear();
                 PrepareInstanceBatches(_PreparedDraws,view.EnableGPUInstancing,false,_ColorInstanceDraws,_ColorInstances.Indices);
@@ -134,7 +137,7 @@ bool Renderer::Render(const RenderView& view) {
         }
         if(view.DrawUI&&!PrepareUI(*view.Scene,width,height,view.UIPreviewObjectID,view.UIScreenPreviewLayoutSize))return false;
         GRHI::RenderPassDesc pass;
-        const bool hdr=settings&&settings->HDREnabled;
+        const bool hdr=settings&&(settings->HDREnabled||view.CaptureLinearColor);
         auto sceneFormat=format;
         pass.ColorTarget=target;
         if(hdr) {
@@ -170,6 +173,7 @@ bool Renderer::Render(const RenderView& view) {
         auto* submitted=command.Command;command.Command=nullptr;
         if(!_Device.Submit(submitted)) return Fail(DeviceError("Submit Runtime view"));
         _InstanceFrameSubmitted=true;
+        _LinearCaptureReady=view.CaptureLinearColor;
         // A recorded atlas is reusable only after the whole command is submitted.
         // A later color-pass error/cancel must not cache an unexecuted depth pass.
         if(_ShadowRecorded)_ShadowValid=true;

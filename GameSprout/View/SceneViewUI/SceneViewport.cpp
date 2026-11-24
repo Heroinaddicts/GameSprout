@@ -252,6 +252,7 @@ void SceneViewport::RenderScene(GameSproutRuntime::IScene* scene,bool grid,float
             std::to_string(info.DynamicShadowDrawCalls)+" draws / "+std::to_string(info.DynamicShadowMapUpdates)+" updates";
         else if(info.ShadowCascadeCount)message+=" · shadow draws "+std::to_string(info.ShadowDrawCalls)+
             " · cascades "+std::to_string(info.ShadowCascadeCount)+" · shadow updates "+std::to_string(info.ShadowMapUpdates);
+        if(info.ReflectionProbeDrawCalls)message+=" · 局部反射 "+std::to_string(info.ReflectionProbeDrawCalls)+" draws";
         const std::string diagnostic=_Renderer->GetLastError();
         if(!diagnostic.empty())message+=" · "+diagnostic;
         if(!_EditingError.empty())message+=" · "+_EditingError;

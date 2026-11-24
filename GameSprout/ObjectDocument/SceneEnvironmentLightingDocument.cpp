@@ -22,7 +22,7 @@ GameSproutRuntime::Color Color(const Json::Value& data,const std::string& path) 
 Json::Value Color(GameSproutRuntime::Color color) {
     Json::Value data(Json::arrayValue);data.append(color.R);data.append(color.G);data.append(color.B);data.append(color.A);return data;
 }
-GameSproutRuntime::ResourceReference ReadSkyEnvironment(const Json::Value& value,const std::string& path) {
+GameSproutRuntime::ResourceReference ReadResource(const Json::Value& value,const std::string& path) {
     if(value.isNull())return {};
     if(!value.isObject()||value.size()!=2||!value["Guid"].isString()||!value["LocalID"].isUInt64()||
        value["LocalID"].asUInt64()==0)Fail(path,"expected a resource Guid and positive LocalID");
@@ -37,6 +37,73 @@ GameSproutRuntime::ResourceReference ReadSkyEnvironment(const Json::Value& value
     if(!nonzero)Fail(path+".Guid","zero GUID is not a resource reference");
     return {std::move(guid),value["LocalID"].asUInt64()};
 }
+GameSproutRuntime::Vector3 Vector(const Json::Value& value,const std::string& path) {
+    if(!value.isArray()||value.size()!=3)Fail(path,"expected three coordinates");
+    return {Number(value[0],path+"[0]",true),Number(value[1],path+"[1]",true),Number(value[2],path+"[2]",true)};
+}
+Json::Value Vector(GameSproutRuntime::Vector3 value) {
+    Json::Value result(Json::arrayValue);
+    result.append(value.X);result.append(value.Y);result.append(value.Z);
+    return result;
+}
+bool Boolean(const Json::Value& value,const std::string& path) {
+    if(!value.isBool())Fail(path,"expected boolean");
+    return value.asBool();
+}
+std::uint32_t Unsigned(const Json::Value& value,const std::string& path) {
+    if((value.type()!=Json::intValue&&value.type()!=Json::uintValue)||!value.isUInt())
+        Fail(path,"expected an unsigned 32-bit integer");
+    return value.asUInt();
+}
+std::int32_t Integer(const Json::Value& value,const std::string& path) {
+    if((value.type()!=Json::intValue&&value.type()!=Json::uintValue)||!value.isInt())
+        Fail(path,"expected a signed 32-bit integer");
+    return value.asInt();
+}
+Json::Value Resource(const GameSproutRuntime::ResourceReference& reference,const std::string& path) {
+    if(reference.Guid.empty())return {};
+    Json::Value result(Json::objectValue);
+    result["Guid"]=reference.Guid;
+    result["LocalID"]=Json::UInt64(reference.LocalID);
+    result["Guid"]=ReadResource(result,path).Guid;
+    return result;
+}
+void ReadSpatial(const Json::Value& root,const std::string& path,GameSproutRuntime::EnvironmentLightingSettings& settings) {
+    if(root.isMember("ReflectionProbes")) {
+        const auto& values=root["ReflectionProbes"];const auto key=path+".ReflectionProbes";
+        if(!values.isArray())Fail(key,"expected array");
+        for(Json::ArrayIndex i=0;i<values.size();++i) {
+            const auto& value=values[i];const auto item=key+"["+std::to_string(i)+"]";
+            if(!value.isObject())Fail(item,"expected object");
+            auto& probe=settings.ReflectionProbes.emplace_back();
+            for(const auto& name:value.getMemberNames()) {
+                const auto member=item+"."+name;
+                if(name=="Enabled")probe.Enabled=Boolean(value[name],member);
+                else if(name=="BoxProjection")probe.BoxProjection=Boolean(value[name],member);
+                else if(name=="Environment")probe.Environment=ReadResource(value[name],member);
+                else if(name=="CapturePosition")probe.CapturePosition=Vector(value[name],member);
+                else if(name=="Center")probe.Center=Vector(value[name],member);
+                else if(name=="Size")probe.Size=Vector(value[name],member);
+                else if(name=="BlendDistance")probe.BlendDistance=Number(value[name],member);
+                else if(name=="Intensity")probe.Intensity=Number(value[name],member);
+                else if(name=="Priority")probe.Priority=Integer(value[name],member);
+                else if(name=="CullingMask")probe.CullingMask=Unsigned(value[name],member);
+                else Fail(member,"unknown field");
+            }
+            if(!GameSproutRuntime::IsValidReflectionProbe(probe))Fail(item,"invalid reflection probe settings");
+        }
+    }
+}
+void SerializeSpatial(const GameSproutRuntime::EnvironmentLightingSettings& settings,Json::Value& result) {
+    for(const auto& probe:settings.ReflectionProbes) {
+        auto& value=result["ReflectionProbes"].append(Json::Value(Json::objectValue));
+        value["Enabled"]=probe.Enabled;value["BoxProjection"]=probe.BoxProjection;
+        value["Environment"]=Resource(probe.Environment,"Scene.EnvironmentLighting.ReflectionProbes.Environment");
+        value["CapturePosition"]=Vector(probe.CapturePosition);value["Center"]=Vector(probe.Center);value["Size"]=Vector(probe.Size);
+        value["BlendDistance"]=probe.BlendDistance;value["Intensity"]=probe.Intensity;
+        value["Priority"]=probe.Priority;value["CullingMask"]=probe.CullingMask;
+    }
+}
 }
 namespace SceneEnvironmentLightingDocument {
 GameSproutRuntime::EnvironmentLightingSettings Read(const Json::Value& data,const std::string& path) {
@@ -44,7 +111,8 @@ GameSproutRuntime::EnvironmentLightingSettings Read(const Json::Value& data,cons
     for(const auto& name:data.getMemberNames())
         if(name!="Mode"&&name!="AmbientColor"&&name!="SkyColor"&&name!="EquatorColor"&&name!="GroundColor"&&name!="Intensity"&&
            name!="SHCoefficients"&&name!="Atmosphere"&&name!="SkyEnvironment"&&name!="SkyRotationDegrees"&&name!="SkyIntensity"&&
-           name!="ReflectionIntensity"&&name!="HDREnabled"&&name!="ExposureEV"&&name!="Tonemap"&&name!="SpotShadows")
+           name!="ReflectionIntensity"&&name!="HDREnabled"&&name!="ExposureEV"&&name!="Tonemap"&&name!="SpotShadows"&&
+           name!="ReflectionProbes")
             Fail(path+"."+name,"unknown field");
     GameSproutRuntime::EnvironmentLightingSettings result;
     if(data.isMember("Mode")) {
@@ -92,7 +160,7 @@ GameSproutRuntime::EnvironmentLightingSettings Read(const Json::Value& data,cons
         if(settings.FogMaxOpacity>1)Fail(key+".FogMaxOpacity","must be between zero and one");
     }
     if(data.isMember("SkyEnvironment"))
-        result.SkyEnvironment=ReadSkyEnvironment(data["SkyEnvironment"],path+".SkyEnvironment");
+        result.SkyEnvironment=ReadResource(data["SkyEnvironment"],path+".SkyEnvironment");
     if(data.isMember("SkyRotationDegrees"))
         result.SkyRotationDegrees=Number(data["SkyRotationDegrees"],path+".SkyRotationDegrees",true);
     if(data.isMember("SkyIntensity"))result.SkyIntensity=Number(data["SkyIntensity"],path+".SkyIntensity");
@@ -130,6 +198,7 @@ GameSproutRuntime::EnvironmentLightingSettings Read(const Json::Value& data,cons
             }else Fail(key+"."+name,"unknown field");
         }
     }
+    ReadSpatial(data,path,result);
     return result;
 }
 Json::Value Serialize(const GameSproutRuntime::EnvironmentLightingSettings& settings) {
@@ -159,7 +228,7 @@ Json::Value Serialize(const GameSproutRuntime::EnvironmentLightingSettings& sett
         auto& sky=result["SkyEnvironment"];
         sky["Guid"]=settings.SkyEnvironment.Guid;
         sky["LocalID"]=Json::UInt64(settings.SkyEnvironment.LocalID);
-        sky["Guid"]=ReadSkyEnvironment(sky,"Scene.EnvironmentLighting.SkyEnvironment").Guid;
+        sky["Guid"]=ReadResource(sky,"Scene.EnvironmentLighting.SkyEnvironment").Guid;
     }
     result["SkyRotationDegrees"]=settings.SkyRotationDegrees;
     result["SkyIntensity"]=settings.SkyIntensity;
@@ -176,6 +245,7 @@ Json::Value Serialize(const GameSproutRuntime::EnvironmentLightingSettings& sett
         shadows["MaxLights"]=Json::UInt(settings.SpotShadows.MaxLights);
         shadows["MaxResolution"]=Json::UInt(settings.SpotShadows.MaxResolution);
     }
+    SerializeSpatial(settings,result);
     return result;
 }
 }

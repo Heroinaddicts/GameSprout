@@ -606,6 +606,9 @@ namespace GRHI {
                                                    const TextureInitialData& data) {
             return mipLevel == 0 && arrayLayer == 0 && UploadTextureRows(texture, firstRow, rowCount, data);
         }
+        // Explicit synchronous readback of an RGBA16F 2D color texture. The
+        // output is tightly packed, top-first RGBA binary16 in little endian.
+        virtual bool ReadTextureRGBA16F(ITexture*, std::vector<uint8_t>& pixels) { pixels.clear();return false; }
     };
 
     // GRHI 的入口，负责枚举物理显卡和创建渲染设备，不直接记录绘制命令。

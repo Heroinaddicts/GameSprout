@@ -11,7 +11,9 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
     PipelineKey key;key.Format=format;key.Stride=data.VertexStride;key.Position=data.PositionOffset;key.Normal=data.NormalOffset;
     key.Color=data.ColorOffset;key.UV=data.UVOffset;key.DoubleSided=draw.Material->DoubleSided;key.Negative=draw.Object->Negative;
     key.Lit=draw.Material->ShadingModel==MaterialShadingModel::Lit;key.Instanced=instanceCount>1;
-    key.EnvironmentReflections=key.Lit&&draw.Material->EnvironmentReflections&&reflections;
+    const bool skyReflection=key.Lit&&draw.Material->EnvironmentReflections&&reflections;
+    key.SpatialLighting=key.Lit&&(draw.ReflectionProbeIndex);
+    key.EnvironmentReflections=skyReflection&&!key.SpatialLighting;
     if(draw.Object->Skinned){key.BoneIndices=data.BoneIndicesOffset;key.BoneWeights=data.BoneWeightsOffset;}
     auto* pipeline=Pipeline(key);if(!pipeline)return false;
     DrawUniform uniform;uniform.ViewProjection=viewProjection;
@@ -32,8 +34,16 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
     pass.SetFragmentTextureSampler(0,draw.Texture?draw.Texture->Texture:_White,draw.Texture?draw.Texture->Sampler:_DefaultSampler);
     if(key.Lit) {
         const auto lightUniform=MakeLitUniform(view,draw,lights);
+        if(key.SpatialLighting) {
+            auto spatialEnvironment=environment;
+            if(!BindSpatialEnvironment(pass,draw,view.Scene->GetEnvironmentLighting(),
+                skyReflection?reflections:nullptr,spatialEnvironment))return false;
+            pass.SetFragmentUniform(1,&spatialEnvironment,sizeof(spatialEnvironment));
+        } else {
+            pass.SetFragmentUniform(1,&environment,sizeof(environment));
+            if(key.EnvironmentReflections)pass.SetFragmentTextureSampler(5,reflections->Specular.get(),EnvironmentSampler());
+        }
         pass.SetFragmentUniform(0,&lightUniform,sizeof(lightUniform));
-        pass.SetFragmentUniform(1,&environment,sizeof(environment));
         pass.SetFragmentUniform(2,&_ShadowUniform,sizeof(_ShadowUniform));
         pass.SetFragmentUniform(3,&_SpotShadowUniform,sizeof(_SpotShadowUniform));
         auto* shadowAtlas=_ShadowAtlas?_ShadowAtlas:_White;
@@ -43,10 +53,10 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
         pass.SetFragmentTextureSampler(4,_SpotShadowCount?_SpotShadowAtlas:_White,shadowSampler);
         pass.SetFragmentTextureSampler(1,draw.NormalTexture?draw.NormalTexture->Texture:_White,
             draw.NormalTexture?draw.NormalTexture->Sampler:_DefaultSampler);
-        if(key.EnvironmentReflections)pass.SetFragmentTextureSampler(5,reflections->Specular.get(),EnvironmentSampler());
     }
     pass.DrawIndexed(draw.Section.IndexCount,instanceCount,draw.Section.FirstIndex,0,0);
     ++_Statistics.DrawCalls;_Statistics.Triangles+=std::uint64_t(draw.Section.IndexCount/3)*instanceCount;
+    if(draw.ReflectionProbeIndex)++_Statistics.ReflectionProbeDrawCalls;
     return true;
 }
 }

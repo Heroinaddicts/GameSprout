@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bake a linear 2:1 OpenEXR or Radiance panorama into a GameSprout .environment."""
+"""Bake a linear HDR panorama or GameSprout cube capture into .environment."""
 import argparse
 import json
 from pathlib import Path
@@ -7,11 +7,12 @@ import struct
 import subprocess
 
 import numpy as np
-import OpenEXR
 
 
 def read_panorama(source):
     if source.suffix.lower() == ".exr":
+        import OpenEXR
+
         image = OpenEXR.File(str(source))
         channels = image.channels()
         color = channels.get("RGBA") or channels.get("RGB")
@@ -67,24 +68,77 @@ def sample(image, direction):
     return top_rgb * (1 - fy) + bottom_rgb * fy
 
 
+def read_cube(source):
+    with source.open("rb") as handle:
+        magic, size, reserved = struct.unpack("<8sII", handle.read(16))
+        if magic != b"GSCUBE01" or not 1 <= size <= 4096 or reserved:
+            raise ValueError("Invalid GameSprout cube capture header")
+        data = np.fromfile(handle, "<f2")
+    if data.size != 6 * size * size * 4:
+        raise ValueError("Invalid GameSprout cube capture length")
+    rgb = data.reshape(6, size, size, 4)[..., :3].astype(np.float32)
+    if not np.isfinite(rgb).all():
+        raise ValueError("Capture contains NaN or infinity")
+    return np.maximum(rgb, 0, out=rgb)
+
+
+def sample_cube(cube, direction):
+    size = cube.shape[1]
+    x, y, z = np.moveaxis(direction, -1, 0)
+    absolute = np.abs(direction)
+    major = absolute.argmax(axis=-1)
+    positive = np.take_along_axis(direction, major[..., None], axis=-1)[..., 0] >= 0
+    face = major * 2 + (~positive)
+    denominator = absolute.max(axis=-1)
+    s = np.choose(face, [-z, z, x, x, x, -x]) / denominator
+    t = np.choose(face, [-y, -y, z, -z, -y, -y]) / denominator
+    u = np.clip((s + 1) * size * .5 - .5, 0, size - 1)
+    v = np.clip((t + 1) * size * .5 - .5, 0, size - 1)
+    x0, y0 = u.astype(np.int32), v.astype(np.int32)
+    x1, y1 = np.minimum(x0 + 1, size - 1), np.minimum(y0 + 1, size - 1)
+    fx, fy = (u - x0)[..., None], (v - y0)[..., None]
+    return ((cube[face,y0,x0] * (1-fx) + cube[face,y0,x1] * fx) * (1-fy)
+            + (cube[face,y1,x0] * (1-fx) + cube[face,y1,x1] * fx) * fy)
+
+
+def sh_basis(x, y, z):
+    return np.stack((np.ones_like(x), y, z, x, x*y, y*z, 3*z*z-1, x*z, x*x-y*y))
+
+
+def convolve_diffuse(coefficients):
+    norm = np.array([0.282094792, 0.488602512, 0.488602512, 0.488602512,
+                     1.092548431, 1.092548431, 0.315391565, 1.092548431, 0.546274215])
+    bands = np.array([1, 2/3, 2/3, 2/3, 1/4, 1/4, 1/4, 1/4, 1/4])
+    return coefficients * (norm**2 * bands)[:, None]
+
+
+def diffuse_cube(cube):
+    size = cube.shape[1]
+    s, t = np.meshgrid(np.linspace(-1, 1, size+1), np.linspace(-1, 1, size+1))
+    area = np.arctan2(s*t, np.sqrt(1+s*s+t*t))
+    weights = np.diff(np.diff(area, axis=0), axis=1).reshape(-1)
+    coefficients = np.zeros((9, 3))
+    for face in range(6):
+        x, y, z = directions(face, size).T
+        coefficients += np.einsum("ij,jc,j->ic", sh_basis(x,y,z), cube[face].reshape(-1,3), weights)
+    return convolve_diffuse(coefficients)
+
+
 def diffuse_sh(image):
     height, width = image.shape[:2]
     phi = (0.5 - (np.arange(width) + 0.5) / width) * (2 * np.pi)
     theta = ((np.arange(height) + 0.5) / height) * np.pi
     latitude_edges = np.arange(height + 1) * np.pi / height
     weights = -np.diff(np.cos(latitude_edges)) * (2 * np.pi / width)
-    norm = np.array([0.282094792, 0.488602512, 0.488602512, 0.488602512,
-                     1.092548431, 1.092548431, 0.315391565, 1.092548431, 0.546274215])
-    bands = np.array([1, 2/3, 2/3, 2/3, 1/4, 1/4, 1/4, 1/4, 1/4])
     coefficients = np.zeros((9, 3))
     for row in range(0, height, 32):
         span = slice(row, row + 32)
         radius = np.sin(theta[span, None])
         x, z = radius * np.cos(phi), radius * np.sin(phi)
         y = np.broadcast_to(np.cos(theta[span, None]), x.shape)
-        basis = np.stack((np.ones_like(x), y, z, x, x*y, y*z, 3*z*z-1, x*z, x*x-y*y))
+        basis = sh_basis(x,y,z)
         coefficients += np.einsum("ijk,jkc,j->ic", basis, image[span], weights[span])
-    return coefficients * (norm**2 * bands)[:, None]
+    return convolve_diffuse(coefficients)
 
 
 def ggx_samples(count, roughness):
@@ -106,10 +160,10 @@ def ggx_samples(count, roughness):
     return rays.astype(np.float32), z[use]
 
 
-def filter_face(image, size, face, samples):
+def filter_face(sample_source, size, face, samples):
     normals = directions(face, size)
     if samples is None:
-        return sample(image, normals)
+        return sample_source(normals)
     rays, weights = samples
     rgb = np.empty_like(normals)
     for offset in range(0, len(normals), 512):
@@ -120,13 +174,13 @@ def filter_face(image, size, face, samples):
         v = np.cross(n, u)
         rotated = (u[:, None] * rays[None, :, 0:1] + v[:, None] * rays[None, :, 1:2]
                    + n[:, None] * rays[None, :, 2:3])
-        rgb[offset:offset + len(n)] = np.einsum("ijk,j->ik", sample(image, rotated), weights) / weights.sum()
+        rgb[offset:offset + len(n)] = np.einsum("ijk,j->ik", sample_source(rotated), weights) / weights.sum()
     return rgb
 
 
-def write_cube(output, image, size, samples=None):
+def write_cube(output, sample_source, size, samples=None):
     for face in range(6):
-        rgb = filter_face(image, size, face, samples)
+        rgb = filter_face(sample_source, size, face, samples)
         rgba = np.ones((len(rgb), 4), dtype="<f2")
         rgba[:, :3] = rgb
         output.write(rgba.tobytes())
@@ -148,9 +202,13 @@ def main():
             parser.error("sizes and samples must be powers of two greater than one")
     if args.output.suffix != ".environment" or args.source.resolve() == args.output.resolve():
         parser.error("provide a separate .environment output path")
-    image = read_panorama(args.source)
+    from_cube = args.source.suffix.lower() == ".gscube"
+    read = read_cube if from_cube else read_panorama
+    lookup = sample_cube if from_cube else sample
+    diffuse = diffuse_cube if from_cube else diffuse_sh
+    image = read(args.source)
     lighting = image if args.lighting_clamp is None else np.minimum(image, args.lighting_clamp)
-    coefficients = diffuse_sh(lighting)
+    coefficients = diffuse(lighting)
     levels = args.reflection_size.bit_length()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix(".environment.tmp")
@@ -158,10 +216,10 @@ def main():
         with temporary.open("wb") as output:
             output.write(struct.pack("<8s4I", b"GSENV001", args.sky_size, args.reflection_size, levels, 0))
             output.write(coefficients.astype("<f4").tobytes())
-            write_cube(output, image, args.sky_size)
+            write_cube(output, lambda direction: lookup(image, direction), args.sky_size)
             for level in range(levels):
                 samples = ggx_samples(args.samples, level / (levels - 1)) if level else None
-                write_cube(output, lighting, args.reflection_size >> level, samples)
+                write_cube(output, lambda direction: lookup(lighting, direction), args.reflection_size >> level, samples)
         temporary.replace(args.output)
     finally:
         temporary.unlink(missing_ok=True)

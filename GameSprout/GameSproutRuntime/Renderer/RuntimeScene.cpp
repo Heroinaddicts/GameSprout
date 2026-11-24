@@ -16,6 +16,7 @@ bool Renderer::SetDrawTransform(DrawObject& object,const Mat4& model) {
     if(!RuntimeMath::IsFinite(model)||!RuntimeMath::TryInverseAffine(model,inverse))return false;
     object.Model=model;
     object.LocalLightGeneration=0;
+    object.ReflectionProbeGeneration=0;
     object.CullBoxKnown=false;
     for(std::size_t row=0;row<3;++row)
         for(std::size_t column=0;column<3;++column)object.Normal(row,column)=inverse(column,row);
@@ -74,7 +75,8 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
     const auto& scene=static_cast<const Scene&>(*view.Scene);
     const auto revision=scene.GetRenderRevision();
     const auto mask=view.Camera.Projection.CullingMask;
-    if(_ObjectSnapshotKnown&&_ObjectSceneID==sceneID&&_ObjectCullingMask==mask) {
+    if(_ObjectSnapshotKnown&&_ObjectSceneID==sceneID&&_ObjectCullingMask==mask&&
+       _ObjectRequiredStaticFlags==view.RequiredStaticFlags) {
         std::vector<std::uint64_t> changes;
         if(_ObjectSceneRevision==revision||
             (scene.GetRenderTransformChanges(_ObjectSceneRevision,changes)&&UpdateSceneTransforms(*view.Scene,changes,objects))) {
@@ -101,6 +103,7 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
         for(std::size_t index=object->GetChildCount();index>0;--index) pending.push_back(object->GetChild(index-1));
         auto* renderer=object->GetComponent<IMeshRendererComponent>();
         if(!renderer) continue;
+        if((object->GetStaticFlags()&view.RequiredStaticFlags)!=view.RequiredStaticFlags)continue;
         auto* mesh=object->GetComponent<IMeshComponent>();
         if(!mesh || !object->IsActiveInHierarchy() || !renderer->IsVisible() || !(view.Camera.Projection.CullingMask&(1u<<object->GetLayer()))) {
             ++_Statistics.SkippedObjects;continue;
@@ -127,6 +130,7 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
         objects.push_back(std::move(data));
     }
     _ObjectSceneID=sceneID;_ObjectSceneRevision=revision;_ObjectCullingMask=mask;
+    _ObjectRequiredStaticFlags=view.RequiredStaticFlags;
     _ExtractionSkipped=_Statistics.SkippedObjects-skippedBefore;
     _ExtractionDiagnostic=_Error.substr(diagnosticBefore);
     if(!_ExtractionDiagnostic.empty()&&_ExtractionDiagnostic.front()=='\n')_ExtractionDiagnostic.erase(0,1);

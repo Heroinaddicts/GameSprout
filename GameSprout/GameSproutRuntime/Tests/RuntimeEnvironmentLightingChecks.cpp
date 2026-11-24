@@ -64,6 +64,10 @@ int main(int argc,char** argv) {
         badSettings=settings;badSettings.SpotShadows.MaxResolution=768;invalid(badSettings);
         runtime->ProcessPendingEvents();Check(listener.Changes==3,"Rejected environment emitted a notification");runtime->UnregisterListener(&listener);
 
+        auto& probe=settings.ReflectionProbes.emplace_back();
+        probe.Environment={"abcdef1234567890abcdef1234567890",9};
+        probe.Center={1,2,3};probe.CapturePosition={1,2,4};probe.Size={14,5,6};probe.Priority=-3;
+        Check(scene->SetEnvironmentLighting(settings),"Spatial lighting settings rejected");
         auto* object=scene->CreateGameObject("Prefab object");Check(object,"Cannot create ordinary object");
         SceneDocument::ObjectIDs ids;Json::Value document;std::string error;
         Check(SceneDocument::Serialize(*scene,ids,document,error),error);
@@ -108,6 +112,8 @@ int main(int argc,char** argv) {
         bad=document;bad["EnvironmentLighting"]["Tonemap"]="Uncharted2";reject(bad);
         bad=document;bad["EnvironmentLighting"]["SpotShadows"]["MaxLights"]=3.5f;reject(bad);
         bad=document;bad["EnvironmentLighting"]["SpotShadows"]["MaxResolution"]=8192;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["ReflectionProbes"][0]["Size"][2]=0;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["ReflectionProbes"][0]["BoxProjection"]=1;reject(bad);
         bad=document;bad["EnvironmentLighting"]=Json::Value();reject(bad);
         auto skyOnly=document;skyOnly["EnvironmentLighting"]=Json::Value(Json::objectValue);
         skyOnly["EnvironmentLighting"]["Mode"]="SkyEnvironment";

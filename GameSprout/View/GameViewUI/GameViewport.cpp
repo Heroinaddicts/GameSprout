@@ -309,6 +309,7 @@ void GameViewport::RenderGame(GameSproutRuntime::IScene* scene,bool continuous,b
     std::string status=std::to_string(statistics.Width)+" × "+std::to_string(statistics.Height)+" px · "+
         std::to_string(statistics.DrawCalls)+" draws · "+std::to_string(statistics.Triangles)+" triangles";
     if(statistics.InstancedDrawCalls)status+=" · instanced "+std::to_string(statistics.InstancedInstances)+" · saved "+std::to_string(statistics.SavedDrawCalls)+" draws";
+    if(statistics.ReflectionProbeDrawCalls)status+=" · 局部反射 "+std::to_string(statistics.ReflectionProbeDrawCalls)+" draws";
     if(statistics.UIDrawCalls)status+=" · UI "+std::to_string(statistics.UIDrawCalls)+" draws";
     Status(status);
 }

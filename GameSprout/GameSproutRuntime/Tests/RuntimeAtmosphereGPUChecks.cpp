@@ -10,7 +10,7 @@
 using namespace GameSproutRuntime;
 namespace {
 void Check(bool value,const std::string& message){if(!value)throw std::runtime_error(message);}
-TextureRenderData Cubemap(bool specular) {
+TextureRenderData Cubemap(bool specular,std::uint64_t environment=3) {
     TextureRenderData data;
     data.Width=data.Height=specular?2:1;data.MipLevels=specular?2:1;
     data.Dimension=TextureDimension::Cube;data.Format=TexturePixelFormat::RGBA16Float;data.SRGB=false;
@@ -25,6 +25,9 @@ TextureRenderData Cubemap(bool specular) {
         if(mip==1)texel={0,0,half,one};
         else if(layer==1)texel={half,eighth,quarter,one};
         else if(layer==4&&!specular)texel={eighth,quarter,half,one};
+        if(specular&&environment==4)texel=layer==0?std::array<std::uint16_t,4>{0,0,half,one}:
+            std::array<std::uint16_t,4>{0,half,0,one};
+        else if(specular&&environment==5)texel={0,0,half,one};
         for(std::uint32_t pixel=0;pixel<size*size;++pixel)
             std::memcpy(data.Pixels.data()+offset+pixel*sizeof(texel),texel.data(),sizeof(texel));
     }
@@ -59,9 +62,9 @@ public:
         data.Metallic=Metallic;data.Roughness=Roughness;
         data.SpecularHighlights=SpecularHighlights;data.EnvironmentReflections=EnvironmentReflections;return true;
     }
-    bool LoadEnvironment(const ResourceReference&,EnvironmentRenderData& data,std::string&) override {
+    bool LoadEnvironment(const ResourceReference& reference,EnvironmentRenderData& data,std::string&) override {
         ++EnvironmentLoads;
-        data={};data.Sky=Cubemap(false);data.Specular=Cubemap(true);
+        data={};data.Sky=Cubemap(false);data.Specular=Cubemap(true,reference.LocalID);
         data.DiffuseSH[0]={.125f,0,.125f};data.DiffuseSH[2]={.125f,0,0};return true;
     }
 };
@@ -140,6 +143,18 @@ int main(int argc,char** argv) {
         provider.Emission={4,.5f,.25f,1};provider.ChangeMaterial();
         Check(scene->SetEnvironmentLighting(environment),"Cannot enable HDR scene color");
         render();Center(*viewport,{1,.125f,.0625f},"Exposure clamped radiance before resolving HDR scene color");
+        view.CaptureLinearColor=true;render();
+        std::vector<std::uint8_t> halfPixels;
+        Check(viewport->ReadLinearColorHalf(halfPixels,error)&&halfPixels.size()==96*96*8,"HDR readback did not return binary16 scene color");
+        const std::size_t halfCenter=(48*96+48)*8;
+        Check(halfPixels[halfCenter]==0&&halfPixels[halfCenter+1]==0x44,
+            "Linear capture clamped or applied the -2 EV display setting to radiance 4.0");
+        view.RequiredStaticFlags=StaticFlags::ContributeGI;render();
+        Center(*viewport,{0,0,0},"Unmarked renderer was included in a static lighting capture");
+        object->SetStaticFlags(StaticFlags::ContributeGI);render();
+        Center(*viewport,{1,.125f,.0625f},"Marked renderer was omitted after static flag edit");
+        view.CaptureLinearColor=false;view.RequiredStaticFlags=StaticFlags::None;render();
+        Check(!viewport->ReadLinearColorHalf(halfPixels,error)&&halfPixels.empty(),"An ordinary frame exposed stale HDR capture pixels");
         DebugDrawList gizmos;gizmos.Triangles.push_back({{-.5f,-.5f,-.1f},{.5f,-.5f,-.1f},{0,.5f,-.1f},{0,1,0,1},true});
         view.DebugDraw=&gizmos;render();Center(*viewport,{1,.125f,.0625f},"Depth-tested gizmo rendered through opaque geometry after HDR resolve");
         UIDebugDrawList overlay;overlay.Triangles.push_back({{20,20},{80,20},{50,80},{.3f,.6f,.9f,1}});
@@ -176,8 +191,53 @@ int main(int argc,char** argv) {
         ++provider.EnvironmentRevision;++provider.Revision;render();
         Check(provider.EnvironmentLoads==2&&provider.MeshLoads==meshLoads&&provider.MaterialLoads==materialLoads,
             "An environment asset edit did not selectively reload the cubemaps");
+
+        // A local capture contains a different face colour from the global sky.
+        // Move the capture origin away from the +Z ray so box projection points at +X.
+        environment.Mode=AmbientLightMode::None;
+        ReflectionProbeSettings probe;
+        probe.Environment={environment.SkyEnvironment.Guid,4};
+        probe.Size={2,2,2};probe.BlendDistance=.5f;
+        probe.CapturePosition={-4,0,0};probe.BoxProjection=false;
+        environment.ReflectionProbes={probe};
+        provider.EnvironmentReflections=true;provider.Metallic=1;provider.Roughness=0;provider.ChangeMaterial();
+        Check(scene->SetEnvironmentLighting(environment),"Reflection probe settings rejected");
+        render();Center(*viewport,{0,.5f,0},"Local cubemap did not override global environment inside its box");
+        Check(viewport->GetStatistics().ReflectionProbeDrawCalls==1,"Local probe draw was not reported");
+        const auto captureLoads=provider.EnvironmentLoads;
+        environment.ReflectionProbes.front().BoxProjection=true;
+        Check(scene->SetEnvironmentLighting(environment),"Box projection settings rejected");render();
+        Center(*viewport,{0,0,.5f},"Box projection did not reflect the capture position");
+        Check(captureLoads==provider.EnvironmentLoads,"Editing a probe reloaded its cubemap");
+
+        environment.ReflectionProbes.front().BoxProjection=false;
+        auto priorityProbe=probe;
+        priorityProbe.Environment.LocalID=5;priorityProbe.Priority=1;
+        environment.ReflectionProbes.push_back(priorityProbe);
+        Check(scene->SetEnvironmentLighting(environment),"Priority probe settings rejected");render();
+        Center(*viewport,{0,0,.5f},"The higher priority overlapping probe did not win");
+        environment.ReflectionProbes.back().CullingMask=2;
+        Check(scene->SetEnvironmentLighting(environment),"Probe layer mask rejected");render();
+        Center(*viewport,{0,.5f,0},"The local receiver layer mask was ignored");
+
+        object->GetTransform()->SetLocalPosition({.75f,0,0});
+        camera({.75f,0,3},{.75f,0,0});render();
+        const auto blended=Pixels(*viewport);
+        const auto spot=(48*96+48)*4;
+        Check(blended[spot]>57&&blended[spot]<71&&blended[spot+1]>57&&blended[spot+1]<71&&blended[spot+2]<=2,
+            "Local reflection did not blend back to the global sky near the box edge");
+        view.EnableReflectionProbes=false;render();
+        Center(*viewport,{.5f,0,0},"Disable local probes did not restore global environment");
+        Check(viewport->GetStatistics().ReflectionProbeDrawCalls==0,"Disabled local probes retained draw statistics");
+        view.EnableReflectionProbes=true;object->GetTransform()->SetLocalPosition({3,0,0});
+        camera({3,0,3},{3,0,0});render();
+        Center(*viewport,{.5f,0,0},"A surface outside the influence box retained a local reflection");
+
+        environment.SkyEnvironment={};object->GetTransform()->SetLocalPosition({});camera({0,0,3},{});
+        Check(scene->SetEnvironmentLighting(environment),"Local-only environment rejected");render();
+        Center(*viewport,{0,.5f,0},"A local probe without a global environment was not bound");
         auto* other=runtime->CreateScene("Unconfigured");view.Scene=other;render();Center(*viewport,{},"Atmosphere leaked across scenes");
         delete viewport;viewport=nullptr;delete runtime;runtime=nullptr;
-        std::cout<<"PASS atmosphere GPU: fog, gradient/cubemap sky, rotated diffuse lighting and rough reflections, FP16 exposure and tone mapping, depth-tested/2D overlays, scene isolation and instancing\n";return 0;
+        std::cout<<"PASS atmosphere GPU: fog, gradient/cubemap sky, rotated diffuse lighting, rough and local box reflections, FP16 exposure and tone mapping, depth-tested/2D overlays, scene isolation and instancing\n";return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';delete viewport;delete runtime;return 1;}
 }

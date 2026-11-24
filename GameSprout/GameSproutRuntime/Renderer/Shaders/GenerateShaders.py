@@ -27,7 +27,7 @@ def main():
                              ("MeshFragment", "fragment"), ("GridVertex", "vertex"), ("GridFragment", "fragment"),
                              ("SkinnedMeshVertex", "vertex"), ("SkinnedMeshNoUVVertex", "vertex"),
                              ("SkinnedMeshNoColorVertex", "vertex"), ("SkinnedMeshNoUVNoColorVertex", "vertex"),
-                             ("LitFragment", "fragment"), ("LitEnvironmentFragment", "fragment"),
+                             ("LitFragment", "fragment"), ("LitEnvironmentFragment", "fragment"), ("LitSpatialFragment", "fragment"),
                              ("InstancedMeshVertex", "vertex"), ("InstancedMeshNoUVVertex", "vertex"),
                              ("InstancedMeshNoColorVertex", "vertex"), ("InstancedMeshNoUVNoColorVertex", "vertex"), ("ShadowFragment", "fragment"),
                              ("SkyVertex", "vertex"), ("SkyFragment", "fragment"),

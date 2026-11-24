@@ -30,6 +30,8 @@ public:
     GRHI::IShader* Shaders[CachedPreviewShaderCount]{};
     std::map<std::tuple<PreviewShader,GRHI::TextureFormat,GRHI::TextureFormat>,GRHI::IGraphicsPipeline*> FullscreenPipelines;
     std::unique_ptr<GRHI::ISampler> EnvironmentSampler;
+    std::unique_ptr<GRHI::ITexture> BlackEnvironment;
+    std::uint64_t EnvironmentGeneration=1;
     GRHI::ITexture* White=nullptr;
     GRHI::ISampler* DefaultSampler=nullptr;
     GRHI::IBuffer* Grid=nullptr;

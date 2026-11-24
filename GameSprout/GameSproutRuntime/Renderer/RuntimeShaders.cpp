@@ -34,6 +34,7 @@ GRHI::IShader* CreatePreviewShader(GRHI::IDevice& device,PreviewShader shader) {
         GS_SHADER_CASE(SkyFragment,Fragment)
         GS_SHADER_CASE(CubemapSkyFragment,Fragment)
         GS_SHADER_CASE(LitEnvironmentFragment,Fragment)
+        GS_SHADER_CASE(LitSpatialFragment,Fragment)
         GS_SHADER_CASE(HDRResolveVertex,Vertex)
         GS_SHADER_CASE(HDRResolveFragment,Fragment)
         GS_SHADER_CASE(UIVertex,Vertex)

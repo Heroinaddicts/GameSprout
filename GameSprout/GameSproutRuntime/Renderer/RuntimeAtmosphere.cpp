@@ -43,33 +43,32 @@ GRHI::ISampler* Renderer::EnvironmentSampler() {
     return sampler.get();
 }
 
-const Renderer::EnvironmentGPU* Renderer::Environment(const ResourceReference& reference) {
+const Renderer::EnvironmentGPU* Renderer::Environment(const ResourceReference& reference,bool loadSky) {
     if(reference.Guid.empty()||!reference.LocalID)return nullptr;
     auto [found,inserted]=_ResourceCache.Environments.try_emplace(ResourceKey(reference));
     auto& environment=found->second;
-    if(inserted) {
+    if(inserted||(loadSky&&!environment.SkyAttempted)) {
+        environment.SkyAttempted|=loadSky;
         environment.ResourceRevision=_Resources.GetResourceRevision(reference);
         EnvironmentRenderData data;
         if(_Resources.LoadEnvironment(reference,data,environment.Error)) {
-            if(data.Sky.Dimension!=TextureDimension::Cube||data.Specular.Dimension!=TextureDimension::Cube||!data.Specular.MipLevels) {
-                environment.Error="Prepared environment requires two cubemaps and at least one reflection mip";
+            if((loadSky&&data.Sky.Dimension!=TextureDimension::Cube)||
+               data.Specular.Dimension!=TextureDimension::Cube||!data.Specular.MipLevels) {
+                environment.Error="Prepared environment requires a reflection cube and a sky cube when drawn as sky";
             } else if(!EnvironmentSampler()) {
                 environment.Error=DeviceError("Create environment sampler");
             } else {
-                auto sky=std::unique_ptr<GRHI::ITexture>(UploadPreparedTexture(data.Sky,environment.Error));
-                if(sky) {
-                    auto specular=std::unique_ptr<GRHI::ITexture>(UploadPreparedTexture(data.Specular,environment.Error));
-                    if(specular) {
-                        environment.Sky=std::move(sky);
-                        environment.Specular=std::move(specular);
-                        environment.DiffuseSH=data.DiffuseSH;
-                        environment.SpecularMaxLOD=float(data.Specular.MipLevels-1);
-                    }
+                if(!environment.Specular) {
+                    environment.Specular.reset(UploadPreparedTexture(data.Specular,environment.Error));
+                    environment.SpecularMaxLOD=float(data.Specular.MipLevels-1);
                 }
+                if(loadSky&&environment.Specular)
+                    environment.Sky.reset(UploadPreparedTexture(data.Sky,environment.Error));
+                environment.DiffuseSH=data.DiffuseSH;
             }
         }
     }
-    if(environment.Sky)return &environment;
+    if(environment.Specular&&(!loadSky||environment.Sky))return &environment;
     Diagnostic("Environment "+reference.Guid+"_"+std::to_string(reference.LocalID)+": "+
         (environment.Error.empty()?"Prepared asset is unavailable":environment.Error));
     return nullptr;

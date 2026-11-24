@@ -31,6 +31,8 @@ namespace GRHI {
                                           const TextureInitialData&) override;
         IBuffer* CreateBuffer(const BufferDesc&, const BufferInitialData*) override;
         bool ReadTexture(ITexture*, std::vector<uint8_t>&) override;
+        bool ReadTextureRGBA16F(ITexture*, std::vector<uint8_t>&) override;
+        bool ReadColorTexture(ITexture*, bool halfFloat, std::vector<uint8_t>&);
         ISampler* CreateSampler(const SamplerDesc&) override;
         IShader* CreateShader(const ShaderDesc&) override;
         IGraphicsPipeline* CreateGraphicsPipeline(const GraphicsPipelineDesc&) override;

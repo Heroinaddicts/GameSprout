@@ -1,7 +1,10 @@
 #pragma once
 #include "GameSproutRuntimeApi.h"
 #include <array>
+#include <algorithm>
 #include <cmath>
+#include <limits>
+#include <vector>
 
 namespace GameSproutRuntime {
 enum class AmbientLightMode : std::uint8_t { None, Color, Gradient, SphericalHarmonics, SkyEnvironment };
@@ -40,6 +43,44 @@ inline bool IsValidLightShadowResolution(std::uint32_t edge) {
     return edge>=256&&edge<=4096&&(edge&(edge-1))==0;
 }
 
+struct ReflectionProbeSettings {
+    bool Enabled = true;
+    bool BoxProjection = true;
+    ResourceReference Environment; // Prepared cubemap captured in world axes.
+    Vector3 CapturePosition;        // Camera origin of that capture in metres.
+    Vector3 Center;                 // World-space centre of the influence box.
+    Vector3 Size{10,10,10};         // Full axis-aligned box dimensions in metres.
+    float BlendDistance = 1;       // Inner distance from the box edge over which the sky fades in.
+    float Intensity = 1;
+    std::int32_t Priority = 0;
+    std::uint32_t CullingMask = ~0u;
+
+    bool operator==(const ReflectionProbeSettings& other) const {
+        const auto equal=[](Vector3 a,Vector3 b){return a.X==b.X&&a.Y==b.Y&&a.Z==b.Z;};
+        return Enabled==other.Enabled&&BoxProjection==other.BoxProjection&&Environment==other.Environment&&
+            equal(CapturePosition,other.CapturePosition)&&equal(Center,other.Center)&&equal(Size,other.Size)&&
+            BlendDistance==other.BlendDistance&&Intensity==other.Intensity&&Priority==other.Priority&&
+            CullingMask==other.CullingMask;
+    }
+};
+
+inline bool IsValidReflectionProbe(const ReflectionProbeSettings& probe) {
+    if(probe.Environment.Guid.empty()!=(probe.Environment.LocalID==0)||
+       !std::isfinite(probe.Intensity)||probe.Intensity<0||
+       !std::isfinite(probe.BlendDistance)||probe.BlendDistance<0||
+       probe.BlendDistance>std::min({probe.Size.X,probe.Size.Y,probe.Size.Z})*.5f)return false;
+    const float centers[]{probe.Center.X,probe.Center.Y,probe.Center.Z};
+    const float sizes[]{probe.Size.X,probe.Size.Y,probe.Size.Z};
+    const float captures[]{probe.CapturePosition.X,probe.CapturePosition.Y,probe.CapturePosition.Z};
+    constexpr auto limit=std::numeric_limits<float>::max();
+    for(unsigned axis=0;axis<3;++axis) {
+        if(!std::isfinite(centers[axis])||!std::isfinite(sizes[axis])||
+           !std::isfinite(captures[axis])||sizes[axis]*.5f<=0||
+           std::fabs(double(centers[axis])-captures[axis])+double(sizes[axis])*.5>limit)return false;
+    }
+    return true;
+}
+
 struct EnvironmentLightingSettings {
     AmbientLightMode Mode = AmbientLightMode::None;
     // Linear RGB/HDR, nonnegative and finite; alpha is unused by lighting.
@@ -63,6 +104,7 @@ struct EnvironmentLightingSettings {
     float ExposureEV = 0;         // Fixed exposure [-16,16], in stops. +1 doubles linear radiance.
     ToneMapping Tonemap = ToneMapping::None;
     SpotShadowBudgetSettings SpotShadows;
+    std::vector<ReflectionProbeSettings> ReflectionProbes;
 };
 
 inline bool IsValidEnvironmentLighting(const EnvironmentLightingSettings& settings) {
@@ -82,6 +124,7 @@ inline bool IsValidEnvironmentLighting(const EnvironmentLightingSettings& settin
            color.R<0||color.G<0||color.B<0||color.A<0||color.A>1)return false;
     for(const auto& coefficient:settings.SHCoefficients)
         if(!std::isfinite(coefficient.X)||!std::isfinite(coefficient.Y)||!std::isfinite(coefficient.Z))return false;
+    if(!std::all_of(settings.ReflectionProbes.begin(),settings.ReflectionProbes.end(),IsValidReflectionProbe))return false;
     const auto& atmosphere=settings.Atmosphere;
     if(!std::isfinite(atmosphere.FogStart)||atmosphere.FogStart<0||
        !std::isfinite(atmosphere.FogEnd)||atmosphere.FogEnd<=atmosphere.FogStart||

@@ -13,8 +13,11 @@ struct Uniform {
     Vector4 AtmosphereParameters; // Enabled, fog start/end metres, maximum opacity.
     Vector4 AtmosphereFogColor,AtmosphereZenithColor,AtmosphereHorizonColor;
     Vector4 SkyTransform; // Inverse yaw cosine/sine, highest reflection mip, reflection intensity.
+    Vector4 ProbeCenter; // XYZ influence box centre; W inner blend distance.
+    Vector4 ProbeExtent; // XYZ influence box half size; W intensity.
+    Vector4 ProbePosition; // XYZ capture origin; W signed mip count (negative disables box projection).
 };
-static_assert(sizeof(Uniform)==304,"Environment fragment block must match HLSL packing");
+static_assert(sizeof(Uniform)==352,"Environment fragment block must match HLSL packing");
 
 inline Vector2 SkyYaw(float degrees) {
     constexpr double radiansPerDegree=3.14159265358979323846/180.0;

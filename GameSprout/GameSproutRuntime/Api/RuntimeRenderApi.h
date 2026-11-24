@@ -90,9 +90,16 @@ struct RenderView {
     const UIDebugDrawList* UIScreenDebugDraw = nullptr;
     // Read eligible 3D material textures ahead of visibility and upload across frames.
     bool EnableTexturePrefetch = false;
+    // Explicit offscreen capture of linear scene color, before exposure, tone
+    // mapping and overlays. Ordinary viewports do not retain a readable image.
+    bool CaptureLinearColor = false;
+    StaticFlags RequiredStaticFlags = StaticFlags::None; // A mesh must carry all bits.
+
     // Host caps for the authored scene budget. Either zero disables the pass.
     std::uint32_t MaxSpotShadowLights = 4;
     std::uint32_t MaxSpotShadowResolution = 4096;
+    // Export/bake tools can capture the scene without feeding probes back into the capture.
+    bool EnableReflectionProbes = true;
 };
 
 struct SceneRaycastHit {
@@ -153,6 +160,7 @@ struct RenderStatistics {
     std::uint32_t SpotShadowLights = 0;
     std::uint32_t SpotShadowTilesUpdated = 0;
     std::uint32_t SpotShadowDrawCalls = 0;
+    std::uint32_t ReflectionProbeDrawCalls = 0; // Color batches using a local cubemap.
 };
 
 class IRuntimeRenderer {
@@ -196,6 +204,11 @@ public:
     virtual bool ReadPixels(std::vector<std::uint8_t>& pixels, std::string& error) = 0;
     // Zero dimensions suspend an offscreen viewport; no scene/camera is rendered.
     virtual bool Resize(std::uint32_t width, std::uint32_t height, std::string& error) = 0;
+    // After a successful CaptureLinearColor frame. Each channel is little-endian
+    // IEEE binary16, with four channels per pixel and rows from top to bottom.
+    virtual bool ReadLinearColorHalf(std::vector<std::uint8_t>& pixels, std::string& error) {
+        pixels.clear();error="Linear color capture is unavailable";return false;
+    }
 };
 
 }

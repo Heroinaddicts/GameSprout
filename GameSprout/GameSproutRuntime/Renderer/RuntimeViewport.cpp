@@ -101,7 +101,7 @@ bool Renderer::Resize(std::uint32_t width,std::uint32_t height,std::string& erro
         next=_Device.CreateTexture(description);
         if(!next){error=_Device.GetLastError();return false;}
     }
-    delete _ColorTarget;_ColorTarget=next;_Statistics={};_RenderedCamera={};_HasRenderedCamera=false;return true;
+    delete _ColorTarget;_ColorTarget=next;_Statistics={};_RenderedCamera={};_HasRenderedCamera=false;_LinearCaptureReady=false;return true;
 }
 bool Renderer::ReadPixels(std::vector<std::uint8_t>& pixels,std::string& error) {
     pixels.clear();error.clear();
@@ -109,4 +109,16 @@ bool Renderer::ReadPixels(std::vector<std::uint8_t>& pixels,std::string& error) 
     if(!_Device.ReadTexture(_ColorTarget,pixels)){pixels.clear();error=_Device.GetLastError();return false;}
     return true;
 }
+bool Renderer::ReadLinearColorHalf(std::vector<std::uint8_t>& pixels,std::string& error) {
+    pixels.clear();error.clear();
+    if(_Rendering||_Runtime.IsExecuting()||_Runtime.IsShuttingDown()||_Surface||!_LinearCaptureReady||!_HDRTarget) {
+        error="Readback requires a successfully submitted offscreen linear capture frame";
+        return false;
+    }
+    if(!_Device.ReadTextureRGBA16F(_HDRTarget.get(),pixels)) {
+        pixels.clear();error=DeviceError("Read linear scene color");return false;
+    }
+    return true;
+}
+
 }
