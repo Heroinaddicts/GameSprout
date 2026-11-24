@@ -72,6 +72,17 @@ private:
         bool SkyAttempted=false;
         std::string Error;
     };
+    struct IndirectAtlasGPU {
+        struct Region {
+            std::array<std::uint32_t,3> Dimensions{};
+            std::uint32_t FirstRow=0;
+        };
+        std::unique_ptr<GRHI::ITexture> Texture;
+        std::vector<std::uint64_t> ResourceRevisions;
+        std::vector<Region> Regions;
+        std::string Error;
+        std::uint64_t LastUsed=0;
+    };
     struct ColliderMeshWire {
         ResourceReference Reference;
         bool Convex=false;
@@ -298,6 +309,10 @@ private:
     void ClearInstanceBuffers();
     bool ExtractLights(IScene*,std::vector<DirectionalLight>&);
     void PrepareLocalLights();
+    void PrepareIndirectLighting(const EnvironmentLightingSettings&,RenderEnvironment::Uniform&);
+    const IndirectAtlasGPU& IndirectAtlas(const std::vector<ResourceKey>&);
+    bool UsesIndirectLighting(const PreparedDraw&) const;
+    void BindIndirectLighting(GRHI::IRenderPass&,const PreparedDraw&,RenderEnvironment::Uniform&);
     void PrepareReflectionProbes(const RenderView&,const EnvironmentLightingSettings&);
     GRHI::ITexture* BlackEnvironmentCube();
     bool BindSpatialEnvironment(GRHI::IRenderPass&,const PreparedDraw&,const EnvironmentLightingSettings&,
@@ -362,6 +377,7 @@ private:
     bool ResolveHDR(GRHI::IRenderPass&,GRHI::TextureFormat color,GRHI::TextureFormat depth,const EnvironmentLightingSettings&);
     const EnvironmentGPU* Environment(const ResourceReference&,bool loadSky=true);
     GRHI::ISampler* EnvironmentSampler();
+    GRHI::ITexture* _IndirectLightingAtlas=nullptr; // Borrowed during the current view render.
     bool DrawGrid(GRHI::IRenderPass& pass,const Mat4& viewProjection,GRHI::TextureFormat format);
     bool DrawSky(GRHI::IRenderPass&,const RenderView&,GRHI::TextureFormat,float aspect,
         const std::vector<DirectionalLight>&,const EnvironmentGPU*);

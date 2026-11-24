@@ -102,6 +102,7 @@ bool AssetGuidSourcesCurrent(const AssetImportManifest&,const IAssetsManager*,co
 bool ModelTextureSearchesCurrent(const AssetImportRequest& request,const AssetImportManifest& manifest,
     std::map<std::string, AssetFileStamp> * observations = nullptr, bool * observationsAvailable = nullptr);
 bool ImportEnvironment(AssetImportJob&);
+bool ImportIndirectLighting(AssetImportJob&);
 bool ImportTexture(AssetImportJob & job);
 bool ImportTextureBytes(AssetImportJob & job, QByteArray bytes, const std::string & key,
     const std::string & name, const Json::Value & settings);

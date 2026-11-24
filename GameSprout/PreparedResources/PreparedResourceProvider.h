@@ -12,6 +12,7 @@ class ResourceProvider : public GameSproutRuntime::IRuntimeResourceProvider {
 public:
     bool LoadMesh(const GameSproutRuntime::ResourceReference&, GameSproutRuntime::MeshRenderData&, std::string&) override;
     bool LoadEnvironment(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::EnvironmentRenderData&,std::string&) override;
+    bool LoadIndirectLighting(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::IndirectLightingRenderData&,std::string&) override;
     bool LoadTexture(const GameSproutRuntime::ResourceReference&, GameSproutRuntime::TextureRenderData&, std::string&) override;
     bool ResolveTexturePrefetch(const GameSproutRuntime::ResourceReference&, GameSproutRuntime::TexturePrefetchSource&) override;
     bool LoadMaterial(const GameSproutRuntime::ResourceReference&, GameSproutRuntime::MaterialRenderData&, std::string&) override;

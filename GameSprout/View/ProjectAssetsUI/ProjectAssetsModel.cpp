@@ -32,6 +32,7 @@ QString ImporterName(eAssetImporterType type) {
     case eAssetImporterType::PhysicsMaterial2D: return QStringLiteral("PhysicsMaterial2D");
     case eAssetImporterType::RenderTexture: return QStringLiteral("RenderTexture");
     case eAssetImporterType::Environment: return QStringLiteral("Environment");
+    case eAssetImporterType::Irradiance: return QStringLiteral("Irradiance");
     case eAssetImporterType::Cubemap: return QStringLiteral("Cubemap");
     case eAssetImporterType::SpriteAtlas: return QStringLiteral("SpriteAtlas");
     case eAssetImporterType::TerrainData: return QStringLiteral("TerrainData");
@@ -57,6 +58,7 @@ QString ResourceName(eAssetType type) {
     case eAssetType::Font: return QStringLiteral("Font");
     case eAssetType::RenderTexture: return QStringLiteral("RenderTexture");
     case eAssetType::Environment: return QStringLiteral("Environment");
+    case eAssetType::Irradiance: return QStringLiteral("Irradiance");
     case eAssetType::Cubemap: return QStringLiteral("Cubemap");
     case eAssetType::SpriteAtlas: return QStringLiteral("SpriteAtlas");
     case eAssetType::Sprite: return QStringLiteral("Sprite");

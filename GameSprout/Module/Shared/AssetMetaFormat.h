@@ -31,6 +31,7 @@ inline const char * ImporterTypeName(const eAssetImporterType type) {
     case eAssetImporterType::PhysicsMaterial2D: return "PhysicsMaterial2D";
     case eAssetImporterType::RenderTexture: return "RenderTexture";
     case eAssetImporterType::Environment: return "Environment";
+    case eAssetImporterType::Irradiance: return "Irradiance";
     case eAssetImporterType::Cubemap: return "Cubemap";
     case eAssetImporterType::SpriteAtlas: return "SpriteAtlas";
     case eAssetImporterType::TerrainData: return "TerrainData";

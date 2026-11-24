@@ -112,6 +112,8 @@ bool Renderer::Render(const RenderView& view) {
             else if(sky&&settings->ReflectionIntensity>0)reflections=sky;
         }
         if(view.DrawScene) {
+            _IndirectLightingAtlas=nullptr;
+            if(view.EnableBakedIndirectLighting)PrepareIndirectLighting(*settings,environment);
             BeginTexturePrefetchFrame(view.EnableTexturePrefetch);
             PrepareDraws(view,viewProjection);
             PrepareLocalLights();

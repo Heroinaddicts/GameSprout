@@ -141,6 +141,7 @@ bool Renderer::RenderPlanarReflection(GRHI::ICommandBuffer& command,const Render
     capture.PrepareDraws(reflected,reflectedViewProjection);
     capture.PrepareLocalLights();
     capture.PrepareReflectionProbes(reflected,settings);
+    capture._IndirectLightingAtlas=_IndirectLightingAtlas;
     if(!capture.PrepareColorInstances(command,reflected))return Fail("Planar reflection: "+capture._Error);
 
     GRHI::RenderPassDesc pass;

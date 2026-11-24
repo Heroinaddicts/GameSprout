@@ -203,6 +203,12 @@ cbuffer LitUniform : register(b0, space3)
     float4 LocalLightRadiances[4];
     float4 PlanarReflection;
 };
+struct IndirectVolume
+{
+    float4 MinimumAndInvBlend;
+    float4 InvSizeAndIntensity;
+    float4 GridAndAtlasRow;
+};
 cbuffer EnvironmentUniform : register(b1, space3)
 {
     float4 EnvironmentInfo;
@@ -219,7 +225,10 @@ cbuffer EnvironmentUniform : register(b1, space3)
     float4 ProbeCenter;
     float4 ProbeExtent;
     float4 ProbePosition;
+    float4 IndirectInfo;
+    IndirectVolume IndirectVolumes[8];
 };
+#include "IndirectLighting.hlsl"
 #include "Atmosphere.hlsl"
 #include "ToneMapping.hlsl"
 // Canonical light clip -> top-first atlas UV. This block is independent from
@@ -512,7 +521,9 @@ float4 EvaluateLit(MeshOutput input, bool useReflections, bool useSpatialLightin
     // URP's metallic workflow keeps the dielectric 4% reflected fraction out of
     // the diffuse lobe: oneMinusReflectivity = .96 * (1 - metallic). Diffuse
     // irradiance remains independent of the viewing camera.
-    float3 ambient = DiffuseEnvironment(normal) * diffuse;
+    float3 irradiance = DiffuseEnvironment(normal);
+    if (useSpatialLighting) irradiance = DiffuseIndirectLighting(input.WorldPosition, normal, irradiance);
+    float3 ambient = irradiance * diffuse;
     color += ambient;
     float3 stylizedDirect = 0.0;
     float stylizedIllumination = 0.0;

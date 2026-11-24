@@ -2,6 +2,7 @@
 #include "RuntimePhysicsData.h"
 #include "GameSproutRuntimeApi.h"
 #include "RuntimeAnimationData.h"
+#include "RuntimeIndirectLightingData.h"
 #include "RuntimeShaderData.h"
 #include "Memory/ByteBuffer.h"
 #include <array>
@@ -192,6 +193,9 @@ public:
     }
     virtual bool LoadEnvironment(const ResourceReference&,EnvironmentRenderData& data,std::string& error) {
         data={};error="Environment loading is unavailable";return false;
+    }
+    virtual bool LoadIndirectLighting(const ResourceReference&,IndirectLightingRenderData& data,std::string& error) {
+        data={};error="Baked indirect lighting is unavailable";return false;
     }
 };
 

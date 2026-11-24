@@ -257,6 +257,9 @@ namespace GameSproutEditor {
         for (const auto& [name, view] : _ViewMap) {
             if(name!="IDEWindow"&&name!="ConsoleUI")view->Release(this);
         }
+        // Cancel GPU captures and import callbacks while assets and the Runtime host are alive.
+        const auto baker=_ModuleMap.find("LightingBaker");
+        if(baker!=_ModuleMap.end())baker->second->Release(_Api);
         // End gameplay while scene snapshots, script module code and the host
         // still exist. OnRelease callbacks must finish before unloading GameLogic.
         const auto play=_ModuleMap.find("PlayMode");
@@ -297,7 +300,7 @@ namespace GameSproutEditor {
         const auto host=_ModuleMap.find("RuntimeHost");
         if(host!=_ModuleMap.end())host->second->Release(_Api);
         for (const auto& [name, module] : _ModuleMap) {
-            if(name!="PrefabStage"&&name!="PrefabManager"&&name!="CodeEditor"&&name!="BuildSetting"&&name!="PlayMode"&&name!="ScriptEditor"&&name!="Console"&&name!="AnimationPreview"&&name!="SceneManager"&&name!="RuntimeHost")module->Release(_Api);
+            if(name!="LightingBaker"&&name!="PrefabStage"&&name!="PrefabManager"&&name!="CodeEditor"&&name!="BuildSetting"&&name!="PlayMode"&&name!="ScriptEditor"&&name!="Console"&&name!="AnimationPreview"&&name!="SceneManager"&&name!="RuntimeHost")module->Release(_Api);
         }
         _ViewMap.clear();
         _ModuleMap.clear();

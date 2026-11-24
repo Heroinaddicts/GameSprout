@@ -1,0 +1,1267 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ui version="4.0">
+ <class>SpatialLightingForm</class>
+ <widget class="QDialog" name="SpatialLightingForm">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>640</width>
+    <height>570</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>局部光照与反射</string>
+  </property>
+  <layout class="QVBoxLayout" name="dialogLayout">
+   <item>
+    <widget class="QLabel" name="availabilityLabel">
+     <property name="text">
+      <string>当前没有可编辑的场景。</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTabWidget" name="featureTabs">
+     <widget class="QWidget" name="planarPage">
+      <attribute name="title">
+       <string>平面反射</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="planarScrollLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QScrollArea" name="planarScrollArea">
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <widget class="QWidget" name="planarScrollContent">
+          <layout class="QVBoxLayout" name="planarPageLayout">
+           <item>
+            <widget class="QWidget" name="planarBody">
+             <layout class="QFormLayout" name="planarFields">
+              <property name="labelAlignment">
+               <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+              <property name="fieldGrowthPolicy">
+               <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="planarFieldsLabel0">
+                <property name="text">
+                 <string>启用</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QCheckBox" name="planarEnabled">
+                <property name="accessibleName">
+                 <string>启用平面反射</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="planarFieldsLabel1">
+                <property name="text">
+                 <string>平面高度（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QLineEdit" name="planarHeight">
+                <property name="accessibleName">
+                 <string>平面高度（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="planarFieldsLabel2">
+                <property name="text">
+                 <string>分辨率比例</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QLineEdit" name="planarScale">
+                <property name="toolTip">
+                 <string>相对主视口尺寸，范围 0.125–1。</string>
+                </property>
+                <property name="accessibleName">
+                 <string>分辨率比例</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="planarFieldsLabel3">
+                <property name="text">
+                 <string>最大分辨率</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QSpinBox" name="planarResolution">
+                <property name="keyboardTracking">
+                 <bool>false</bool>
+                </property>
+                <property name="minimum">
+                 <number>128</number>
+                </property>
+                <property name="maximum">
+                 <number>4096</number>
+                </property>
+                <property name="value">
+                 <number>1024</number>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="planarFieldsLabel4">
+                <property name="text">
+                 <string>反射强度</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QLineEdit" name="planarStrength">
+                <property name="toolTip">
+                 <string>范围 0–1。</string>
+                </property>
+                <property name="accessibleName">
+                 <string>反射强度</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="planarFieldsLabel5">
+                <property name="text">
+                 <string>最大距离（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QLineEdit" name="planarDistance">
+                <property name="accessibleName">
+                 <string>最大距离（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="0">
+               <widget class="QLabel" name="planarFieldsLabel6">
+                <property name="text">
+                 <string>反射捕获层</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="1">
+               <widget class="LayerMaskCombo" name="planarMask" />
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="planarReceiverTip">
+             <property name="text">
+              <string>在 Lit 材质中启用平面反射，将材质应用到与平面同高的水面。</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="planarBottom">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Expanding</enum>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="probePage">
+      <attribute name="title">
+       <string>反射探针</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="probeScrollLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QScrollArea" name="probeScrollArea">
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <widget class="QWidget" name="probeScrollContent">
+          <layout class="QVBoxLayout" name="probePageLayout">
+           <item>
+            <layout class="QHBoxLayout" name="probeToolbar">
+             <item>
+              <widget class="QComboBox" name="probeList">
+               <property name="accessibleName">
+                <string>探针</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="probeAdd">
+               <property name="text">
+                <string>添加探针</string>
+               </property>
+               <property name="autoDefault">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="probeRemove">
+               <property name="text">
+                <string>移除</string>
+               </property>
+               <property name="autoDefault">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QWidget" name="probeBody">
+             <layout class="QFormLayout" name="probeFields">
+              <property name="labelAlignment">
+               <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+              <property name="fieldGrowthPolicy">
+               <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="probeFieldsLabel0">
+                <property name="text">
+                 <string>烘焙资源</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="ResourceField" name="probeAsset" />
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="probeFieldsLabel1">
+                <property name="text">
+                 <string>启用</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QCheckBox" name="probeEnabled">
+                <property name="accessibleName">
+                 <string>启用探针</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="probeFieldsLabel2">
+                <property name="text">
+                 <string>盒投影</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QCheckBox" name="probeProjection">
+                <property name="accessibleName">
+                 <string>启用盒投影</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="probeFieldsLabel3">
+                <property name="text">
+                 <string>捕获位置（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <layout class="QHBoxLayout" name="captureLayout">
+                <item>
+                 <widget class="QLabel" name="captureXLabel">
+                  <property name="text">
+                   <string>X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="captureX">
+                  <property name="accessibleName">
+                   <string>捕获位置（米） X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="captureYLabel">
+                  <property name="text">
+                   <string>Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="captureY">
+                  <property name="accessibleName">
+                   <string>捕获位置（米） Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="captureZLabel">
+                  <property name="text">
+                   <string>Z</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="captureZ">
+                  <property name="accessibleName">
+                   <string>捕获位置（米） Z</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="probeFieldsLabel4">
+                <property name="text">
+                 <string>影响盒中心（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <layout class="QHBoxLayout" name="probeCenterLayout">
+                <item>
+                 <widget class="QLabel" name="probeCenterXLabel">
+                  <property name="text">
+                   <string>X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="probeCenterX">
+                  <property name="accessibleName">
+                   <string>影响盒中心（米） X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="probeCenterYLabel">
+                  <property name="text">
+                   <string>Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="probeCenterY">
+                  <property name="accessibleName">
+                   <string>影响盒中心（米） Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="probeCenterZLabel">
+                  <property name="text">
+                   <string>Z</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="probeCenterZ">
+                  <property name="accessibleName">
+                   <string>影响盒中心（米） Z</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="probeFieldsLabel5">
+                <property name="text">
+                 <string>影响盒尺寸（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <layout class="QHBoxLayout" name="probeSizeLayout">
+                <item>
+                 <widget class="QLabel" name="probeSizeXLabel">
+                  <property name="text">
+                   <string>X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="probeSizeX">
+                  <property name="accessibleName">
+                   <string>影响盒尺寸（米） X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="probeSizeYLabel">
+                  <property name="text">
+                   <string>Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="probeSizeY">
+                  <property name="accessibleName">
+                   <string>影响盒尺寸（米） Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="probeSizeZLabel">
+                  <property name="text">
+                   <string>Z</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="probeSizeZ">
+                  <property name="accessibleName">
+                   <string>影响盒尺寸（米） Z</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="6" column="0">
+               <widget class="QLabel" name="probeFieldsLabel6">
+                <property name="text">
+                 <string>渐变距离（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="1">
+               <widget class="QLineEdit" name="probeBlend">
+                <property name="toolTip">
+                 <string>距离盒内边缘不足该值时，与全局天空渐变。</string>
+                </property>
+                <property name="accessibleName">
+                 <string>渐变距离（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="7" column="0">
+               <widget class="QLabel" name="probeFieldsLabel7">
+                <property name="text">
+                 <string>反射强度</string>
+                </property>
+               </widget>
+              </item>
+              <item row="7" column="1">
+               <widget class="QLineEdit" name="probeIntensity">
+                <property name="accessibleName">
+                 <string>反射强度</string>
+                </property>
+               </widget>
+              </item>
+              <item row="8" column="0">
+               <widget class="QLabel" name="probeFieldsLabel8">
+                <property name="text">
+                 <string>优先级</string>
+                </property>
+               </widget>
+              </item>
+              <item row="8" column="1">
+               <widget class="QLineEdit" name="probePriority">
+                <property name="toolTip">
+                 <string>重叠时优先使用较大的值。</string>
+                </property>
+                <property name="accessibleName">
+                 <string>优先级</string>
+                </property>
+               </widget>
+              </item>
+              <item row="9" column="0">
+               <widget class="QLabel" name="probeFieldsLabel9">
+                <property name="text">
+                 <string>接收层</string>
+                </property>
+               </widget>
+              </item>
+              <item row="9" column="1">
+               <widget class="LayerMaskCombo" name="probeMask" />
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="probeDivider" />
+           </item>
+           <item>
+            <widget class="QGroupBox" name="probeBakeGroup">
+             <property name="title">
+              <string>烘焙探针</string>
+             </property>
+             <layout class="QFormLayout" name="probeBakeGroupFields">
+              <item row="0" column="0">
+               <widget class="QLabel" name="probeBakeGroupFieldsLabel0">
+                <property name="text">
+                 <string>捕获每面尺寸</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="probeBakeResolution">
+                <property name="currentIndex">
+                 <number>3</number>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>16</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>32</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>64</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>128</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>256</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>512</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="probeBakeGroupFieldsLabel1">
+                <property name="text">
+                 <string>反射每面尺寸</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="probeReflectionResolution">
+                <property name="currentIndex">
+                 <number>2</number>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>16</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>32</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>64</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>128</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>256</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>512</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="probeBakeGroupFieldsLabel2">
+                <property name="text">
+                 <string>预滤波采样数</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QComboBox" name="probeSamples">
+                <property name="currentIndex">
+                 <number>3</number>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>16</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>32</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>64</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>128</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>256</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>512</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="probeBakeGroupFieldsLabel3">
+                <property name="text">
+                 <string>捕获距离（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QLineEdit" name="probeCaptureDistance">
+                <property name="text">
+                 <string>150</string>
+                </property>
+                <property name="accessibleName">
+                 <string>探针捕获距离</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="probeBakeGroupFieldsLabel4">
+                <property name="text">
+                 <string />
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QCheckBox" name="probeStaticOnly">
+                <property name="text">
+                 <string>仅捕获静态对象</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="probeBakeGroupFieldsLabel5">
+                <property name="text">
+                 <string />
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QPushButton" name="probeBake">
+                <property name="text">
+                 <string>烘焙所选探针</string>
+                </property>
+                <property name="autoDefault">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <spacer name="probeBottom">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Expanding</enum>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="indirectPage">
+      <attribute name="title">
+       <string>烘焙间接光</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="indirectScrollLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QScrollArea" name="indirectScrollArea">
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <widget class="QWidget" name="indirectScrollContent">
+          <layout class="QVBoxLayout" name="indirectPageLayout">
+           <item>
+            <layout class="QHBoxLayout" name="indirectToolbar">
+             <item>
+              <widget class="QComboBox" name="indirectList">
+               <property name="accessibleName">
+                <string>体积</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="indirectAdd">
+               <property name="text">
+                <string>添加体积</string>
+               </property>
+               <property name="autoDefault">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="indirectRemove">
+               <property name="text">
+                <string>移除</string>
+               </property>
+               <property name="autoDefault">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QWidget" name="indirectBody">
+             <layout class="QFormLayout" name="indirectFields">
+              <property name="labelAlignment">
+               <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+              <property name="fieldGrowthPolicy">
+               <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="indirectFieldsLabel0">
+                <property name="text">
+                 <string>烘焙资源</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="ResourceField" name="indirectAsset" />
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="indirectFieldsLabel1">
+                <property name="text">
+                 <string>体积中心（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <layout class="QHBoxLayout" name="indirectCenterLayout">
+                <item>
+                 <widget class="QLabel" name="indirectCenterXLabel">
+                  <property name="text">
+                   <string>X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="indirectCenterX">
+                  <property name="accessibleName">
+                   <string>体积中心（米） X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="indirectCenterYLabel">
+                  <property name="text">
+                   <string>Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="indirectCenterY">
+                  <property name="accessibleName">
+                   <string>体积中心（米） Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="indirectCenterZLabel">
+                  <property name="text">
+                   <string>Z</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="indirectCenterZ">
+                  <property name="accessibleName">
+                   <string>体积中心（米） Z</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="indirectFieldsLabel2">
+                <property name="text">
+                 <string>体积尺寸（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <layout class="QHBoxLayout" name="indirectSizeLayout">
+                <item>
+                 <widget class="QLabel" name="indirectSizeXLabel">
+                  <property name="text">
+                   <string>X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="indirectSizeX">
+                  <property name="accessibleName">
+                   <string>体积尺寸（米） X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="indirectSizeYLabel">
+                  <property name="text">
+                   <string>Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="indirectSizeY">
+                  <property name="accessibleName">
+                   <string>体积尺寸（米） Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="indirectSizeZLabel">
+                  <property name="text">
+                   <string>Z</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="indirectSizeZ">
+                  <property name="accessibleName">
+                   <string>体积尺寸（米） Z</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="indirectFieldsLabel3">
+                <property name="text">
+                 <string>渐变距离（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QLineEdit" name="indirectBlend">
+                <property name="accessibleName">
+                 <string>渐变距离（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="indirectFieldsLabel4">
+                <property name="text">
+                 <string>间接光强度</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QLineEdit" name="indirectIntensity">
+                <property name="accessibleName">
+                 <string>间接光强度</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="indirectFieldsLabel5">
+                <property name="text">
+                 <string>优先级</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QSpinBox" name="indirectPriority">
+                <property name="keyboardTracking">
+                 <bool>false</bool>
+                </property>
+                <property name="minimum">
+                 <number>0</number>
+                </property>
+                <property name="maximum">
+                 <number>255</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="indirectDivider" />
+           </item>
+           <item>
+            <widget class="QGroupBox" name="indirectBakeGroup">
+             <property name="title">
+              <string>烘焙间接光体积</string>
+             </property>
+             <layout class="QFormLayout" name="indirectBakeGroupFields">
+              <property name="labelAlignment">
+               <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+              </property>
+              <property name="fieldGrowthPolicy">
+               <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="bakeGridLabel">
+                <property name="text">
+                 <string>采样网格</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <layout class="QHBoxLayout" name="bakeGridLayout">
+                <item>
+                 <widget class="QLabel" name="gridXLabel">
+                  <property name="text">
+                   <string>X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSpinBox" name="gridX">
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>32</number>
+                  </property>
+                  <property name="value">
+                   <number>3</number>
+                  </property>
+                  <property name="accessibleName">
+                   <string>采样网格 X</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="gridYLabel">
+                  <property name="text">
+                   <string>Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSpinBox" name="gridY">
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>32</number>
+                  </property>
+                  <property name="value">
+                   <number>2</number>
+                  </property>
+                  <property name="accessibleName">
+                   <string>采样网格 Y</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="gridZLabel">
+                  <property name="text">
+                   <string>Z</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QSpinBox" name="gridZ">
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="maximum">
+                   <number>32</number>
+                  </property>
+                  <property name="value">
+                   <number>3</number>
+                  </property>
+                  <property name="accessibleName">
+                   <string>采样网格 Z</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="indirectBakeGroupFieldsLabel1">
+                <property name="text">
+                 <string>捕获每面尺寸</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="indirectBakeResolution">
+                <property name="currentIndex">
+                 <number>0</number>
+                </property>
+                <item>
+                 <property name="text">
+                  <string>16</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>32</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>64</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>128</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>256</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>512</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="indirectBakeGroupFieldsLabel2">
+                <property name="text">
+                 <string>捕获距离（米）</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QLineEdit" name="indirectCaptureDistance">
+                <property name="text">
+                 <string>150</string>
+                </property>
+                <property name="accessibleName">
+                 <string>间接光捕获距离</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="indirectBakeGroupFieldsLabel3">
+                <property name="text">
+                 <string />
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QCheckBox" name="indirectStaticOnly">
+                <property name="text">
+                 <string>仅捕获静态对象</string>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="indirectBakeGroupFieldsLabel4">
+                <property name="text">
+                 <string />
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QPushButton" name="indirectBake">
+                <property name="text">
+                 <string>烘焙所选体积</string>
+                </property>
+                <property name="autoDefault">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <spacer name="indirectBottom">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Expanding</enum>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="statusLabel">
+     <property name="text">
+      <string />
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="bakeStatusLabel">
+     <property name="text">
+      <string />
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="footerLayout">
+     <item>
+      <widget class="QProgressBar" name="bakeProgress">
+       <property name="visible">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="footerRemainder">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Expanding</enum>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="cancelBake">
+       <property name="text">
+        <string>取消烘焙</string>
+       </property>
+       <property name="autoDefault">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="closeButton">
+       <property name="text">
+        <string>关闭</string>
+       </property>
+       <property name="autoDefault">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+  <action name="windowMenuAction">
+   <property name="text">
+    <string>窗口</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>LayerMaskCombo</class>
+   <extends>QComboBox</extends>
+   <header>LayerMaskCombo.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ResourceField</class>
+   <extends>QWidget</extends>
+   <header>ResourceField.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources />
+ <connections />
+</ui>

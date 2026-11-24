@@ -32,3 +32,17 @@ target_link_libraries(EnvironmentLightingWindowChecks PRIVATE LightingUI Foundat
     GameSproutRuntime::GameSproutRuntimeApi Qt6::Widgets Qt6::Test)
 add_test(NAME Lighting.EnvironmentDesignerWindow COMMAND EnvironmentLightingWindowChecks)
 set_tests_properties(Lighting.EnvironmentDesignerWindow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)
+
+add_subdirectory("${gamesprout_root}/View/SpatialLightingUI" SpatialLightingUI)
+set_target_properties(SpatialLightingUI PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/modules"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/modules")
+add_executable(SpatialLightingWindowChecks SpatialLightingWindowChecks.cpp)
+target_compile_features(SpatialLightingWindowChecks PRIVATE cxx_std_20)
+target_include_directories(SpatialLightingWindowChecks PRIVATE
+    "${gamesprout_root}/View/SpatialLightingUI" "${gamesprout_root}/Module/Interface"
+    "${gamesprout_root}/View/Interface" "${gamesprout_root}/GameSproutEditor/Api")
+target_link_libraries(SpatialLightingWindowChecks PRIVATE SpatialLightingUI Foundation::FoundationApi
+    GameSproutRuntime::GameSproutRuntimeApi Qt6::Widgets)
+add_test(NAME Lighting.SpatialDesignerWindow COMMAND SpatialLightingWindowChecks)
+set_tests_properties(Lighting.SpatialDesignerWindow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 30)

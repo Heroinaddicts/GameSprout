@@ -12,7 +12,7 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
     key.Color=data.ColorOffset;key.UV=data.UVOffset;key.DoubleSided=draw.Material->DoubleSided;key.Negative=draw.Object->Negative;
     key.Lit=draw.Material->ShadingModel==MaterialShadingModel::Lit;key.Instanced=instanceCount>1;
     const bool skyReflection=key.Lit&&draw.Material->EnvironmentReflections&&reflections;
-    key.SpatialLighting=key.Lit&&(draw.ReflectionProbeIndex||UsesPlanarReflection(draw));
+    key.SpatialLighting=key.Lit&&(draw.ReflectionProbeIndex||UsesPlanarReflection(draw)||UsesIndirectLighting(draw));
     key.EnvironmentReflections=skyReflection&&!key.SpatialLighting;
     if(draw.Object->Skinned){key.BoneIndices=data.BoneIndicesOffset;key.BoneWeights=data.BoneWeightsOffset;}
     auto* pipeline=Pipeline(key);if(!pipeline)return false;
@@ -39,6 +39,7 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
             if(!BindSpatialEnvironment(pass,draw,view.Scene->GetEnvironmentLighting(),
                 skyReflection?reflections:nullptr,spatialEnvironment))return false;
             BindPlanarReflection(pass,draw,lightUniform);
+            BindIndirectLighting(pass,draw,spatialEnvironment);
             pass.SetFragmentUniform(1,&spatialEnvironment,sizeof(spatialEnvironment));
         } else {
             pass.SetFragmentUniform(1,&environment,sizeof(environment));

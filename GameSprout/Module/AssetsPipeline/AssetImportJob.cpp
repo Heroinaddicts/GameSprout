@@ -340,6 +340,7 @@ bool RunAssetImport(AssetImportJob & job, Foundation::ITaskContext & context) {
     switch (job.Request.Importer) {
     case eAssetImporterType::Texture: success = ImportTexture(job); break;
     case eAssetImporterType::Environment: success = ImportEnvironment(job); break;
+    case eAssetImporterType::Irradiance: success = ImportIndirectLighting(job); break;
     case eAssetImporterType::Model: success = ImportModel(job); break;
     case eAssetImporterType::Audio:
     case eAssetImporterType::Video: success = ImportMedia(job); break;

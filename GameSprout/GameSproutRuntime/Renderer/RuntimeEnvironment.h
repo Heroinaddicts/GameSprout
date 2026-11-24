@@ -5,6 +5,11 @@
 #include <limits>
 
 namespace GameSproutRuntime::RenderEnvironment {
+struct IndirectVolume {
+    Vector4 MinimumAndInvBlend; // XYZ minimum, W inverse inner fade distance.
+    Vector4 InvSizeAndIntensity; // XYZ reciprocal extent, W intensity.
+    Vector4 GridAndAtlasRow; // Grid XYZ and vertical offset into the coefficient atlas.
+};
 // Scene-owned environment, shared by all draw calls in the view.
 struct Uniform {
     Vector4 Info; // X: AmbientLightMode. Remaining components are zero padding.
@@ -16,8 +21,11 @@ struct Uniform {
     Vector4 ProbeCenter; // XYZ influence box centre; W inner blend distance.
     Vector4 ProbeExtent; // XYZ influence box half size; W intensity.
     Vector4 ProbePosition; // XYZ capture origin; W signed mip count (negative disables box projection).
+    Vector4 IndirectInfo; // Inverse atlas width and height, active volume count.
+    std::array<IndirectVolume,MaxBakedIndirectVolumes> IndirectVolumes;
 };
-static_assert(sizeof(Uniform)==352,"Environment fragment block must match HLSL packing");
+static_assert(sizeof(IndirectVolume)==48 && sizeof(Uniform)==752,
+    "Environment fragment block must match HLSL packing");
 
 inline Vector2 SkyYaw(float degrees) {
     constexpr double radiansPerDegree=3.14159265358979323846/180.0;

@@ -1,5 +1,6 @@
 #pragma once
 #include "GameSproutRuntimeApi.h"
+#include "RuntimeIndirectLightingData.h"
 #include <array>
 #include <algorithm>
 #include <cmath>
@@ -126,6 +127,7 @@ struct EnvironmentLightingSettings {
     SpotShadowBudgetSettings SpotShadows;
     PlanarReflectionSettings PlanarReflection;
     std::vector<ReflectionProbeSettings> ReflectionProbes;
+    std::vector<BakedIndirectVolume> IndirectLightVolumes;
 };
 
 inline bool IsValidEnvironmentLighting(const EnvironmentLightingSettings& settings) {
@@ -147,6 +149,8 @@ inline bool IsValidEnvironmentLighting(const EnvironmentLightingSettings& settin
     for(const auto& coefficient:settings.SHCoefficients)
         if(!std::isfinite(coefficient.X)||!std::isfinite(coefficient.Y)||!std::isfinite(coefficient.Z))return false;
     if(!std::all_of(settings.ReflectionProbes.begin(),settings.ReflectionProbes.end(),IsValidReflectionProbe))return false;
+    if(settings.IndirectLightVolumes.size()>MaxBakedIndirectVolumes||
+       !std::all_of(settings.IndirectLightVolumes.begin(),settings.IndirectLightVolumes.end(),IsValidBakedIndirectVolume))return false;
     const auto& atmosphere=settings.Atmosphere;
     if(!std::isfinite(atmosphere.FogStart)||atmosphere.FogStart<0||
        !std::isfinite(atmosphere.FogEnd)||atmosphere.FogEnd<=atmosphere.FogStart||

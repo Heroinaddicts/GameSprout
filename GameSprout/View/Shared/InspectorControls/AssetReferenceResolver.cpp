@@ -32,6 +32,7 @@ std::string TypeName(eAssetType type) {
     case eAssetType::AvatarMask:return "Avatar Mask";
     case eAssetType::PhysicsMaterial:return "Physics Material";
     case eAssetType::Environment:return "Environment";
+    case eAssetType::Irradiance:return "Irradiance";
     default:return "Unsupported";
     }
 }
@@ -49,7 +50,7 @@ bool Resolve(IAssetsManager* assets,ILibraryManager* library,const GameSproutRun
        expected!=eAssetType::Texture && expected!=eAssetType::Material && expected!=eAssetType::Shader &&
        expected!=eAssetType::Model && expected!=eAssetType::Skeleton && expected!=eAssetType::AnimationClip &&
        expected!=eAssetType::AnimatorController && expected!=eAssetType::Avatar && expected!=eAssetType::AvatarMask &&
-       expected!=eAssetType::PhysicsMaterial && expected!=eAssetType::Environment) {
+       expected!=eAssetType::PhysicsMaterial && expected!=eAssetType::Environment && expected!=eAssetType::Irradiance) {
         error="此字段尚未支持该资源类型。";return false;
     }
     const Guid guid(reference.Guid);

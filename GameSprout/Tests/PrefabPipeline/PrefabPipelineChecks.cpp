@@ -255,6 +255,13 @@ void CheckSceneEnvironmentReference() {
     const std::string sourceGuid="567890ABCDEF1234567890ABCDEF1234";
     scene["EnvironmentLighting"]["SkyEnvironment"]=Reference(sourceGuid,73);
     scene["EnvironmentLighting"]["ReflectionProbes"][0]["Environment"]=Reference(sourceGuid,73);
+    const std::string irradianceGuid="324567890abcdef1234567890abcdef1";
+    const std::string irradiancePath="Lighting/Castle.irradiance";
+    fixture.SourcePaths[irradianceGuid]=irradiancePath;
+    Write(fixture.Root.filePath("Assets/Lighting/Castle.irradiance"),"Fixture irradiance source stamp");
+    const auto irradianceMeta=Meta(irradianceGuid,irradiancePath,"Irradiance");
+    Write(fixture.Root.filePath("Assets/Lighting/Castle.irradiance.meta"),QByteArray::fromStdString(AssetArtifactIO::JsonText(irradianceMeta)));
+    scene["EnvironmentLighting"]["IndirectLightVolumes"][0]["Asset"]=Reference(irradianceGuid,1);
     const auto imported=fixture.Import(scene,true);
     Check(imported.Success,imported.Result.Error);
     const auto& manifest=imported.Result.Manifest;
@@ -262,11 +269,16 @@ void CheckSceneEnvironmentReference() {
           manifest.GuidSourcePaths.contains(environmentGuid)&&manifest.GuidSourcePaths.at(environmentGuid)==environmentPath&&
           std::any_of(manifest.Dependencies.begin(),manifest.Dependencies.end(),[&](const auto& entry){return entry.Path==environmentPath;}),
           "Sky environment did not contribute a build dependency from its scene");
+    Check(std::find(manifest.ReferencedGuids.begin(),manifest.ReferencedGuids.end(),irradianceGuid)!=manifest.ReferencedGuids.end()&&
+          manifest.GuidSourcePaths.contains(irradianceGuid)&&manifest.GuidSourcePaths.at(irradianceGuid)==irradiancePath&&
+          std::any_of(manifest.Dependencies.begin(),manifest.Dependencies.end(),[&](const auto& entry){return entry.Path==irradiancePath;}),
+          "Irradiance volume did not contribute a build dependency from its scene");
     Json::Value wrapper;
     Check(ObjectDocumentBinary::Decode(imported.Bytes,wrapper)&&
           SameReference(wrapper["Data"]["EnvironmentLighting"]["SkyEnvironment"],sourceGuid,73)&&
-          SameReference(wrapper["Data"]["EnvironmentLighting"]["ReflectionProbes"][0]["Environment"],sourceGuid,73),
-          "Prepared Scene lost a sky or reflection probe environment reference");
+          SameReference(wrapper["Data"]["EnvironmentLighting"]["ReflectionProbes"][0]["Environment"],sourceGuid,73)&&
+          SameReference(wrapper["Data"]["EnvironmentLighting"]["IndirectLightVolumes"][0]["Asset"],irradianceGuid,1),
+          "Prepared Scene lost a spatial lighting reference");
 }
 void CheckSceneRecomposition(Fixture& fixture,std::uint64_t prefabLocalID) {
     auto oldSource=Source();auto& baseline=oldSource["Data"];

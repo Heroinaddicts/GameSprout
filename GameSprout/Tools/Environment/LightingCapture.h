@@ -20,7 +20,7 @@ inline bool CaptureFace(IRuntimeViewport& viewport,IScene& scene,Vector3 positio
     }
     RenderView view;
     view.Scene=&scene;view.DrawGrid=false;view.DrawUI=false;view.CaptureLinearColor=true;
-    view.EnableReflectionProbes=false;view.EnablePlanarReflections=false;
+    view.EnableReflectionProbes=false;view.EnablePlanarReflections=false;view.EnableBakedIndirectLighting=false;
     view.RequiredStaticFlags=requiredFlags;
     view.Camera.Position=position;
     view.Camera.Projection.VerticalFovRadians=1.57079632679f;

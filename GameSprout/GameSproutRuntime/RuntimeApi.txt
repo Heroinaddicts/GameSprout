@@ -166,6 +166,11 @@ EnvironmentLightingSettings::PlanarReflection 提供一个世界 Y 高度的水�
 ResolutionScale 范围 0.125 到 1，按视口等比例缩小，默认 0.5。MaxResolution 为反射目标最大边长，默认 1024 像素，范围 128 到 4096。MaxDistance 单位是米，限制近处接收者和镜面取景范围。LayerMask 与相机可见层取交集，控制哪些对象进入倒影。
 RenderView::EnablePlanarReflections 可关闭视口的额外绘制。仅在上方视角存在可见接收者时生成倒影。反射相机裁剪水面以下几何，跳过参与平面反射的水面材质，复用主视口阴影图集。线性 FP16 倒影在主视口统一应用曝光和色调映射。RenderStatistics::PlanarReflectionDrawCalls、PlanarReflectionWidth 和 PlanarReflectionHeight 分别报告额外绘制和目标大小。
 
+烘焙间接光体积
+将预烘制的 .irradiance 引用放入 IScene::SetEnvironmentLighting 的 IndirectLightVolumes。每个 BakedIndirectVolume 使用世界 AABB 的 Center 和 Size，单位为米。Intensity 接受 0 到 16，0 关闭该体积。BlendDistance 从盒内边界向内部渐变，0 使用硬边界。多个体积重叠时，较高 Priority 覆盖较低 Priority，边缘按各自距离混合。
+每个场景最多使用 8 个体积。每个网格在 X、Y、Z 轴各包含 1 到 32 个样点，端点均匀分布，单样点轴使用轴中心。格点为世界空间线性 E/pi 的 SH9，系数基底和全局环境光相同，以 X 最快的顺序排列。自定义资源提供者通过 LoadIndirectLighting 提供这一数据。
+Lit 在每像素对样点做三线性插值，体积内使用预烘制的漫反射，体积外回到全局环境漫反射。动态物体沿途也能接收烘焙间接光。同一设备、Provider 与资源组合的视口复用 GPU 图集，调整强度和盒范围无需重新上传。RenderView::EnableBakedIndirectLighting 默认开启，可在重烘培时关闭旧体积。
+
 方向光阴影设置
 方向光的 LightShadowSettings::CacheStaticCasters 默认关闭。通过 ILightComponent::SetShadows 开启后，带 StaticFlags::ShadowCasterStatic 的非蒙皮网格进入静态层，其他网格和蒙皮网格进入动态层。
 通过 IGameObject::SetStaticFlags 标记投影物体，保留节点原有的其他标记。静态投影物体的变换、几何或投影状态变化后会重新生成静态层。仅动态物体移动时复用静态层。

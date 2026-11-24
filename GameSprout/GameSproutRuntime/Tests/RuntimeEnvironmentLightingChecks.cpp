@@ -68,6 +68,8 @@ int main(int argc,char** argv) {
         auto& probe=settings.ReflectionProbes.emplace_back();
         probe.Environment={"abcdef1234567890abcdef1234567890",9};
         probe.Center={1,2,3};probe.CapturePosition={1,2,4};probe.Size={14,5,6};probe.Priority=-3;
+        auto& volume=settings.IndirectLightVolumes.emplace_back();
+        volume.Asset={"12121212121212121212121212121212",1};volume.Center={4,3,2};volume.Priority=8;
         Check(scene->SetEnvironmentLighting(settings),"Spatial lighting settings rejected");
         auto* object=scene->CreateGameObject("Prefab object");Check(object,"Cannot create ordinary object");
         SceneDocument::ObjectIDs ids;Json::Value document;std::string error;
@@ -116,6 +118,7 @@ int main(int argc,char** argv) {
         bad=document;bad["EnvironmentLighting"]["PlanarReflection"]["ResolutionScale"]=2;reject(bad);
         bad=document;bad["EnvironmentLighting"]["ReflectionProbes"][0]["Size"][2]=0;reject(bad);
         bad=document;bad["EnvironmentLighting"]["ReflectionProbes"][0]["BoxProjection"]=1;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["IndirectLightVolumes"][0]["Priority"]=256;reject(bad);
         bad=document;bad["EnvironmentLighting"]=Json::Value();reject(bad);
         auto skyOnly=document;skyOnly["EnvironmentLighting"]=Json::Value(Json::objectValue);
         skyOnly["EnvironmentLighting"]["Mode"]="SkyEnvironment";

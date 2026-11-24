@@ -90,6 +90,7 @@ struct RenderView {
     const UIDebugDrawList* UIScreenDebugDraw = nullptr;
     // Read eligible 3D material textures ahead of visibility and upload across frames.
     bool EnableTexturePrefetch = false;
+    bool EnableBakedIndirectLighting = true; // Disable for a fresh indirect-light capture.
     // Explicit offscreen capture of linear scene color, before exposure, tone
     // mapping and overlays. Ordinary viewports do not retain a readable image.
     bool CaptureLinearColor = false;

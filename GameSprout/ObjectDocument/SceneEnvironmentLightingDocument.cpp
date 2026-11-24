@@ -110,6 +110,27 @@ void ReadSpatial(const Json::Value& root,const std::string& path,GameSproutRunti
             if(!GameSproutRuntime::IsValidReflectionProbe(probe))Fail(item,"invalid reflection probe settings");
         }
     }
+    if(root.isMember("IndirectLightVolumes")) {
+        const auto& values=root["IndirectLightVolumes"];const auto key=path+".IndirectLightVolumes";
+        if(!values.isArray()||values.size()>GameSproutRuntime::MaxBakedIndirectVolumes)
+            Fail(key,"expected an array of at most eight irradiance volumes");
+        for(Json::ArrayIndex i=0;i<values.size();++i) {
+            const auto& value=values[i];const auto item=key+"["+std::to_string(i)+"]";
+            if(!value.isObject())Fail(item,"expected object");
+            auto& volume=settings.IndirectLightVolumes.emplace_back();
+            for(const auto& name:value.getMemberNames()) {
+                const auto member=item+"."+name;
+                if(name=="Asset")volume.Asset=ReadResource(value[name],member);
+                else if(name=="Center")volume.Center=Vector(value[name],member);
+                else if(name=="Size")volume.Size=Vector(value[name],member);
+                else if(name=="BlendDistance")volume.BlendDistance=Number(value[name],member);
+                else if(name=="Intensity")volume.Intensity=Number(value[name],member);
+                else if(name=="Priority")volume.Priority=Unsigned(value[name],member);
+                else Fail(member,"unknown field");
+            }
+            if(!GameSproutRuntime::IsValidBakedIndirectVolume(volume))Fail(item,"invalid irradiance volume settings");
+        }
+    }
 }
 void SerializeSpatial(const GameSproutRuntime::EnvironmentLightingSettings& settings,Json::Value& result) {
     const auto& plan=settings.PlanarReflection;
@@ -127,6 +148,12 @@ void SerializeSpatial(const GameSproutRuntime::EnvironmentLightingSettings& sett
         value["BlendDistance"]=probe.BlendDistance;value["Intensity"]=probe.Intensity;
         value["Priority"]=probe.Priority;value["CullingMask"]=probe.CullingMask;
     }
+    for(const auto& volume:settings.IndirectLightVolumes) {
+        auto& value=result["IndirectLightVolumes"].append(Json::Value(Json::objectValue));
+        value["Asset"]=Resource(volume.Asset,"Scene.EnvironmentLighting.IndirectLightVolumes.Asset");
+        value["Center"]=Vector(volume.Center);value["Size"]=Vector(volume.Size);
+        value["BlendDistance"]=volume.BlendDistance;value["Intensity"]=volume.Intensity;value["Priority"]=volume.Priority;
+    }
 }
 }
 namespace SceneEnvironmentLightingDocument {
@@ -136,7 +163,7 @@ GameSproutRuntime::EnvironmentLightingSettings Read(const Json::Value& data,cons
         if(name!="Mode"&&name!="AmbientColor"&&name!="SkyColor"&&name!="EquatorColor"&&name!="GroundColor"&&name!="Intensity"&&
            name!="SHCoefficients"&&name!="Atmosphere"&&name!="SkyEnvironment"&&name!="SkyRotationDegrees"&&name!="SkyIntensity"&&
            name!="ReflectionIntensity"&&name!="HDREnabled"&&name!="ExposureEV"&&name!="Tonemap"&&name!="SpotShadows"&&
-           name!="PlanarReflection"&&name!="ReflectionProbes")
+           name!="PlanarReflection"&&name!="ReflectionProbes"&&name!="IndirectLightVolumes")
             Fail(path+"."+name,"unknown field");
     GameSproutRuntime::EnvironmentLightingSettings result;
     if(data.isMember("Mode")) {

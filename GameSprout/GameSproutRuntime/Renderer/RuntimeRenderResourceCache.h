@@ -23,6 +23,8 @@ public:
     std::map<Renderer::ResourceKey,Renderer::MeshGPU> Meshes;
     std::map<Renderer::ResourceKey,Renderer::TextureGPU> Textures;
     std::map<Renderer::ResourceKey,Renderer::EnvironmentGPU> Environments;
+    std::map<std::vector<Renderer::ResourceKey>,Renderer::IndirectAtlasGPU> IndirectAtlases;
+    std::uint64_t IndirectAtlasAccess=0;
     std::map<Renderer::ResourceKey,Renderer::Material> Materials;
     std::map<Renderer::ResourceKey,Renderer::ShaderGPU> UserShaders;
     std::map<Renderer::ShaderPipelineKey,GRHI::IGraphicsPipeline*> ShaderPipelines;
