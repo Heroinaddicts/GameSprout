@@ -30,18 +30,23 @@ constexpr std::array FilterQualities{
     std::pair{GameSproutRuntime::ShadowFilterQuality::Medium,"Medium"},
     std::pair{GameSproutRuntime::ShadowFilterQuality::High,"High"}
 };
+constexpr std::array LightTypes{
+    std::pair{GameSproutRuntime::LightType::Directional,"Directional"},
+    std::pair{GameSproutRuntime::LightType::Point,"Point"},
+    std::pair{GameSproutRuntime::LightType::Spot,"Spot"}
+};
 template<class Enum,std::size_t Size>
 Enum ReadChoice(const Json::Value& value,const std::string& path,const std::array<std::pair<Enum,const char*>,Size>& choices) {
     if(value.isString()) {
         const auto name=value.asString();
         for(const auto& [candidate,label]:choices)if(name==label)return candidate;
     }
-    Fail(path,"invalid shadow option");
+    Fail(path,"unknown option");
 }
 template<class Enum,std::size_t Size>
 const char* ChoiceName(Enum value,const std::array<std::pair<Enum,const char*>,Size>& choices) {
     for(const auto& [candidate,label]:choices)if(value==candidate)return label;
-    Fail("Light.Settings.Shadows","invalid Runtime shadow option");
+    Fail("Light.Settings","unknown Runtime option");
 }
 
 GameSproutRuntime::LightSettings Read(const Json::Value& component,const std::string& path) {
@@ -50,9 +55,12 @@ GameSproutRuntime::LightSettings Read(const Json::Value& component,const std::st
     GameSproutRuntime::LightSettings result;
     if(!component.isMember("Settings"))return result;
     const auto& settings=component["Settings"];const std::string key=path+".Settings";
-    Keys(settings,key,{"Type","Enabled","Color","Intensity","CullingMask","Shadows"});
-    if(settings.isMember("Type")&&(!settings["Type"].isString()||settings["Type"].asString()!="Directional"))
-        Fail(key+".Type","only Directional is supported");
+    Keys(settings,key,{"Type","Enabled","Color","Intensity","CullingMask","Shadows",
+        "Range","InnerSpotAngleDegrees","OuterSpotAngleDegrees"});
+    if(settings.isMember("Type"))result.Type=ReadChoice(settings["Type"],key+".Type",LightTypes);
+    for(const auto& [name,target]:{std::pair<const char*,float*>{"Range",&result.Range},
+        {"InnerSpotAngleDegrees",&result.InnerSpotAngleDegrees},{"OuterSpotAngleDegrees",&result.OuterSpotAngleDegrees}})
+        if(settings.isMember(name))*target=Number(settings[name],key+"."+name);
     if(settings.isMember("Enabled")) {
         if(!settings["Enabled"].isBool())Fail(key+".Enabled","expected bool");
         result.Enabled=settings["Enabled"].asBool();
@@ -74,7 +82,7 @@ GameSproutRuntime::LightSettings Read(const Json::Value& component,const std::st
     if(settings.isMember("Shadows")) {
         const auto& shadows=settings["Shadows"];const std::string shadowKey=key+".Shadows";
         Keys(shadows,shadowKey,{"Enabled","Strength","Distance","Resolution","CascadeCount","DepthBias","NormalBias",
-            "Soft","CacheStaticCasters","StaticUpdateMode","CascadeSplits","FadeStart","FilterQuality"});
+            "Soft","CacheStaticCasters","StaticUpdateMode","CascadeSplits","FadeStart","FilterQuality","NearPlane","Priority"});
         for(const auto& [name,target]:{std::pair<const char*,bool*>{"Enabled",&result.Shadows.Enabled},
             {"Soft",&result.Shadows.Soft},{"CacheStaticCasters",&result.Shadows.CacheStaticCasters}})
             if(shadows.isMember(name)) {
@@ -83,9 +91,11 @@ GameSproutRuntime::LightSettings Read(const Json::Value& component,const std::st
             }
         for(const auto& [name,target]:{std::pair<const char*,float*>{"Strength",&result.Shadows.Strength},
             {"Distance",&result.Shadows.Distance},{"DepthBias",&result.Shadows.DepthBias},
-            {"NormalBias",&result.Shadows.NormalBias},{"FadeStart",&result.Shadows.FadeStart}})
+            {"NormalBias",&result.Shadows.NormalBias},{"FadeStart",&result.Shadows.FadeStart},
+            {"NearPlane",&result.Shadows.NearPlane}})
             if(shadows.isMember(name))*target=Number(shadows[name],shadowKey+"."+name);
-        for(const auto& [name,target]:{std::pair<const char*,std::uint32_t*>{"Resolution",&result.Shadows.Resolution},{"CascadeCount",&result.Shadows.CascadeCount}})
+        for(const auto& [name,target]:{std::pair<const char*,std::uint32_t*>{"Resolution",&result.Shadows.Resolution},
+            {"CascadeCount",&result.Shadows.CascadeCount},{"Priority",&result.Shadows.Priority}})
             if(shadows.isMember(name)) {
                 if(!shadows[name].isUInt())Fail(shadowKey+"."+name,"expected uint32");
                 *target=shadows[name].asUInt();
@@ -111,8 +121,10 @@ GameSproutRuntime::LightSettings Read(const Json::Value& component,const std::st
             }
         }
         if(!GameSproutRuntime::IsValidLightShadows(result.Shadows))
-            Fail(shadowKey,"invalid shadow settings: strength [0,1], positive distance, resolution 256/512/1024/2048/4096, cascades 1/2/4, biases [0,10] texels");
+            Fail(shadowKey,"invalid shadow settings: strength [0,1], positive distance and near plane, resolution 256/512/1024/2048/4096, cascades 1/2/4, biases [0,10] texels, priority [0,255]");
     }
+    if(!GameSproutRuntime::IsValidLocalLightGeometry(result))
+        Fail(key,"expected positive range, 0 <= inner <= outer, outer [1,179] degrees, and spot shadow near plane below range");
     return result;
 }
 }
@@ -132,7 +144,14 @@ Json::Value Serialize(GameSproutRuntime::IComponent& component) {
     const auto& settings=light->GetSettings();
     if(!GameSproutRuntime::IsValidLightShadows(settings.Shadows))Fail("Light.Settings.Shadows","invalid Runtime settings");
     Json::Value result(Json::objectValue);result["Type"]="GameSproutRuntime.Light";
-    auto& data=result["Settings"];data["Type"]="Directional";data["Enabled"]=settings.Enabled;
+    auto& data=result["Settings"];data["Type"]=ChoiceName(settings.Type,LightTypes);data["Enabled"]=settings.Enabled;
+    const GameSproutRuntime::LightSettings defaults;
+    if(settings.Type!=GameSproutRuntime::LightType::Directional||settings.Range!=defaults.Range)data["Range"]=settings.Range;
+    if(settings.Type==GameSproutRuntime::LightType::Spot||settings.InnerSpotAngleDegrees!=defaults.InnerSpotAngleDegrees||
+        settings.OuterSpotAngleDegrees!=defaults.OuterSpotAngleDegrees) {
+        data["InnerSpotAngleDegrees"]=settings.InnerSpotAngleDegrees;
+        data["OuterSpotAngleDegrees"]=settings.OuterSpotAngleDegrees;
+    }
     auto& color=data["Color"];color=Json::Value(Json::arrayValue);
     color.append(settings.Color.R);color.append(settings.Color.G);color.append(settings.Color.B);color.append(settings.Color.A);
     data["Intensity"]=settings.Intensity;data["CullingMask"]=Json::UInt(settings.CullingMask);
@@ -145,6 +164,10 @@ Json::Value Serialize(GameSproutRuntime::IComponent& component) {
     shadows["StaticUpdateMode"]=ChoiceName(settings.Shadows.StaticUpdateMode,StaticUpdateModes);
     shadows["FadeStart"]=settings.Shadows.FadeStart;
     shadows["FilterQuality"]=ChoiceName(settings.Shadows.FilterQuality,FilterQualities);
+    if(settings.Type==GameSproutRuntime::LightType::Spot||settings.Shadows.NearPlane!=defaults.Shadows.NearPlane)
+        shadows["NearPlane"]=settings.Shadows.NearPlane;
+    if(settings.Type==GameSproutRuntime::LightType::Spot||settings.Shadows.Priority!=defaults.Shadows.Priority)
+        shadows["Priority"]=Json::UInt(settings.Shadows.Priority);
     auto& splits=shadows["CascadeSplits"];splits=Json::Value(Json::arrayValue);
     if(settings.Shadows.CascadeSplits[0]>0)
         for(std::uint32_t index=0;index+1<settings.Shadows.CascadeCount;++index)

@@ -37,7 +37,7 @@ namespace GameSproutRuntime {
 bool Renderer::Render(const RenderView& view) {
     _HasRenderedCamera=false;_RenderedCamera={};
     if(_Rendering || _Runtime.IsExecuting() || _Runtime.IsShuttingDown() || _Runtime.IsConstructing()) return Fail("Runtime Renderer cannot run inside a Runtime callback, construction or another Render");
-    _Error.clear();_Statistics={};_ShadowRecorded=false;
+    _Error.clear();_Statistics={};_ShadowRecorded=false;_SpotShadowRecorded=false;
     if(!_Surface&&!_ColorTarget){_Statistics={};return true;}
     if(_Surface&&_ColorTarget)return Fail("Viewport has conflicting render targets");
     if(view.DrawScene||view.DrawUI) {
@@ -101,12 +101,19 @@ bool Renderer::Render(const RenderView& view) {
         _ShaderFrame.Time=_Runtime.GetShaderTime();
         _ShaderFrame.CameraPosition={view.Camera.Position.X,view.Camera.Position.Y,view.Camera.Position.Z,1};
         RenderEnvironment::Uniform environment{};
-        if(view.DrawScene&&!RenderEnvironment::Prepare(view.Scene->GetEnvironmentLighting(),environment))
-            Diagnostic("Scene environment radiance is invalid or exceeds finite shader precision; diffuse environment disabled for this frame");
+        const auto* settings=view.DrawScene?&view.Scene->GetEnvironmentLighting():nullptr;
+        const auto* sky=settings?Environment(settings->SkyEnvironment):nullptr;
+        const EnvironmentGPU* reflections=nullptr;
+        if(settings) {
+            if(!RenderEnvironment::Prepare(*settings,environment,sky?&sky->DiffuseSH:nullptr,sky?sky->SpecularMaxLOD:0))
+                Diagnostic("Scene environment radiance is invalid or exceeds finite shader precision; environment lighting disabled for this frame");
+            else if(sky&&settings->ReflectionIntensity>0)reflections=sky;
+        }
         if(view.DrawScene) {
             BeginTexturePrefetchFrame(view.EnableTexturePrefetch);
             PrepareDraws(view,viewProjection);
             EndTexturePrefetchFrame();
+            PrepareLocalLights();
             if(!_ColorInstanceBatchesKnown||_ColorInstancingEnabled!=view.EnableGPUInstancing) {
                 _ColorInstances.Indices.clear();
                 PrepareInstanceBatches(_PreparedDraws,view.EnableGPUInstancing,false,_ColorInstanceDraws,_ColorInstances.Indices);
@@ -120,21 +127,42 @@ bool Renderer::Render(const RenderView& view) {
                 _ChangedInstanceTransforms.clear();
             }
             if(!RenderShadows(*command.Command,view,float(width)/height))return false;
-            for(auto* buffer:{_InstanceTransformsBuffer,_ColorInstances.Buffer,_StaticShadowInstances.Buffer,_DynamicShadowInstances.Buffer})
+            if(!RenderSpotShadows(*command.Command,view,viewProjection))return false;
+            for(auto* buffer:{_InstanceTransformsBuffer,_ColorInstances.Buffer,_StaticShadowInstances.Buffer,
+                _DynamicShadowInstances.Buffer,_SpotShadowInstances.Buffer})
                 if(buffer)_Statistics.ResidentInstanceBytes+=buffer->GetSize();
         }
         if(view.DrawUI&&!PrepareUI(*view.Scene,width,height,view.UIPreviewObjectID,view.UIScreenPreviewLayoutSize))return false;
         GRHI::RenderPassDesc pass;
-        pass.ColorTarget=target;pass.ClearColor={view.ClearColor.R,view.ClearColor.G,view.ClearColor.B,view.ClearColor.A};
+        const bool hdr=settings&&settings->HDREnabled;
+        auto sceneFormat=format;
+        pass.ColorTarget=target;
+        if(hdr) {
+            auto* hdrTarget=HDRTarget(width,height);
+            if(!hdrTarget)return false;
+            sceneFormat=hdrTarget->GetFormat();pass.ColorTarget=hdrTarget->GetColorTargetView();
+            if(!debugBatches.empty())pass.DepthStore=GRHI::StoreOp::Store;
+        } else if(settings)_HDRTarget.reset();
+        pass.ClearColor={view.ClearColor.R,view.ClearColor.G,view.ClearColor.B,view.ClearColor.A};
         if(depth){pass.DepthTarget=depth->GetDepthTargetView();pass.DepthLoad=GRHI::LoadOp::Clear;pass.ClearDepth=1.0f;}
         command.Pass=command.Command->BeginRenderPass(pass);
         if(!command.Pass) return Fail(DeviceError("Begin Runtime depth/color pass"));
         _Statistics.Width=width;_Statistics.Height=height;
-        if(view.DrawScene&&!DrawSky(*command.Pass,view,format,float(width)/float(height),lights))return false;
-        if(view.DrawScene && view.DrawGrid && !DrawGrid(*command.Pass,viewProjection,format)) return false;
-        if(view.DrawScene&&!DrawPrepared(*command.Pass,_PreparedDraws,view,viewProjection,format,lights,&environment,sizeof(environment)))return false;
-        if(view.DrawScene && !DrawDebug(*command.Pass,viewProjection,format,debugBatches,debugBuffers.Buffers)) return false;
+        if(view.DrawScene&&!DrawSky(*command.Pass,view,sceneFormat,float(width)/float(height),lights,sky))return false;
+        if(view.DrawScene && view.DrawGrid && !DrawGrid(*command.Pass,viewProjection,sceneFormat)) return false;
+        if(view.DrawScene&&!DrawPrepared(*command.Pass,_PreparedDraws,view,viewProjection,sceneFormat,lights,environment,reflections))return false;
         const auto depthFormat=depth?depth->GetFormat():GRHI::TextureFormat::Unknown;
+        if(hdr) {
+            command.Command->EndRenderPass(command.Pass);command.Pass=nullptr;
+            GRHI::RenderPassDesc display;
+            display.ColorTarget=target;display.Load=GRHI::LoadOp::DontCare;
+            display.DepthTarget=pass.DepthTarget;
+            display.DepthLoad=debugBatches.empty()?GRHI::LoadOp::DontCare:GRHI::LoadOp::Load;
+            command.Pass=command.Command->BeginRenderPass(display);
+            if(!command.Pass)return Fail(DeviceError("Begin Runtime HDR resolve pass"));
+            if(!ResolveHDR(*command.Pass,format,depthFormat,*settings))return false;
+        }
+        if(view.DrawScene && !DrawDebug(*command.Pass,viewProjection,format,debugBatches,debugBuffers.Buffers)) return false;
         if(view.DrawUI&&!DrawUI(*command.Pass,format,depthFormat)) return false;
         if(view.UIScreenDebugDraw&&!DrawUIScreenDebug(*command.Pass,format,depthFormat,{float(width),float(height)},
             *view.UIScreenDebugDraw,debugBuffers.Buffers)) return false;
@@ -145,6 +173,7 @@ bool Renderer::Render(const RenderView& view) {
         // A recorded atlas is reusable only after the whole command is submitted.
         // A later color-pass error/cancel must not cache an unexecuted depth pass.
         if(_ShadowRecorded)_ShadowValid=true;
+        if(_SpotShadowRecorded)_SpotShadowValid=true;
         if(view.DrawScene){_RenderedCamera={view.Camera,viewProjection,width,height,view.Scene->GetInstanceID()};_HasRenderedCamera=true;}
         return true;
     } catch(const std::exception& exception) {return Fail(std::string("Runtime Renderer: ")+exception.what());}

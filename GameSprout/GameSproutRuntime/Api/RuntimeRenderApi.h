@@ -90,6 +90,9 @@ struct RenderView {
     const UIDebugDrawList* UIScreenDebugDraw = nullptr;
     // Read eligible 3D material textures ahead of visibility and upload across frames.
     bool EnableTexturePrefetch = false;
+    // Host caps for the authored scene budget. Either zero disables the pass.
+    std::uint32_t MaxSpotShadowLights = 4;
+    std::uint32_t MaxSpotShadowResolution = 4096;
 };
 
 struct SceneRaycastHit {
@@ -147,6 +150,9 @@ struct RenderStatistics {
     bool TexturePrefetchPending = false;
     std::uint32_t PrefetchedTextures = 0;
     std::uint64_t PrefetchUploadBytes = 0;
+    std::uint32_t SpotShadowLights = 0;
+    std::uint32_t SpotShadowTilesUpdated = 0;
+    std::uint32_t SpotShadowDrawCalls = 0;
 };
 
 class IRuntimeRenderer {

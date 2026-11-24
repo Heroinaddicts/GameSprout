@@ -81,6 +81,7 @@ void Renderer::InvalidateInstanceUploads() {
     _ColorInstances.Uploaded.clear();
     _StaticShadowInstances.Uploaded.clear();
     _DynamicShadowInstances.Uploaded.clear();
+    _SpotShadowInstances.Uploaded.clear();
 }
 
 void Renderer::ClearInstanceBuffers() {
@@ -90,7 +91,7 @@ void Renderer::ClearInstanceBuffers() {
     _ChangedInstanceTransforms.clear();
     _ColorInstanceDraws.clear();
     _ColorInstanceBatchesKnown=false;
-    for(auto* stream:{&_ColorInstances,&_StaticShadowInstances,&_DynamicShadowInstances}) {
+    for(auto* stream:{&_ColorInstances,&_StaticShadowInstances,&_DynamicShadowInstances,&_SpotShadowInstances}) {
         delete stream->Buffer;
         *stream={};
     }
@@ -112,7 +113,8 @@ void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,boo
             if(shadow) {
                 if(next.ShadowDoubleSided!=draw.ShadowDoubleSided)break;
             }else if(next.Material!=draw.Material||next.Object->Layer!=draw.Object->Layer||
-                (draw.Material->ShadingModel==MaterialShadingModel::Lit&&next.Object->ReceiveShadows!=draw.Object->ReceiveShadows))break;
+                (draw.Material->ShadingModel==MaterialShadingModel::Lit&&
+                    (next.Object->ReceiveShadows!=draw.Object->ReceiveShadows||next.LocalLightIndices!=draw.LocalLightIndices)))break;
             ++end;
         }
         const auto count=static_cast<std::uint32_t>(end-begin);
@@ -178,7 +180,7 @@ bool Renderer::UploadInstanceStream(GRHI::ICommandBuffer& command,InstanceStream
 
 bool Renderer::DrawPrepared(GRHI::IRenderPass& pass,const std::vector<PreparedDraw>& draws,const RenderView& view,
     const Mat4& viewProjection,GRHI::TextureFormat format,const std::vector<DirectionalLight>& lights,
-    const void* environment,std::size_t environmentSize) {
+    const RenderEnvironment::Uniform& environment,const EnvironmentGPU* reflections) {
     for(const auto& batch:_ColorInstanceDraws) {
         const auto& draw=draws[batch.First];
         if(draw.Shader) {
@@ -187,7 +189,7 @@ bool Renderer::DrawPrepared(GRHI::IRenderPass& pass,const std::vector<PreparedDr
             ++_Statistics.DrawCalls;_Statistics.Triangles+=draw.Section.IndexCount/3;
             continue;
         }
-        if(!DrawBuiltin(pass,draw,view,viewProjection,format,lights,environment,environmentSize,batch.IndexOffset,batch.Count))
+        if(!DrawBuiltin(pass,draw,view,viewProjection,format,lights,environment,reflections,batch.IndexOffset,batch.Count))
             return false;
         if(batch.Count>1) {
             ++_Statistics.InstancedDrawCalls;_Statistics.InstancedInstances+=batch.Count;

@@ -99,7 +99,7 @@ Renderer::Renderer(Runtime& runtime,GRHI::IDevice& device,IRuntimeResourceProvid
 Renderer::~Renderer() {
     ClearResources();
     for(auto& entry:_Depths) delete entry.second.Texture;
-    delete _ShadowAtlas;delete _DynamicShadowAtlas;delete _ShadowSampler;
+    delete _ShadowAtlas;delete _DynamicShadowAtlas;delete _SpotShadowAtlas;delete _ShadowSampler;
     delete _ShadowRepairVertices;
     for(auto& entry:_UIPipelines)delete entry.second;
     delete _UIVertex;delete _UIFragment;delete _UIFallbackAtlas;
@@ -109,9 +109,12 @@ Renderer::~Renderer() {
 void Renderer::ClearResources() {
     ClearUIDraws();
     _ShadowValid=false;_ShadowUniform.Info={};_StaticShadowCasters.clear();_PrimaryShadowCasterBounds.clear();
+    _SpotShadowValid=false;_SpotShadowCount=0;
+    for(auto& casters:_SpotShadowCasters)casters.clear();
     _StaticShadowTransformObjects.clear();
     _StaticShadowCandidates.clear();_StaticShadowBounds.clear();_DynamicShadowObjects.clear();
     _PreparedDraws.clear();_SceneObjects.clear();_SceneObjectIndices.clear();_SceneLights.clear();_LightTransformSources.clear();
+    _LocalLights.clear();_HadLocalLighting=false;
     _VisibleDrawScratch.clear();_OpaqueDrawOrder.clear();
     _VisibleOpaqueSlots.clear();_VisibleTransparentSlots.clear();_OpaqueDrawOrderKnown=false;
     _SkinnedDraws.clear();

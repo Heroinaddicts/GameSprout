@@ -29,6 +29,9 @@ int main(int argc,char** argv) {
         settings.Atmosphere.Enabled=true;settings.Atmosphere.DrawSky=false;
         settings.Atmosphere.ZenithColor={.1f,.3f,.7f,1};settings.Atmosphere.FogColor={.4f,.6f,.8f,1};
         settings.Atmosphere.FogStart=80;settings.Atmosphere.FogEnd=700;settings.Atmosphere.FogMaxOpacity=.7f;
+        settings.SkyEnvironment={"abcdef1234567890abcdef1234567890",7};
+        settings.SkyRotationDegrees=-35;settings.SkyIntensity=1.5f;settings.ReflectionIntensity=.25f;
+        settings.HDREnabled=true;settings.ExposureEV=-1.5f;settings.Tonemap=GameSproutRuntime::ToneMapping::ACES;
         settings.SHCoefficients[0]={.2f,.3f,.4f};settings.SHCoefficients[6]={-.5f,.125f,-.25f};
         Check(scene->SetEnvironmentLighting(settings),"Signed SH and linear HDR must be valid");runtime->ProcessPendingEvents();
         Check(listener.Changes==1&&listener.SceneID==scene->GetInstanceID()&&listener.ObjectID==scene->GetInstanceID(),"Wrong environment root event identity");
@@ -38,6 +41,11 @@ int main(int argc,char** argv) {
         settings.Atmosphere.FogStart=90;
         Check(scene->SetEnvironmentLighting(settings),"Atmosphere-only edit rejected");runtime->ProcessPendingEvents();
         Check(listener.Changes==2&&scene->GetEnvironmentLighting().Atmosphere.FogStart==90,"Atmosphere-only edit did not publish an environment event");
+        settings.SpotShadows={3,512};
+        Check(scene->SetEnvironmentLighting(settings),"Shadow-budget-only edit rejected");runtime->ProcessPendingEvents();
+        Check(listener.Changes==3&&scene->GetEnvironmentLighting().SpotShadows==settings.SpotShadows&&
+            other->GetEnvironmentLighting().SpotShadows==GameSproutRuntime::SpotShadowBudgetSettings{},
+            "Spot shadow budget did not publish its own scene event");
         const auto invalid=[&](GameSproutRuntime::EnvironmentLightingSettings value) {
             Check(!scene->SetEnvironmentLighting(value)&&scene->GetEnvironmentLighting().Mode==settings.Mode&&
                 scene->GetEnvironmentLighting().Intensity==settings.Intensity&&scene->GetEnvironmentLighting().AmbientColor.R==4&&
@@ -52,7 +60,9 @@ int main(int argc,char** argv) {
         badSettings=settings;badSettings.Atmosphere.FogEnd=settings.Atmosphere.FogStart;invalid(badSettings);
         badSettings=settings;badSettings.Atmosphere.FogMaxOpacity=1.1f;invalid(badSettings);
         badSettings=settings;badSettings.Atmosphere.ZenithColor.R=std::numeric_limits<float>::infinity();invalid(badSettings);
-        runtime->ProcessPendingEvents();Check(listener.Changes==2,"Rejected environment emitted a notification");runtime->UnregisterListener(&listener);
+        badSettings=settings;badSettings.SpotShadows.MaxLights=5;invalid(badSettings);
+        badSettings=settings;badSettings.SpotShadows.MaxResolution=768;invalid(badSettings);
+        runtime->ProcessPendingEvents();Check(listener.Changes==3,"Rejected environment emitted a notification");runtime->UnregisterListener(&listener);
 
         auto* object=scene->CreateGameObject("Prefab object");Check(object,"Cannot create ordinary object");
         SceneDocument::ObjectIDs ids;Json::Value document;std::string error;
@@ -63,6 +73,14 @@ int main(int argc,char** argv) {
         Check(document["EnvironmentLighting"]["Atmosphere"]["Enabled"].asBool()&&
             !document["EnvironmentLighting"]["Atmosphere"]["DrawSky"].asBool()&&
             document["EnvironmentLighting"]["Atmosphere"]["FogStart"].asFloat()==90,"Scene lost its atmosphere settings");
+        const auto& environment=document["EnvironmentLighting"];
+        Check(environment["SkyEnvironment"]["Guid"]==settings.SkyEnvironment.Guid&&
+            environment["SkyEnvironment"]["LocalID"].asUInt64()==7&&environment["SkyRotationDegrees"].asFloat()==-35&&
+            environment["SkyIntensity"].asFloat()==1.5f&&environment["ReflectionIntensity"].asFloat()==.25f&&
+            environment["HDREnabled"].asBool()&&environment["ExposureEV"].asFloat()==-1.5f&&environment["Tonemap"]=="ACES",
+            "Scene lost skybox, reflection or HDR settings");
+        Check(environment["SpotShadows"]["MaxLights"].asUInt()==3&&environment["SpotShadows"]["MaxResolution"].asUInt()==512,
+            "Scene lost the authored spot shadow budget");
         GameSproutRuntime::IScene* loaded=nullptr;SceneDocument::ObjectIDs loadedIDs;
         Check(SceneDocument::Instantiate(document,*runtime,loaded,loadedIDs,error),error);
         Json::Value again;Check(SceneDocument::Serialize(*loaded,loadedIDs,again,error)&&again==document,"Environment scene round trip changed data");
@@ -81,7 +99,19 @@ int main(int argc,char** argv) {
         bad=document;bad["EnvironmentLighting"]["Atmosphere"]["FogStart"]=1000;reject(bad);
         bad=document;bad["EnvironmentLighting"]["Atmosphere"]["FogMaxOpacity"]=1.1;reject(bad);
         bad=document;bad["EnvironmentLighting"]["Atmosphere"]["FogColor"][0]=-1;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["SkyEnvironment"]["LocalID"]=0;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["SkyEnvironment"]["Guid"]="bad";reject(bad);
+        bad=document;bad["EnvironmentLighting"]["SkyIntensity"]=-1;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["ReflectionIntensity"]=-1;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["HDREnabled"]=1;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["ExposureEV"]=17;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["Tonemap"]="Uncharted2";reject(bad);
+        bad=document;bad["EnvironmentLighting"]["SpotShadows"]["MaxLights"]=3.5f;reject(bad);
+        bad=document;bad["EnvironmentLighting"]["SpotShadows"]["MaxResolution"]=8192;reject(bad);
         bad=document;bad["EnvironmentLighting"]=Json::Value();reject(bad);
+        auto skyOnly=document;skyOnly["EnvironmentLighting"]=Json::Value(Json::objectValue);
+        skyOnly["EnvironmentLighting"]["Mode"]="SkyEnvironment";
+        Check(SceneDocument::Validate(skyOnly,error),"Scene cannot select skybox mode before binding a resource");
         bad=document;bad.removeMember("EnvironmentLighting");GameSproutRuntime::IScene* omitted=nullptr;
         Check(SceneDocument::Instantiate(bad,*runtime,omitted,error)&&omitted->GetEnvironmentLighting().Mode==GameSproutRuntime::AmbientLightMode::None,
             "Omitted environment must use the normal None default");

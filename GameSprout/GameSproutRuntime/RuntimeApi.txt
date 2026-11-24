@@ -151,6 +151,11 @@ Grid 是世界 Y=0、X/Z 各 [-50,50] 米参考线；多 View 复用按尺寸缓
 RuntimeGenerateShaders 显式重新生成，或运行 GenerateShaders.py --shadercross 工具路径。
 Runtime.RendererGPU 使用实际 GRHI/Metal 离屏像素验证矩阵/纹理/sRGB、四种属性布局、depth、法线、负/零缩放、grid/resize与缓存。
 
+天空环境与 HDR
+IScene::GetEnvironmentLighting 和 SetEnvironmentLighting 使用完整场景设置。SkyEnvironment 引用预处理的 .environment。AmbientLightMode::SkyEnvironment 采用资源的漫反射 SH9。天空旋转以 +Y 为轴并同时作用于天空背景、天空漫反射与材质环境反射。SkyIntensity 调整背景，Intensity 调整漫反射，ReflectionIntensity 调整镜面环境反射。Atmosphere.Enabled 与 DrawSky 控制天空绘制。
+HDREnabled 启用 FP16 线性场景色合成。ExposureEV 范围 -16 至 16，增加 1 表示线性亮度乘二。Tonemap 支持 None、Neutral、ACES。曝光应用于场景世界绘制，屏幕空间 UI 在合成完成后叠加。GameSprout/Lit 可通过 MaterialRenderData::EnvironmentReflections 开关环境反射，默认启用。
+普通 Texture 产物包含 mip 链，Runtime 同步加载和后台预取均可上传完整子资源。SamplerSettings 暴露 MipFilter 与 MaxAnisotropy。资源导入侧可选点采样、双线性或三线性，以及 1 到 16 的各向异性级别。
+
 方向光阴影设置
 方向光的 LightShadowSettings::CacheStaticCasters 默认关闭。通过 ILightComponent::SetShadows 开启后，带 StaticFlags::ShadowCasterStatic 的非蒙皮网格进入静态层，其他网格和蒙皮网格进入动态层。
 通过 IGameObject::SetStaticFlags 标记投影物体，保留节点原有的其他标记。静态投影物体的变换、几何或投影状态变化后会重新生成静态层。仅动态物体移动时复用静态层。
@@ -158,6 +163,16 @@ StaticUpdateMode 默认为 AutomaticIncremental。级联投影能按整纹素平
 CascadeSplits 全零时自动分割。手动设置时，从近到远填入 CascadeCount - 1 个严格递增的 0 到 1 之间的分数，其余元素填零。分割范围从相机近裁剪面到阴影距离与相机远裁剪距离的较小值。
 FadeStart 是有效最大阴影距离的比例，默认 0.9，1 表示在最大距离直接截止。Soft 开启后可通过 FilterQuality 选择 Low（4 次采样）、Medium（9 次，默认）或 High（25 次）。
 ILightComponent::RequestShadowRefresh() 请求每个使用该方向光的视口在下一次成功绘制阴影时重建所有级联。连续请求会合并，临时不可绘制的视口会在恢复后执行。请求通过场景视觉事件通知按需绘制的宿主。
+
+点光源和聚光灯
+ILightComponent::SetSettings 接受 LightType::Point 和 LightType::Spot。两者使用 Transform 世界位置、线性 HDR 颜色和相对强度，照度按距离平方衰减并在 Range 米处平滑归零。
+聚光灯沿 Transform 局部 +Z 朝向照射。SetSpotAngles 接受以度为单位的完整内锥角和外锥角，外锥角范围 1 到 179 度，内锥角范围 0 到外锥角。
+内置 Lit 按物体 Layer 和网格世界包围范围选择局部光源，每个绘制对象最多接收四个局部光源。使用同一组光源的实例仍可合批。
+聚光灯的 Shadows 使用同一视口图集。Resolution 表示单灯瓦片边长。Distance 和 FadeStart 控制距相机的有效阴影范围，NearPlane 控制聚光灯投影的近裁剪面，必须小于 Range。
+读取 IScene::GetEnvironmentLighting() 中的 SpotShadows，修改后用 SetEnvironmentLighting 保存场景预算。MaxLights 范围 0 到 4，默认 2。MaxResolution 默认 1024，接受 256、512、1024、2048、4096。Editor 的环境照明与天空窗口提供这两项设置。
+宿主通过 RenderView::MaxSpotShadowLights 和 MaxSpotShadowResolution 限制当前视口预算，默认 4 盏与 4096 像素。实际预算取场景与宿主限制的较小值。数量或宿主分辨率设为 0 时关闭聚光灯阴影。
+有可见接收物的聚光灯按 Priority 和相机距离取得瓦片。相同灯具投影与投射物复用瓦片，RequestShadowRefresh 请求下一次绘制重建对应瓦片。
+点光源支持实时照明。实时阴影支持方向光和聚光灯。聚光灯的阴影瓦片不分级联与静态层。
 Editor 方向光 Inspector 的「实时阴影」提供缓存开关及高级设置。节点的 Static 菜单提供「Shadow Caster Static」。这些设置会保存进场景，手动重建按钮只发出一次视觉刷新请求。
 
 网格投射和接收阴影

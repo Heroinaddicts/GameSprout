@@ -4,7 +4,8 @@
 #include <cmath>
 
 namespace GameSproutRuntime {
-enum class AmbientLightMode : std::uint8_t { None, Color, Gradient, SphericalHarmonics };
+enum class AmbientLightMode : std::uint8_t { None, Color, Gradient, SphericalHarmonics, SkyEnvironment };
+enum class ToneMapping : std::uint8_t { None, Neutral, ACES };
 
 // Scene appearance, independent of the diffuse ambient-light source. All
 // colors are linear RGB; distances are world-space metres from the view camera.
@@ -27,6 +28,18 @@ struct SceneAtmosphereSettings {
     }
 };
 
+struct SpotShadowBudgetSettings {
+    // Per scene and viewport. Zero disables Spot shadows while preserving light.
+    std::uint32_t MaxLights = 2;
+    std::uint32_t MaxResolution = 1024; // Maximum edge in pixels per tile.
+
+    bool operator==(const SpotShadowBudgetSettings&) const = default;
+};
+
+inline bool IsValidLightShadowResolution(std::uint32_t edge) {
+    return edge>=256&&edge<=4096&&(edge&(edge-1))==0;
+}
+
 struct EnvironmentLightingSettings {
     AmbientLightMode Mode = AmbientLightMode::None;
     // Linear RGB/HDR, nonnegative and finite; alpha is unused by lighting.
@@ -40,12 +53,29 @@ struct EnvironmentLightingSettings {
     // Evaluate directly: do not apply normalization constants or pi again.
     std::array<Vector3,9> SHCoefficients{};
     SceneAtmosphereSettings Atmosphere;
+    // Optional prepared environment asset. It supplies the background cube,
+    // diffuse irradiance for SkyEnvironment mode and prefiltered reflections.
+    ResourceReference SkyEnvironment;
+    float SkyRotationDegrees = 0; // Yaw about world +Y in Unity-style coordinates.
+    float SkyIntensity = 1;       // Background multiplier, independent of diffuse Intensity.
+    float ReflectionIntensity = 1;
+    bool HDREnabled = false;       // Render scene color to linear FP16 before resolving to the viewport.
+    float ExposureEV = 0;         // Fixed exposure [-16,16], in stops. +1 doubles linear radiance.
+    ToneMapping Tonemap = ToneMapping::None;
+    SpotShadowBudgetSettings SpotShadows;
 };
 
 inline bool IsValidEnvironmentLighting(const EnvironmentLightingSettings& settings) {
     if(settings.Mode!=AmbientLightMode::None && settings.Mode!=AmbientLightMode::Color &&
-       settings.Mode!=AmbientLightMode::Gradient && settings.Mode!=AmbientLightMode::SphericalHarmonics)return false;
-    if(!std::isfinite(settings.Intensity)||settings.Intensity<0)return false;
+       settings.Mode!=AmbientLightMode::Gradient && settings.Mode!=AmbientLightMode::SphericalHarmonics &&
+       settings.Mode!=AmbientLightMode::SkyEnvironment)return false;
+    if(!std::isfinite(settings.Intensity)||settings.Intensity<0||settings.SpotShadows.MaxLights>4||
+        !IsValidLightShadowResolution(settings.SpotShadows.MaxResolution))return false;
+    if(settings.SkyEnvironment.Guid.empty()!=(settings.SkyEnvironment.LocalID==0)||
+       !std::isfinite(settings.SkyRotationDegrees)||!std::isfinite(settings.SkyIntensity)||settings.SkyIntensity<0||
+       !std::isfinite(settings.ReflectionIntensity)||settings.ReflectionIntensity<0||
+       !std::isfinite(settings.ExposureEV)||settings.ExposureEV< -16||settings.ExposureEV>16||
+       (settings.Tonemap!=ToneMapping::None&&settings.Tonemap!=ToneMapping::Neutral&&settings.Tonemap!=ToneMapping::ACES))return false;
     for(const auto& color:{settings.AmbientColor,settings.SkyColor,settings.EquatorColor,settings.GroundColor,
         settings.Atmosphere.ZenithColor,settings.Atmosphere.HorizonColor,settings.Atmosphere.FogColor})
         if(!std::isfinite(color.R)||!std::isfinite(color.G)||!std::isfinite(color.B)||!std::isfinite(color.A)||
@@ -60,7 +90,7 @@ inline bool IsValidEnvironmentLighting(const EnvironmentLightingSettings& settin
 }
 
 enum class LightType : std::uint8_t {
-    Directional = 0
+    Directional = 0, Point, Spot
 };
 
 enum class StaticShadowUpdateMode : std::uint8_t {
@@ -77,8 +107,8 @@ enum class ShadowFilterQuality : std::uint8_t {
 struct LightShadowSettings {
     bool Enabled = false;
     float Strength = 1;
-    // Maximum camera-space shadow distance in metres. Resolution is the
-    // complete atlas edge; one, two or four cascades share this atlas.
+    // Maximum shadow distance from the view camera in metres. Resolution is
+    // the atlas edge for Directional and a single tile edge for Spot.
     float Distance = 50;
     std::uint32_t Resolution = 2048;
     std::uint32_t CascadeCount = 4;
@@ -99,6 +129,10 @@ struct LightShadowSettings {
     // fading inside the shadow range, 0 fades over the entire distance.
     float FadeStart = .9f;
     ShadowFilterQuality FilterQuality = ShadowFilterQuality::Medium; // Used when Soft is true.
+    // Spot only: projection near plane in metres and priority for the view's
+    // limited number of shadow maps. Higher priority is allocated first.
+    float NearPlane = .1f;
+    std::uint32_t Priority = 0;
     bool operator==(const LightShadowSettings&) const = default;
 };
 
@@ -121,12 +155,12 @@ inline bool IsValidShadowCascadeSplits(std::uint32_t cascadeCount,const std::arr
 inline bool IsValidLightShadows(const LightShadowSettings& settings) {
     return std::isfinite(settings.Strength)&&settings.Strength>=0&&settings.Strength<=1&&
         std::isfinite(settings.Distance)&&settings.Distance>0&&
-        (settings.Resolution==256||settings.Resolution==512||settings.Resolution==1024||
-         settings.Resolution==2048||settings.Resolution==4096)&&
+        IsValidLightShadowResolution(settings.Resolution)&&
         IsValidShadowCascadeSplits(settings.CascadeCount,settings.CascadeSplits)&&
         std::isfinite(settings.DepthBias)&&settings.DepthBias>=0&&settings.DepthBias<=10&&
         std::isfinite(settings.NormalBias)&&settings.NormalBias>=0&&settings.NormalBias<=10&&
         std::isfinite(settings.FadeStart)&&settings.FadeStart>=0&&settings.FadeStart<=1&&
+        std::isfinite(settings.NearPlane)&&settings.NearPlane>0&&settings.Priority<=255&&
         (settings.StaticUpdateMode==StaticShadowUpdateMode::AutomaticIncremental||
          settings.StaticUpdateMode==StaticShadowUpdateMode::FullCascade)&&
         (settings.FilterQuality==ShadowFilterQuality::Low||settings.FilterQuality==ShadowFilterQuality::Medium||
@@ -145,14 +179,28 @@ struct LightSettings {
     // Object Layer membership, independent of the camera's visibility mask.
     std::uint32_t CullingMask = 0xffffffffu;
     LightShadowSettings Shadows;
+    // Point and Spot end smoothly at Range, in world-space metres. Angles
+    // are full cone angles in degrees. Scale does not change range or cone.
+    float Range = 10;
+    float InnerSpotAngleDegrees = 30;
+    float OuterSpotAngleDegrees = 45;
 };
+
+inline bool IsValidLocalLightGeometry(const LightSettings& settings) {
+    return (settings.Type==LightType::Directional||settings.Type==LightType::Point||settings.Type==LightType::Spot)&&
+        std::isfinite(settings.Range)&&settings.Range>0&&
+        std::isfinite(settings.InnerSpotAngleDegrees)&&std::isfinite(settings.OuterSpotAngleDegrees)&&
+        settings.InnerSpotAngleDegrees>=0&&settings.InnerSpotAngleDegrees<=settings.OuterSpotAngleDegrees&&
+        settings.OuterSpotAngleDegrees>=1&&settings.OuterSpotAngleDegrees<=179&&
+        (settings.Type!=LightType::Spot||!settings.Shadows.Enabled||settings.Shadows.NearPlane<settings.Range);
+}
 
 class GAMESPROUT_RUNTIME_PUBLIC_TYPE ILightComponent : public IComponent {
 public:
     virtual const LightSettings& GetSettings() const = 0;
     // Invalid/nonfinite/negative values leave the complete state unchanged.
-    // A directional light emits along its Transform's local +Z axis. Position
-    // and scale do not affect its direction or intensity.
+    // Directional and Spot emit along local +Z. Point emits in all directions.
+    // Point and Spot use world position. Directional and Spot support shadows.
     virtual bool SetSettings(const LightSettings& settings) = 0;
 
     bool IsEnabled() const { return GetSettings().Enabled; }
@@ -165,9 +213,17 @@ public:
     bool SetIntensity(float intensity) { auto settings=GetSettings();settings.Intensity=intensity;return SetSettings(settings); }
     std::uint32_t GetCullingMask() const { return GetSettings().CullingMask; }
     bool SetCullingMask(std::uint32_t mask) { auto settings=GetSettings();settings.CullingMask=mask;return SetSettings(settings); }
+    float GetRange() const { return GetSettings().Range; }
+    bool SetRange(float metres) { auto settings=GetSettings();settings.Range=metres;return SetSettings(settings); }
+    float GetInnerSpotAngleDegrees() const { return GetSettings().InnerSpotAngleDegrees; }
+    float GetOuterSpotAngleDegrees() const { return GetSettings().OuterSpotAngleDegrees; }
+    bool SetSpotAngles(float innerDegrees,float outerDegrees) {
+        auto settings=GetSettings();settings.InnerSpotAngleDegrees=innerDegrees;
+        settings.OuterSpotAngleDegrees=outerDegrees;return SetSettings(settings);
+    }
     const LightShadowSettings& GetShadows() const { return GetSettings().Shadows; }
     bool SetShadows(const LightShadowSettings& shadows) { auto settings=GetSettings();settings.Shadows=shadows;return SetSettings(settings); }
-    // Rebuild all cascades on the next submitted shadow render for this light
+    // Rebuild all cascades or the spot tile on the next submitted shadow render
     // in each viewport. Requests coalesce and do not change authored settings.
     virtual void RequestShadowRefresh() = 0;
 

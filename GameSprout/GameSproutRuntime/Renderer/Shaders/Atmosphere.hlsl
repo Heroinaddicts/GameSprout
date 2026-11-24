@@ -57,3 +57,21 @@ float4 SkyFragment(SkyOutput input) : SV_Target0
     }
     return float4(color, 1.0);
 }
+
+float3 InverseSkyYaw(float3 direction, float2 yaw)
+{
+    return float3(yaw.x * direction.x - yaw.y * direction.z, direction.y,
+        yaw.y * direction.x + yaw.x * direction.z);
+}
+
+TextureCube<float4> SkyCube : register(t0, space2);
+SamplerState SkyCubeSampler : register(s0, space2);
+cbuffer CubemapSkyUniform : register(b0, space3)
+{
+    float4 SkyCubeParameters; // Inverse yaw cosine/sine and sky intensity.
+};
+float4 CubemapSkyFragment(SkyOutput input) : SV_Target0
+{
+    float3 ray = InverseSkyYaw(normalize(input.RayDirection), SkyCubeParameters.xy);
+    return float4(SkyCube.Sample(SkyCubeSampler, ray).rgb * SkyCubeParameters.z, 1.0);
+}

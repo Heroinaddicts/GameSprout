@@ -196,6 +196,11 @@ cbuffer LitUniform : register(b0, space3)
     float4 NormalTextureST;
     float4 StyleParameters; // Strength, light threshold, transition softness, saturation.
     float4 StylizedShadowTint;
+    float4 LocalLightInfo;
+    float4 LocalLightPositions[4];
+    float4 LocalLightDirections[4];
+    float4 LocalLightParameters[4];
+    float4 LocalLightRadiances[4];
 };
 cbuffer EnvironmentUniform : register(b1, space3)
 {
@@ -209,8 +214,10 @@ cbuffer EnvironmentUniform : register(b1, space3)
     float4 AtmosphereFogColor;
     float4 AtmosphereZenithColor;
     float4 AtmosphereHorizonColor;
+    float4 SkyTransform;
 };
 #include "Atmosphere.hlsl"
+#include "ToneMapping.hlsl"
 // Canonical light clip -> top-first atlas UV. This block is independent from
 // scene ambient diffuse; shadows only attenuate the selected direct light.
 cbuffer ShadowUniform : register(b2, space3)
@@ -229,6 +236,7 @@ Texture2D<float> ShadowTexture : register(t2, space2);
 SamplerState ShadowSampler : register(s2, space2);
 Texture2D<float> DynamicShadowTexture : register(t3, space2);
 SamplerState DynamicShadowSampler : register(s3, space2);
+#include "LocalLighting.hlsl"
 
 float SampleShadowVisibility(float2 staticUV, float2 dynamicUV, float2 reference, bool sampleDynamic)
 {
@@ -410,10 +418,11 @@ float3 DiffuseEnvironment(float3 normal)
         float y = clamp(normal.y, -1.0, 1.0);
         return y >= 0.0 ? lerp(EquatorColor.rgb, SkyColor.rgb, y) : lerp(EquatorColor.rgb, GroundColor.rgb, -y);
     }
-    if (mode == 3)
+    if (mode == 3 || mode == 4)
     {
+        if (mode == 4) normal = InverseSkyYaw(normal, SkyTransform.xy);
         // Public coefficients already contain diffuse convolution E/pi and
-        // basis scaling. Evaluate in world space, preserving signed terms until
+        // basis scaling. Preserve signed terms until
         // the complete sum; applying SH constants or pi here would double-scale.
         float basis[9] = {1.0, normal.y, normal.z, normal.x, normal.x * normal.y,
             normal.y * normal.z, 3.0 * normal.z * normal.z - 1.0,
@@ -424,9 +433,54 @@ float3 DiffuseEnvironment(float3 normal)
     }
     return 0.0;
 }
-float4 LitFragment(MeshOutput input) : SV_Target0
+TextureCube<float4> SpecularEnvironment : register(t5, space2);
+SamplerState SpecularEnvironmentSampler : register(s5, space2);
+
+float3 ReflectedEnvironment(float3 normal, float3 view, float nDotV, float3 f0)
+{
+    float roughness = saturate(LitParameters.y);
+    float3 ray = InverseSkyYaw(reflect(-view, normal), SkyTransform.xy);
+    float3 radiance = SpecularEnvironment.SampleLevel(SpecularEnvironmentSampler, ray, roughness * SkyTransform.z).rgb;
+    // Analytic integrated GGX fit (Karis) for the split sum with the prefiltered cube.
+    float4 fit = roughness * float4(-1.0, -0.0275, -0.572, 0.022) + float4(1.0, 0.0425, 1.04, -0.04);
+    float a = min(fit.x * fit.x, exp2(-9.28 * nDotV)) * fit.x + fit.y;
+    float2 scaleBias = float2(-1.04, 1.04) * a + fit.zw;
+    return radiance * max(f0 * scaleBias.x + scaleBias.y, 0.0) * SkyTransform.w;
+}
+void AccumulateDirectLight(float3 light, float3 radiance, float shadow, float stylizedScale, float nDotL, float3 normal,
+    float3 view, float nDotV, float alphaSquared, float3 f0, float3 diffuse,
+    inout float3 color, inout float3 stylizedDirect, inout float stylizedIllumination)
 {
     const float pi = 3.141592653589793;
+    float3 halfway = SafeDirection(light + view, normal);
+    float nDotH = saturate(dot(normal, halfway));
+    float vDotH = saturate(dot(view, halfway));
+    float distributionDenominator = nDotH * nDotH * (alphaSquared - 1.0) + 1.0;
+    float distribution = alphaSquared / max(pi * distributionDenominator * distributionDenominator, 1e-8);
+    // Height-correlated Smith visibility, including the 1/(4 NoL NoV) factor.
+    float visibilityL = nDotV * sqrt(nDotL * nDotL * (1.0 - alphaSquared) + alphaSquared);
+    float visibilityV = nDotL * sqrt(nDotV * nDotV * (1.0 - alphaSquared) + alphaSquared);
+    float visibility = 0.5 / max(visibilityL + visibilityV, 1e-6);
+    float fresnelWeight = pow(1.0 - vDotH, 5.0);
+    float3 fresnel = f0 + (1.0 - f0) * fresnelWeight;
+    float3 specular = CameraPosition.w >= 0.5 ? distribution * visibility * fresnel * pi : 0.0;
+    color += (diffuse + specular) * radiance * nDotL * shadow;
+    if (StyleParameters.x > 0.0)
+    {
+        // A soft light band preserves broad painted forms. Screen-space
+        // filtering keeps a near-hard author threshold from shimmering.
+        float width = max(max(StyleParameters.z, fwidth(nDotL)), 0.001);
+        float band = smoothstep(StyleParameters.y - width, StyleParameters.y + width, nDotL);
+        float illumination = lerp(nDotL, band, 0.9) * shadow;
+        stylizedIllumination = max(stylizedIllumination, illumination * stylizedScale);
+        // Keep shiny surfaces legible without tiny, clipped white GGX peaks.
+        float3 softSpecular = min(specular, 0.25) * 0.25;
+        stylizedDirect += (diffuse * illumination + softSpecular * nDotL * shadow) * radiance;
+    }
+}
+
+float4 EvaluateLit(MeshOutput input, bool useReflections)
+{
     float4 base = BaseTexture.Sample(BaseSampler, input.UV) * input.Color;
     float3 albedo = saturate(base.rgb);
     float metallic = saturate(LitParameters.x);
@@ -438,50 +492,46 @@ float4 LitFragment(MeshOutput input) : SV_Target0
     float3 view = SafeDirection(CameraPosition.xyz - input.WorldPosition, normal);
     float nDotV = max(saturate(dot(normal, view)), 0.0001);
     float3 f0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+    float3 diffuse = albedo * (0.96 * (1.0 - metallic));
     float3 color = max(Emission.rgb, 0.0);
     // URP's metallic workflow keeps the dielectric 4% reflected fraction out of
     // the diffuse lobe: oneMinusReflectivity = .96 * (1 - metallic). Diffuse
-    // irradiance remains independent of the viewing camera. Missing reflection
-    // IBL is not replaced with an ambient specular constant.
+    // irradiance remains independent of the viewing camera.
     float3 ambient = DiffuseEnvironment(normal) * albedo * (0.96 * (1.0 - metallic));
     color += ambient;
     float3 stylizedDirect = 0.0;
     float stylizedIllumination = 0.0;
+    float3 geometricNormal = SafeDirection(input.Normal, float3(0, 1, 0));
     [unroll] for (int index = 0; index < 4; ++index)
     {
         float3 light = LightDirections[index].xyz;
         float nDotL = saturate(dot(normal, light));
         if (LightDirections[index].w < 0.5 || nDotL <= 0.0) continue;
-        float3 halfway = SafeDirection(light + view, normal);
-        float nDotH = saturate(dot(normal, halfway));
-        float vDotH = saturate(dot(view, halfway));
-        float distributionDenominator = nDotH * nDotH * (alphaSquared - 1.0) + 1.0;
-        float distribution = alphaSquared / max(pi * distributionDenominator * distributionDenominator, 1e-8);
-        // Height-correlated Smith visibility for GGX, including the 1/(4 NoL NoV) factor.
-        float visibilityL = nDotV * sqrt(nDotL * nDotL * (1.0 - alphaSquared) + alphaSquared);
-        float visibilityV = nDotL * sqrt(nDotV * nDotV * (1.0 - alphaSquared) + alphaSquared);
-        float visibility = 0.5 / max(visibilityL + visibilityV, 1e-6);
-        float fresnelWeight = pow(1.0 - vDotH, 5.0);
-        float3 fresnel = f0 + (1.0 - f0) * fresnelWeight;
-        // URP-compatible relative light units: the Lambert pi factor is
-        // absorbed into the author-facing intensity, consistently with the
-        // imported Light.intensity. Environment SH is already E/pi and is unchanged.
-        float3 diffuse = albedo * (0.96 * (1.0 - metallic));
-        float3 specular = CameraPosition.w >= 0.5 ? distribution * visibility * fresnel * pi : 0.0;
-        float shadow = LightDirections[index].w > 1.5 ? DirectionalShadow(input.WorldPosition, SafeDirection(input.Normal, float3(0, 1, 0))) : 1.0;
-        color += (diffuse + specular) * LightRadiances[index].rgb * nDotL * shadow;
-        if (StyleParameters.x > 0.0)
+        float shadow = LightDirections[index].w > 1.5 ? DirectionalShadow(input.WorldPosition, geometricNormal) : 1.0;
+        AccumulateDirectLight(light, LightRadiances[index].rgb, shadow, 1.0, nDotL, normal, view, nDotV,
+            alphaSquared, f0, diffuse, color, stylizedDirect, stylizedIllumination);
+    }
+    [loop] for (int index = 0; index < int(LocalLightInfo.x); ++index)
+    {
+        float3 delta = LocalLightPositions[index].xyz - input.WorldPosition;
+        float distanceSquared = dot(delta, delta);
+        float3 light = SafeDirection(delta, normal);
+        float nDotL = saturate(dot(normal, light));
+        if (nDotL <= 0.0) continue;
+        float attenuation = LocalLightAttenuation(delta, distanceSquared, LocalLightPositions[index].w);
+        float outer = LocalLightDirections[index].w;
+        if (outer >= 0.0)
         {
-            // A soft light band preserves broad painted forms. Screen-space
-            // filtering keeps a near-hard author threshold from shimmering.
-            float width = max(max(StyleParameters.z, fwidth(nDotL)), 0.001);
-            float band = smoothstep(StyleParameters.y - width, StyleParameters.y + width, nDotL);
-            float illumination = lerp(nDotL, band, 0.9) * shadow;
-            stylizedIllumination = max(stylizedIllumination, illumination);
-            // Keep shiny surfaces legible without tiny, clipped white GGX peaks.
-            float3 softSpecular = min(specular, 0.25) * 0.25;
-            stylizedDirect += (diffuse * illumination + softSpecular * nDotL * shadow) * LightRadiances[index].rgb;
+            float cosine = dot(-light, LocalLightDirections[index].xyz);
+            float width = LocalLightParameters[index].x - outer;
+            float cone = width > 0.0 ? saturate((cosine - outer) / width) : step(outer, cosine);
+            attenuation *= cone * cone;
         }
+        if (attenuation <= 0.0) continue;
+        int shadowSlot = int(LocalLightParameters[index].y) - 1;
+        float shadow = shadowSlot >= 0 ? SpotShadow(shadowSlot, input.WorldPosition, geometricNormal) : 1.0;
+        AccumulateDirectLight(light, LocalLightRadiances[index].rgb * attenuation, shadow, saturate(attenuation), nDotL, normal, view, nDotV,
+            alphaSquared, f0, diffuse, color, stylizedDirect, stylizedIllumination);
     }
     if (StyleParameters.x > 0.0)
     {
@@ -493,7 +543,18 @@ float4 LitFragment(MeshOutput input) : SV_Target0
         stylized = max(lerp(luminance.xxx, stylized, StyleParameters.w), 0.0);
         color = lerp(color, stylized, StyleParameters.x);
     }
+    if (useReflections) color += ReflectedEnvironment(normal, view, nDotV, f0);
     return float4(ApplySceneFog(color, input.WorldPosition), base.a);
+}
+
+float4 LitFragment(MeshOutput input) : SV_Target0
+{
+    return EvaluateLit(input, false);
+}
+
+float4 LitEnvironmentFragment(MeshOutput input) : SV_Target0
+{
+    return EvaluateLit(input, true);
 }
 
 struct GridInput {

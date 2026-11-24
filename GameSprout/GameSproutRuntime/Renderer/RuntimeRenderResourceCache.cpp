@@ -37,7 +37,7 @@ RenderResourceCache::~RenderResourceCache() {
     delete TextureUploadTarget;
     ClearPreparedResources();
     for(auto& entry:Pipelines)delete entry.second;
-    for(auto& entry:SkyPipelines)delete entry.second;
+    for(auto& entry:FullscreenPipelines)delete entry.second;
     for(auto* shader:Shaders)delete shader;
     delete White;delete DefaultSampler;delete Grid;
 }
@@ -57,6 +57,13 @@ void RenderResourceCache::Synchronize() {
     // their complete identity; a sibling LocalID is never an invalidation key.
     changed(Meshes,meshes);changed(Textures,textures);
     changed(Materials,materials);changed(UserShaders,shaders);
+    // Environment addresses are only borrowed within a Render invocation;
+    // changing a sky asset needs no scene/mesh/material snapshot invalidation.
+    for(auto entry=Environments.begin();entry!=Environments.end();) {
+        const ResourceReference reference{entry->first.Guid,entry->first.LocalID};
+        if(Provider.GetResourceRevision(reference)!=entry->second.ResourceRevision)entry=Environments.erase(entry);
+        else ++entry;
+    }
     _Revision=revision;_RevisionKnown=true;
     if(meshes.empty()&&textures.empty()&&materials.empty()&&shaders.empty())return;
 

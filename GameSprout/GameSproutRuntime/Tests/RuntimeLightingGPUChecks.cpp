@@ -136,11 +136,58 @@ int main(int argc,char** argv){
         Check(render()[0]>lambert[0]+5,"Stylized diffuse did not replace angular Lambert falloff with the soft light band");
         provider.Material.Stylization=0;provider.Material.SpecularHighlights=true;++provider.Revision;
         sunObject->GetTransform()->SetLocalRotation({0,1,0,0});
+
+        light->SetEnabled(false);
+        auto* localObject=scene->CreateGameObject("Local light");
+        localObject->GetTransform()->SetLocalPosition({0,0,1});
+        auto* local=localObject->AddComponent<ILightComponent>();
+        auto localSettings=local->GetSettings();localSettings.Type=LightType::Point;localSettings.Range=4;localSettings.Intensity=.3f;
+        Check(local->SetSettings(localSettings),"Cannot create Point light fixture");
+        const int nearPoint=render()[0];Check(nearPoint>60,"Point light did not reach a receiver facing it");
+        localObject->GetTransform()->SetLocalPosition({0,0,2});
+        const int farPoint=render()[0];Check(farPoint>6&&farPoint<nearPoint/3,"Point light did not fade with distance");
+        Check(local->SetRange(.5f)&&render()[0]==0,"Point lit geometry beyond its range");
+        Check(local->SetRange(4)&&local->SetLightType(LightType::Spot)&&render()[0]==0,"Spot ignored its emission direction");
+        localObject->GetTransform()->SetLocalRotation({0,1,0,0});
+        Check(render()[0]==farPoint,"Spot cone centre did not match Point intensity");
+        localObject->GetTransform()->SetLocalPosition({0,0,1});
+        local->SetCullingMask(2);Check(render()[0]==0,"Spot ignored its layer mask");local->SetCullingMask(1);
+        localObject->GetTransform()->SetLocalPosition({.8f,0,1});
+        localObject->GetTransform()->SetLocalRotation({0,-.9436283f,0,.3310069f});
+        auto* caster=scene->CreateGameObject("Spot caster");
+        caster->GetTransform()->SetLocalPosition({.4f,0,.5f});caster->GetTransform()->SetLocalScale({.3f,.3f,.3f});
+        caster->AddComponent<IMeshComponent>()->SetMesh({"0123456789abcdef0123456789abcdef",1});
+        auto* casterRenderer=caster->AddComponent<IMeshRendererComponent>();
+        casterRenderer->SetMaterials({{"0123456789abcdef0123456789abcdef",2}});
+        view.MaxSpotShadowLights=1;view.MaxSpotShadowResolution=256;
+        const auto unoccluded=render();Check(unoccluded[0]>20,"Off-axis spot fixture did not light its receiver");
+        auto localShadow=local->GetShadows();localShadow.Enabled=true;localShadow.Soft=false;localShadow.Distance=10;
+        Check(local->SetShadows(localShadow),"Cannot enable spot shadows");
+        const auto occluded=render();
+        Check(occluded[0]<unoccluded[0]/3&&viewport->GetStatistics().SpotShadowDrawCalls>=1&&
+            viewport->GetStatistics().SpotShadowTilesUpdated==1,"Spot did not cast a depth-tested shadow (lit="+
+            std::to_string(unoccluded[0])+", shadow="+std::to_string(occluded[0])+", draws="+
+            std::to_string(viewport->GetStatistics().SpotShadowDrawCalls)+", updates="+
+            std::to_string(viewport->GetStatistics().SpotShadowTilesUpdated)+")");
+        Check(render()==occluded&&viewport->GetStatistics().SpotShadowTilesUpdated==0,"Unchanged spot shadow was redrawn");
+        local->RequestShadowRefresh();render();
+        Check(viewport->GetStatistics().SpotShadowTilesUpdated==1,"Spot shadow refresh did not redraw its tile");
+        view.MaxSpotShadowLights=0;
+        Check(render()==unoccluded&&viewport->GetStatistics().SpotShadowLights==0,"Zero spot shadow budget disabled direct light");
+        view.MaxSpotShadowLights=1;
+        auto shadowBudget=scene->GetEnvironmentLighting();shadowBudget.SpotShadows.MaxLights=0;
+        Check(scene->SetEnvironmentLighting(shadowBudget)&&render()==unoccluded&&viewport->GetStatistics().SpotShadowLights==0,
+            "Scene budget did not constrain the requested viewport spot shadows");
+        shadowBudget.SpotShadows.MaxLights=1;
+        Check(scene->SetEnvironmentLighting(shadowBudget)&&render()==occluded,"Reenabled scene budget did not restore spot shadow depth");
+        casterRenderer->SetShadowCastingMode(ShadowCastingMode::Off);
+        Check(render()==unoccluded,"Removed spot caster kept stale shadow depth");
+        caster->SetActive(false);local->SetEnabled(false);light->SetEnabled(true);
         provider.Skin=true;provider.UV=true;++provider.Revision;auto* animator=object->AddComponent<IAnimatorComponent>();
         auto* bone=scene->CreateGameObject("Bone",object);Check(animator->SetNodeBindings({{"Bone",bone->GetInstanceID()}}),"Skin node binding failed");
         auto* skin=object->AddComponent<ISkinnedMeshRendererComponent>();Check(skin->SetAnimatorObjectID(object->GetInstanceID()),"Skin owner failed");
         Check(render()[0]>55,"Lit skinned vertex shader did not render");bone->GetTransform()->SetLocalPosition({1.5f,0,0});Check(render()[0]==0,"Lit vertex stage ignored skin palette");
         delete viewport;viewport=nullptr;delete runtime;runtime=nullptr;
-        std::cout<<"PASS Lit GPU: linear colors/intensity, active/direction/layers, scale-independent lights, emission, GGX, sRGB, derivative normals, optional layouts, multiple lights, skinning\n";return 0;
+        std::cout<<"PASS Lit GPU: directional and local attenuation, spot shadow atlas, emission, GGX, sRGB, derivative normals, optional layouts, multiple lights, skinning\n";return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';delete viewport;delete runtime;return 1;}
 }

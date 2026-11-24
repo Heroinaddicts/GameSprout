@@ -15,6 +15,7 @@ bool Renderer::SetDrawTransform(DrawObject& object,const Mat4& model) {
     Mat4 inverse;
     if(!RuntimeMath::IsFinite(model)||!RuntimeMath::TryInverseAffine(model,inverse))return false;
     object.Model=model;
+    object.LocalLightGeneration=0;
     object.CullBoxKnown=false;
     for(std::size_t row=0;row<3;++row)
         for(std::size_t column=0;column<3;++column)object.Normal(row,column)=inverse(column,row);

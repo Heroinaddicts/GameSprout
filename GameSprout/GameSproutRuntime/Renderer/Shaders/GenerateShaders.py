@@ -27,10 +27,12 @@ def main():
                              ("MeshFragment", "fragment"), ("GridVertex", "vertex"), ("GridFragment", "fragment"),
                              ("SkinnedMeshVertex", "vertex"), ("SkinnedMeshNoUVVertex", "vertex"),
                              ("SkinnedMeshNoColorVertex", "vertex"), ("SkinnedMeshNoUVNoColorVertex", "vertex"),
-                             ("LitFragment", "fragment"),
+                             ("LitFragment", "fragment"), ("LitEnvironmentFragment", "fragment"),
                              ("InstancedMeshVertex", "vertex"), ("InstancedMeshNoUVVertex", "vertex"),
                              ("InstancedMeshNoColorVertex", "vertex"), ("InstancedMeshNoUVNoColorVertex", "vertex"), ("ShadowFragment", "fragment"),
                              ("SkyVertex", "vertex"), ("SkyFragment", "fragment"),
+                             ("CubemapSkyFragment", "fragment"),
+                             ("HDRResolveVertex", "vertex"), ("HDRResolveFragment", "fragment"),
                              ("UIVertex", "vertex"), ("UIFragment", "fragment"),
                              ("ShadowVertex", "vertex"), ("InstancedShadowVertex", "vertex"),
                              ("SkinnedShadowVertex", "vertex")]:

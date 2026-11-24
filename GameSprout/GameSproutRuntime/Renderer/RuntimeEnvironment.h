@@ -5,24 +5,34 @@
 #include <limits>
 
 namespace GameSproutRuntime::RenderEnvironment {
-// Scene-owned diffuse environment, separate from per-object material/light data.
-// No reflection texture or invented specular environment is bound by this block.
+// Scene-owned environment, shared by all draw calls in the view.
 struct Uniform {
     Vector4 Info; // X: AmbientLightMode. Remaining components are zero padding.
     Vector4 AmbientColor,SkyColor,EquatorColor,GroundColor;
     std::array<Vector4,9> SH;
     Vector4 AtmosphereParameters; // Enabled, fog start/end metres, maximum opacity.
     Vector4 AtmosphereFogColor,AtmosphereZenithColor,AtmosphereHorizonColor;
+    Vector4 SkyTransform; // Inverse yaw cosine/sine, highest reflection mip, reflection intensity.
 };
-static_assert(sizeof(Uniform)==288,"Environment fragment block must match HLSL packing");
+static_assert(sizeof(Uniform)==304,"Environment fragment block must match HLSL packing");
+
+inline Vector2 SkyYaw(float degrees) {
+    constexpr double radiansPerDegree=3.14159265358979323846/180.0;
+    const double radians=std::remainder(double(degrees),360.0)*radiansPerDegree;
+    return {float(std::cos(radians)),float(std::sin(radians))};
+}
 
 // Intensity is applied once while preparing this frame's scene state. Overflow
 // in derived HDR radiance is diagnosed by the Renderer; no Infinity is uploaded.
 // Inactive modes' stored colors/coefficients are deliberately not multiplied.
-inline bool Prepare(const EnvironmentLightingSettings& settings,Uniform& output) {
+inline bool Prepare(const EnvironmentLightingSettings& settings,Uniform& output,
+    const std::array<Vector3,9>* skyDiffuse=nullptr,float reflectionMaxLOD=0) {
     if(!IsValidEnvironmentLighting(settings))return false;
     Uniform candidate{};
-    candidate.Info.X=static_cast<float>(settings.Mode);
+    const auto mode=settings.Mode==AmbientLightMode::SkyEnvironment&&!skyDiffuse?AmbientLightMode::Gradient:settings.Mode;
+    candidate.Info.X=static_cast<float>(mode);
+    const auto yaw=SkyYaw(settings.SkyRotationDegrees);
+    candidate.SkyTransform={yaw.X,yaw.Y,reflectionMaxLOD,settings.ReflectionIntensity};
     const auto& atmosphere=settings.Atmosphere;
     candidate.AtmosphereParameters={atmosphere.Enabled?1.0f:0.0f,atmosphere.FogStart,atmosphere.FogEnd,atmosphere.FogMaxOpacity};
     candidate.AtmosphereFogColor={atmosphere.FogColor.R,atmosphere.FogColor.G,atmosphere.FogColor.B,0};
@@ -36,7 +46,7 @@ inline bool Prepare(const EnvironmentLightingSettings& settings,Uniform& output)
     const auto color=[&](Color source,Vector4& destination) {
         return scaled(source.R,destination.X)&&scaled(source.G,destination.Y)&&scaled(source.B,destination.Z);
     };
-    switch(settings.Mode) {
+    switch(mode) {
     case AmbientLightMode::None:break;
     case AmbientLightMode::Color:
         if(!color(settings.AmbientColor,candidate.AmbientColor))return false;
@@ -46,8 +56,10 @@ inline bool Prepare(const EnvironmentLightingSettings& settings,Uniform& output)
            !color(settings.GroundColor,candidate.GroundColor))return false;
         break;
     case AmbientLightMode::SphericalHarmonics:
+    case AmbientLightMode::SkyEnvironment:
+        const auto& coefficients=mode==AmbientLightMode::SkyEnvironment?*skyDiffuse:settings.SHCoefficients;
         for(std::size_t index=0;index<candidate.SH.size();++index) {
-            const auto source=settings.SHCoefficients[index];auto& destination=candidate.SH[index];
+            const auto source=coefficients[index];auto& destination=candidate.SH[index];
             if(!scaled(source.X,destination.X)||!scaled(source.Y,destination.Y)||!scaled(source.Z,destination.Z))return false;
         }
         // Signed finite coefficients may still overflow a float shader sum.

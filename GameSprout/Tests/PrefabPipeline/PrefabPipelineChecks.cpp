@@ -242,6 +242,30 @@ void CheckUIFontReference() {
               "UI font resource did not contribute a scene or Prefab dependency");
     }
 }
+void CheckSceneEnvironmentReference() {
+    Fixture fixture;
+    const std::string environmentGuid="567890abcdef1234567890abcdef1234";
+    const std::string environmentPath="Lighting/Castle.environment";
+    fixture.SourcePaths[environmentGuid]=environmentPath;
+    Write(fixture.Root.filePath("Assets/Lighting/Castle.environment"),"{\"Version\":1}");
+    const auto environmentMeta=Meta(environmentGuid,environmentPath,"Environment");
+    Write(fixture.Root.filePath("Assets/Lighting/Castle.environment.meta"),QByteArray::fromStdString(AssetArtifactIO::JsonText(environmentMeta)));
+    auto scene=Source()["Data"];
+    scene["EnvironmentLighting"]["Mode"]="SkyEnvironment";
+    const std::string sourceGuid="567890ABCDEF1234567890ABCDEF1234";
+    scene["EnvironmentLighting"]["SkyEnvironment"]=Reference(sourceGuid,73);
+    const auto imported=fixture.Import(scene,true);
+    Check(imported.Success,imported.Result.Error);
+    const auto& manifest=imported.Result.Manifest;
+    Check(std::find(manifest.ReferencedGuids.begin(),manifest.ReferencedGuids.end(),environmentGuid)!=manifest.ReferencedGuids.end()&&
+          manifest.GuidSourcePaths.contains(environmentGuid)&&manifest.GuidSourcePaths.at(environmentGuid)==environmentPath&&
+          std::any_of(manifest.Dependencies.begin(),manifest.Dependencies.end(),[&](const auto& entry){return entry.Path==environmentPath;}),
+          "Sky environment did not contribute a build dependency from its scene");
+    Json::Value wrapper;
+    Check(ObjectDocumentBinary::Decode(imported.Bytes,wrapper)&&
+          SameReference(wrapper["Data"]["EnvironmentLighting"]["SkyEnvironment"],sourceGuid,73),
+          "Prepared Scene lost the sky environment reference");
+}
 void CheckSceneRecomposition(Fixture& fixture,std::uint64_t prefabLocalID) {
     auto oldSource=Source();auto& baseline=oldSource["Data"];
     auto& root=baseline["Objects"][0];root["Components"][0]["Position"]=Numbers({0,0,0});
@@ -355,6 +379,7 @@ int main(int argc,char** argv) {
         CheckSceneRecomposition(fixture,artifact.LocalID);
         CheckMissingReferences();
         CheckUIFontReference();
+        CheckSceneEnvironmentReference();
         CheckDependencyMemoization();
         CheckRepeatedSceneReferences();
         std::cout<<"Prefab production import, Runtime binary codec, stable resource identity, dependency and rejection checks passed\n";return 0;

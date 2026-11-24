@@ -81,9 +81,9 @@ int main(int argc,char** argv) {
             "Scene reload lost light values");
         Check(reloaded->GetShadows()==settings.Shadows,"Scene reload lost cascade/shadow settings");
         Json::Value again;Check(SceneDocument::Serialize(*reopened,reloadedIDs,again,error)&&again==document,"Light scene was not stable after reload");
-        auto bad=document;bad["Objects"][0]["Components"][1]["Settings"]["Range"]=10;
-        Check(!SceneDocument::Validate(bad,error)&&error.find("Range")!=std::string::npos,"Unknown light field was accepted");
-        bad=document;bad["Objects"][0]["Components"][1]["Settings"]["Type"]="Point";
+        auto bad=document;bad["Objects"][0]["Components"][1]["Settings"]["Unexpected"]=10;
+        Check(!SceneDocument::Validate(bad,error)&&error.find("Unexpected")!=std::string::npos,"Unknown light field was accepted");
+        bad=document;bad["Objects"][0]["Components"][1]["Settings"]["Type"]="Area";
         Check(!SceneDocument::Validate(bad,error),"Unsupported document light type accepted");
         bad=document;bad["Objects"][0]["Components"][1]["Settings"]["CullingMask"]=Json::UInt64(0x100000000ull);
         Check(!SceneDocument::Validate(bad,error),"Oversized light mask accepted");
@@ -125,6 +125,17 @@ int main(int argc,char** argv) {
         auto before=SceneDocument::SerializeComponent(*instanceLight,{});patch["Settings"]["Intensity"]=-2;
         Check(!SceneDocument::RestoreComponent(patch,*instance,*runtime,error)&&SceneDocument::SerializeComponent(*instanceLight,{})==before,
             "Rejected light override was not atomic");
+        using GameSproutRuntime::LightType;
+        Check(light->SetLightType(LightType::Point)&&light->SetRange(22)&&light->GetRange()==22,
+            "Point light API failed");
+        Check(light->SetLightType(LightType::Spot)&&light->SetSpotAngles(22,44),"Spot light API failed");
+        auto spotShadow=light->GetShadows();spotShadow.NearPlane=.5f;spotShadow.Priority=230;
+        Check(light->SetShadows(spotShadow)&&!light->SetRange(.25f)&&!light->SetSpotAngles(60,20),"Spot shadow/cone validation failed");
+        const auto localDocument=SceneDocument::SerializeComponent(*light,{});
+        Check(localDocument["Settings"]["Type"]=="Spot"&&localDocument["Settings"]["Range"].asFloat()==22&&
+            localDocument["Settings"]["OuterSpotAngleDegrees"].asFloat()==44&&
+            SceneDocument::RestoreComponent(localDocument,*instance,*runtime,error)&&instanceLight->GetShadows()==spotShadow&&
+            instanceLight->GetSettings().InnerSpotAngleDegrees==22,"Spot light component did not round-trip");
         Check(runtime->DestroyScene(reopened)&&runtime->DestroyScene(scene),"Cannot release lighting scenes");
         delete runtime;std::cout<<"PASS Light API validation/events and Scene/Prefab persistence\n";return 0;
     } catch(const std::exception& error) {std::cerr<<"FAIL "<<error.what()<<'\n';delete runtime;return 1;}

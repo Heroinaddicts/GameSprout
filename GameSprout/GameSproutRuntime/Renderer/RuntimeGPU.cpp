@@ -20,7 +20,6 @@ bool Renderer::InitializeSamples() {
 bool Renderer::Initialize() {
     static_assert(sizeof(DrawUniform)==224,"Shader draw uniform must match std140 layout");
     static_assert(sizeof(SkinUniform)==8192,"Shader skin uniform must match 128 column-major matrices");
-    static_assert(sizeof(LitUniform)==224,"Lit fragment uniform must match its HLSL layout");
     static_assert(sizeof(InstanceVertex)==128,"Instanced vertex data must contain two column-major matrices");
     const PreviewShader kinds[]={PreviewShader::MeshVertex,PreviewShader::MeshNoUVVertex,PreviewShader::MeshNoColorVertex,
         PreviewShader::MeshNoUVNoColorVertex,PreviewShader::MeshFragment,PreviewShader::GridVertex,PreviewShader::GridFragment,
@@ -82,7 +81,9 @@ GRHI::IGraphicsPipeline* Renderer::Pipeline(const PipelineKey& key) {
     }
     GRHI::GraphicsPipelineDesc description;
     const std::size_t fragment=key.Shadow?static_cast<std::size_t>(PreviewShader::ShadowFragment):
-        (key.Grid?6:(key.Lit?11:4));
+        key.Grid?static_cast<std::size_t>(PreviewShader::GridFragment):
+        key.EnvironmentReflections?static_cast<std::size_t>(PreviewShader::LitEnvironmentFragment):
+        static_cast<std::size_t>(key.Lit?PreviewShader::LitFragment:PreviewShader::MeshFragment);
     if(!_Shaders[fragment]) {
         _Shaders[fragment]=CreatePreviewShader(_Device,static_cast<PreviewShader>(fragment));
         if(!_Shaders[fragment]) {Fail(DeviceError("Create Runtime mesh fragment shader"));return nullptr;}

@@ -22,12 +22,14 @@ public:
     std::uint64_t Generation=0;
     std::map<Renderer::ResourceKey,Renderer::MeshGPU> Meshes;
     std::map<Renderer::ResourceKey,Renderer::TextureGPU> Textures;
+    std::map<Renderer::ResourceKey,Renderer::EnvironmentGPU> Environments;
     std::map<Renderer::ResourceKey,Renderer::Material> Materials;
     std::map<Renderer::ResourceKey,Renderer::ShaderGPU> UserShaders;
     std::map<Renderer::ShaderPipelineKey,GRHI::IGraphicsPipeline*> ShaderPipelines;
     std::map<Renderer::PipelineKey,GRHI::IGraphicsPipeline*> Pipelines;
     GRHI::IShader* Shaders[CachedPreviewShaderCount]{};
-    std::map<GRHI::TextureFormat,GRHI::IGraphicsPipeline*> SkyPipelines;
+    std::map<std::tuple<PreviewShader,GRHI::TextureFormat,GRHI::TextureFormat>,GRHI::IGraphicsPipeline*> FullscreenPipelines;
+    std::unique_ptr<GRHI::ISampler> EnvironmentSampler;
     GRHI::ITexture* White=nullptr;
     GRHI::ISampler* DefaultSampler=nullptr;
     GRHI::IBuffer* Grid=nullptr;

@@ -40,6 +40,11 @@ bool Scene::SetEnvironmentLighting(const EnvironmentLightingSettings& settings) 
     const auto sameColor=[](Color a,Color b){return a.R==b.R&&a.G==b.G&&a.B==b.B&&a.A==b.A;};
     bool same=settings.Mode==_EnvironmentLighting.Mode&&settings.Intensity==_EnvironmentLighting.Intensity&&
         settings.Atmosphere==_EnvironmentLighting.Atmosphere&&
+        settings.SkyEnvironment==_EnvironmentLighting.SkyEnvironment&&
+        settings.SkyRotationDegrees==_EnvironmentLighting.SkyRotationDegrees&&settings.SkyIntensity==_EnvironmentLighting.SkyIntensity&&
+        settings.ReflectionIntensity==_EnvironmentLighting.ReflectionIntensity&&settings.HDREnabled==_EnvironmentLighting.HDREnabled&&
+        settings.ExposureEV==_EnvironmentLighting.ExposureEV&&settings.Tonemap==_EnvironmentLighting.Tonemap&&
+        settings.SpotShadows==_EnvironmentLighting.SpotShadows&&
         sameColor(settings.AmbientColor,_EnvironmentLighting.AmbientColor)&&sameColor(settings.SkyColor,_EnvironmentLighting.SkyColor)&&
         sameColor(settings.EquatorColor,_EnvironmentLighting.EquatorColor)&&sameColor(settings.GroundColor,_EnvironmentLighting.GroundColor);
     for(std::size_t index=0;same&&index<settings.SHCoefficients.size();++index) {

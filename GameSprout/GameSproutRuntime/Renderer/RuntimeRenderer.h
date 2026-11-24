@@ -14,6 +14,7 @@ namespace GameSproutRuntime {
 class Runtime;
 class RenderResourceCache;
 namespace RuntimeShadowMath { struct CascadeSet; }
+namespace RenderEnvironment { struct Uniform; }
 class Renderer final : public IRuntimeViewport {
 public:
     Renderer(Runtime& runtime,GRHI::IDevice& device,IRuntimeResourceProvider& resources);
@@ -62,6 +63,13 @@ private:
         std::string Error;
     };
     struct TextureGPU {std::uint64_t ResourceRevision=0;GRHI::ITexture* Texture=nullptr;GRHI::ISampler* Sampler=nullptr;bool SRGB=false;std::string Error;};
+    struct EnvironmentGPU {
+        std::uint64_t ResourceRevision=0;
+        std::unique_ptr<GRHI::ITexture> Sky,Specular;
+        std::array<Vector3,9> DiffuseSH{};
+        float SpecularMaxLOD=0;
+        std::string Error;
+    };
     struct ColliderMeshWire {
         ResourceReference Reference;
         bool Convex=false;
@@ -104,12 +112,14 @@ private:
         std::uint32_t Stride=0,Position=0,Normal=0;
         std::int32_t Color=-1,UV=-1,BoneIndices=-1,BoneWeights=-1;
         bool Grid=false,DoubleSided=false,Negative=false,DebugTriangles=false,DepthTest=true,Lit=false,Instanced=false,Shadow=false;
+        bool EnvironmentReflections=false;
         bool operator<(const PipelineKey& other) const {
-            return std::tie(Format,Stride,Position,Normal,Color,UV,BoneIndices,BoneWeights,Grid,DoubleSided,Negative,DebugTriangles,DepthTest,Lit,Instanced,Shadow)<
-                std::tie(other.Format,other.Stride,other.Position,other.Normal,other.Color,other.UV,other.BoneIndices,other.BoneWeights,other.Grid,other.DoubleSided,other.Negative,other.DebugTriangles,other.DepthTest,other.Lit,other.Instanced,other.Shadow);
+            return std::tie(Format,Stride,Position,Normal,Color,UV,BoneIndices,BoneWeights,Grid,DoubleSided,Negative,DebugTriangles,DepthTest,Lit,Instanced,Shadow,EnvironmentReflections)<
+                std::tie(other.Format,other.Stride,other.Position,other.Normal,other.Color,other.UV,other.BoneIndices,other.BoneWeights,other.Grid,other.DoubleSided,other.Negative,other.DebugTriangles,other.DepthTest,other.Lit,other.Instanced,other.Shadow,other.EnvironmentReflections);
         }
     };
     struct Depth {GRHI::ITexture* Texture=nullptr;std::uint64_t LastUsed=0;};
+    static constexpr std::size_t MaxLocalLights=4;
     struct DrawObject {
         std::uint64_t ObjectID=0;
         std::uint32_t InstanceIndex=0;
@@ -132,18 +142,31 @@ private:
         bool ReceiveShadows=true;
         bool Negative=false;
         std::uint8_t Layer=0;
+        std::uint64_t LocalLightGeneration=0,LocalLightFrame=0;
+        std::array<std::uint32_t,MaxLocalLights> LocalLightIndices{};
     };
     struct SkinnedDrawState {std::size_t ObjectIndex;Bounds LocalBounds;};
     struct DrawUniform {Mat4 Model,ViewProjection,Normal;Color BaseColor;Vector4 TextureST{1,1,0,0};};
     struct FrameUniform {Vector4 Time,CameraPosition,MainLightDirection,MainLightColor;};
     static_assert(sizeof(FrameUniform)==64);
     static constexpr std::size_t MaxDirectionalLights=4;
+    static constexpr std::size_t MaxSpotShadows=4;
     struct DirectionalLight {
         Vector3 TowardsLight;
         Color Radiance;
         std::uint32_t CullingMask=0;
         LightShadowSettings Shadows;
         std::uint64_t ObjectID=0;
+    };
+    struct LocalLight {
+        Vector3 Position,Forward;
+        Color Radiance;
+        LightType Type;
+        std::uint32_t CullingMask;
+        float Range,InnerCosine,OuterCosine,OuterAngle;
+        double Luminance;
+        LightShadowSettings Shadows;
+        std::uint64_t ObjectID,ComponentID;
     };
     struct LitUniform {
         Vector4 CameraPosition;
@@ -154,8 +177,13 @@ private:
         Vector4 NormalTextureST;
         Vector4 StyleParameters; // Strength, light threshold, softness, saturation.
         Color StylizedShadowTint;
+        Vector4 LocalInfo; // X is the number of active slots.
+        Vector4 LocalPositions[MaxLocalLights]; // XYZ position, W range.
+        Vector4 LocalDirections[MaxLocalLights]; // XYZ spot forward, W outer cosine (-1 for Point).
+        Vector4 LocalParameters[MaxLocalLights]; // X inner cosine, Y one-based shadow slot or zero.
+        Color LocalRadiances[MaxLocalLights];
     };
-    static_assert(sizeof(LitUniform)==224,"Lit material block must match HLSL packing");
+    static_assert(sizeof(LitUniform)==496,"Lit material block must match HLSL packing");
     struct PreparedDraw;
     struct ShadowUniform {
         Mat4 WorldToShadow[4];
@@ -169,6 +197,13 @@ private:
         Vector4 StaticScroll[4]; // Wrapped tile-local offset for the static layer.
     };
     static_assert(sizeof(ShadowUniform)==624,"Shadow fragment block must match HLSL packing");
+    struct SpotShadowUniform {
+        Mat4 WorldToShadow[MaxSpotShadows];
+        Vector4 Atlas[MaxSpotShadows]; // UV scale XY, top-first tile origin ZW.
+        Vector4 Parameters[MaxSpotShadows]; // Strength, depth bias, normal bias, filter tier.
+        Vector4 Distance[MaxSpotShadows]; // Camera distance and fade start in metres, atlas texel XY.
+    };
+    static_assert(sizeof(SpotShadowUniform)==448,"Spot shadow block must match HLSL packing");
     bool RenderShadows(GRHI::ICommandBuffer&,const RenderView&,float aspect);
     struct InstanceDraw {
         std::size_t First;
@@ -196,6 +231,7 @@ private:
         float DistanceSquared=0;
         std::uint64_t SectionOrdinal=0;
         bool ShadowDoubleSided=false;
+        std::array<std::uint32_t,MaxLocalLights> LocalLightIndices{}; // One-based indices, zero terminator.
     };
     struct ShadowCandidate { PreparedDraw Draw; Bounds World; };
     struct StaticShadowCasterKey {
@@ -241,14 +277,17 @@ private:
     bool UploadResidentInstances(GRHI::ICommandBuffer&);
     bool UploadInstanceStream(GRHI::ICommandBuffer&,InstanceStream&);
     bool DrawPrepared(GRHI::IRenderPass&,const std::vector<PreparedDraw>&,const RenderView&,const Mat4&,
-        GRHI::TextureFormat,const std::vector<DirectionalLight>&,const void*,std::size_t);
+        GRHI::TextureFormat,const std::vector<DirectionalLight>&,const RenderEnvironment::Uniform&,const EnvironmentGPU*);
     bool DrawBuiltin(GRHI::IRenderPass&,const PreparedDraw&,const RenderView&,const Mat4&,
-        GRHI::TextureFormat,const std::vector<DirectionalLight>&,const void*,std::size_t,
+        GRHI::TextureFormat,const std::vector<DirectionalLight>&,const RenderEnvironment::Uniform&,const EnvironmentGPU*,
         std::size_t firstInstance=0,std::uint32_t instanceCount=1);
     void InvalidateInstanceUploads();
     void ClearInstanceBuffers();
     bool ExtractLights(IScene*,std::vector<DirectionalLight>&);
-    LitUniform MakeLitUniform(const RenderView&,const DrawObject&,const MaterialRenderData&,const std::vector<DirectionalLight>&,bool);
+    void PrepareLocalLights();
+    LitUniform MakeLitUniform(const RenderView&,const PreparedDraw&,const std::vector<DirectionalLight>&);
+    RenderFrustum::Box LocalLightObjectBounds(const DrawObject&,const MeshGPU&) const;
+    bool RenderSpotShadows(GRHI::ICommandBuffer&,const RenderView&,const Mat4& viewProjection);
     // Keep this limit equal to Preview.hlsl. Uniform data is per object, never shared with the Mesh.
     static constexpr std::size_t MaxSkinBones = 128;
     struct SkinUniform { Mat4 Bones[MaxSkinBones]; };
@@ -300,9 +339,15 @@ private:
         const MeshSection&,const DrawObject&,const Mat4&,GRHI::TextureFormat);
     GRHI::IGraphicsPipeline* Pipeline(const PipelineKey& key);
     GRHI::ITexture* DepthTarget(std::uint32_t width,std::uint32_t height);
+    GRHI::ITexture* HDRTarget(std::uint32_t width,std::uint32_t height);
+    GRHI::IGraphicsPipeline* FullscreenPipeline(PreviewShader vertex,PreviewShader fragment,
+        GRHI::TextureFormat color,GRHI::TextureFormat depth);
+    bool ResolveHDR(GRHI::IRenderPass&,GRHI::TextureFormat color,GRHI::TextureFormat depth,const EnvironmentLightingSettings&);
+    const EnvironmentGPU* Environment(const ResourceReference&);
+    GRHI::ISampler* EnvironmentSampler();
     bool DrawGrid(GRHI::IRenderPass& pass,const Mat4& viewProjection,GRHI::TextureFormat format);
     bool DrawSky(GRHI::IRenderPass&,const RenderView&,GRHI::TextureFormat,float aspect,
-        const std::vector<DirectionalLight>&);
+        const std::vector<DirectionalLight>&,const EnvironmentGPU*);
     bool PrepareDebug(const DebugDrawList* draw,std::vector<DebugBatch>& batches);
     bool DrawDebug(GRHI::IRenderPass& pass,const Mat4& viewProjection,GRHI::TextureFormat format,
                    const std::vector<DebugBatch>& batches,std::vector<GRHI::IBuffer*>& buffers);
@@ -336,6 +381,10 @@ private:
     std::vector<DrawObject> _SceneObjects;
     std::unordered_map<std::uint64_t,std::size_t> _SceneObjectIndices;
     std::vector<DirectionalLight> _SceneLights;
+    std::vector<LocalLight> _LocalLights;
+    std::vector<bool> _VisibleLocalShadowReceivers;
+    std::uint64_t _LocalLightGeneration=1;
+    bool _HadLocalLighting=false;
     std::unordered_set<std::uint64_t> _LightTransformSources;
     FrameUniform _ShaderFrame;
     std::vector<PreparedDraw> _PreparedDraws;
@@ -356,6 +405,7 @@ private:
     bool _ObjectSnapshotKnown=false,_LightSnapshotKnown=false;
     std::string _ExtractionDiagnostic,_LightDiagnostic;
     std::map<std::pair<std::uint32_t,std::uint32_t>,Depth> _Depths;
+    std::unique_ptr<GRHI::ITexture> _HDRTarget;
     GRHI::IShader* (&_Shaders)[CachedPreviewShaderCount];
     GRHI::ITexture* _ShadowAtlas=nullptr;
     GRHI::ITexture* _DynamicShadowAtlas=nullptr;
@@ -378,11 +428,25 @@ private:
     std::uint64_t _ShadowSceneID=0,_ShadowSceneRevision=0;
     std::uint64_t _ShadowLightObjectID=0,_ShadowLightComponentID=0,_ShadowRefreshRevision=0;
     bool _ShadowValid=false,_ShadowRecorded=false,_ShadowNavigationApproximate=false;
+    GRHI::ITexture* _SpotShadowAtlas=nullptr;
+    SpotShadowUniform _SpotShadowUniform;
+    struct SpotShadowCacheKey {
+        std::uint64_t ObjectID=0,ComponentID=0,Refresh=0;
+        std::uint32_t Edge=0,CullingMask=0;
+        Mat4 Projection;
+    };
+    std::array<SpotShadowCacheKey,MaxSpotShadows> _SpotShadowKeys{};
+    std::array<std::uint32_t,MaxSpotShadows> _SpotShadowIndices{};
+    std::array<std::vector<StaticShadowCasterKey>,MaxSpotShadows> _SpotShadowCasters;
+    std::uint64_t _SpotShadowSceneID=0,_SpotShadowSceneRevision=0;
+    std::uint32_t _SpotShadowViewMask=0,_SpotShadowTileStride=0;
+    std::size_t _SpotShadowCount=0;
+    bool _SpotShadowValid=false,_SpotShadowRecorded=false,_SpotShadowHasSkinned=false;
     GRHI::IBuffer* _InstanceTransformsBuffer=nullptr;
     std::vector<InstanceVertex> _InstanceTransforms;
     std::vector<std::uint32_t> _ChangedInstanceTransforms;
     std::vector<InstanceDraw> _ColorInstanceDraws;
-    InstanceStream _ColorInstances,_StaticShadowInstances,_DynamicShadowInstances;
+    InstanceStream _ColorInstances,_StaticShadowInstances,_DynamicShadowInstances,_SpotShadowInstances;
     bool _InstanceTransformsDirty=true,_InstanceFrameSubmitted=true;
     bool _ColorInstanceBatchesKnown=false,_ColorInstancingEnabled=false;
     GRHI::ITexture*& _White;
