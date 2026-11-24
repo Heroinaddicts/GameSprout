@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <cstring>
 #include <deque>
+#include <functional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -12,8 +14,9 @@ class UniformArenaSDL {
 public:
     const std::vector<std::uint8_t>* Store(const void* source,std::size_t size) {
         const auto* bytes=static_cast<const std::uint8_t*>(source);
-        std::size_t hash=size;
-        for(std::size_t index=0;index<size;++index)hash=(hash^bytes[index])*std::size_t{16777619};
+        // Hash the whole byte range with the standard library's optimized byte
+        // hash. This is only a lookup hint; byte equality decides whether to share.
+        const auto hash=std::hash<std::string_view>{}({static_cast<const char*>(source),size});
         const auto [first,last]=_Lookup.equal_range(hash);
         for(auto entry=first;entry!=last;++entry) {
             const auto& existing=_Bytes[entry->second];

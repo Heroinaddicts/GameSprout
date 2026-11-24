@@ -20,6 +20,18 @@ int main() {
             arena.Store(varying.data(),sizeof(varying));
         }
         Check(*original==expected && arena.Store(expected.data(),expected.size())==original,"Uniform arena growth invalidated snapshots or deduplication");
+        std::array<std::uint8_t,8192> palette{};
+        const auto* pose=arena.Store(palette.data(),palette.size());
+        for(const auto offset:{std::size_t{0},palette.size()/2,palette.size()-1}) {
+            palette[offset]=0xe1;
+            const auto* changedPose=arena.Store(palette.data(),palette.size());
+            Check(changedPose!=pose && (*changedPose)[offset]==0xe1 && (*pose)[offset]==0,
+                "Large uniform snapshot lost changed binary data");
+            Check(arena.Store(palette.data(),palette.size())==changedPose,"A repeated large uniform snapshot was copied");
+            palette[offset]=0;
+            Check(arena.Store(palette.data(),palette.size())==pose,"Restoring the original large uniform failed to reuse it");
+        }
+        Check(arena.Store(palette.data(),palette.size()/2)!=pose,"Uniform snapshots of different lengths were merged");
         int pipeline1,pipeline2,vertex,index,texture,sampler;
         GRHI::PassBindingsSDL draw;
         draw.Pipeline={&pipeline1,1};draw.Vertices[0]={{&vertex,2},0};draw.Index={{&index,3},12};
