@@ -1,2 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ui version="4.0"><class>LightingActionsForm</class><widget class="QMenu" name="LightingActionsForm"><widget class="QMenu" name="lightMenu"><property name="title"><string>Light</string></property><addaction name="directionalLightAction"/></widget><addaction name="lightMenu"/><action name="directionalLightAction"><property name="text"><string>Directional Light</string></property></action><action name="windowMenuAction"><property name="text"><string>窗口</string></property></action><action name="environmentLightingAction"><property name="text"><string>环境照明</string></property></action></widget><resources/><connections/></ui>
+<ui version="4.0">
+ <class>LightingActionsForm</class>
+ <widget class="QMenu" name="LightingActionsForm">
+  <widget class="QMenu" name="lightMenu">
+   <property name="title"><string>Light</string></property>
+   <addaction name="directionalLightAction"/>
+   <addaction name="pointLightAction"/>
+   <addaction name="spotLightAction"/>
+  </widget>
+  <addaction name="lightMenu"/>
+  <action name="directionalLightAction"><property name="text"><string>Directional Light</string></property></action>
+  <action name="pointLightAction"><property name="text"><string>Point Light</string></property></action>
+  <action name="spotLightAction"><property name="text"><string>Spot Light</string></property></action>
+  <action name="windowMenuAction"><property name="text"><string>窗口</string></property></action>
+  <action name="environmentLightingAction"><property name="text"><string>环境照明</string></property></action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

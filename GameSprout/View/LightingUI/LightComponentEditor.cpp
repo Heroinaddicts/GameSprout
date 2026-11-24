@@ -31,8 +31,10 @@ void ResizeCascadeSplits(GameSproutRuntime::LightShadowSettings& shadows,std::ui
 LightComponentEditor::LightComponentEditor(QWidget* parent,ILightingAuthoring* authoring)
     :ComponentEditor(parent),_Ui(new Ui::LightComponentEditorForm()),_Authoring(authoring) {
     _Ui->setupUi(this);
-    for(QLineEdit* edit:{_Ui->redEdit,_Ui->greenEdit,_Ui->blueEdit,_Ui->intensityEdit})
+    for(QLineEdit* edit:{_Ui->redEdit,_Ui->greenEdit,_Ui->blueEdit,_Ui->intensityEdit,
+        _Ui->rangeEdit,_Ui->innerAngleEdit,_Ui->outerAngleEdit,_Ui->shadowNearPlaneEdit})
         QObject::connect(edit,&QLineEdit::editingFinished,this,[this,edit]{CommitValues(edit);});
+    QObject::connect(_Ui->shadowPrioritySpin,&QSpinBox::editingFinished,this,[this]{CommitValues(_Ui->shadowPrioritySpin);});
     QObject::connect(_Ui->enabledCheck,&QCheckBox::clicked,this,[this]{CommitValues(_Ui->enabledCheck);});
     QObject::connect(_Ui->colorButton,&QPushButton::clicked,this,[this]{ChooseColor();});
     for(auto* edit:{_Ui->shadowStrengthEdit,_Ui->shadowDistanceEdit,_Ui->shadowDepthBiasEdit,_Ui->shadowNormalBiasEdit,
@@ -42,7 +44,7 @@ LightComponentEditor::LightComponentEditor(QWidget* parent,ILightingAuthoring* a
     QObject::connect(_Ui->softShadowsCheck,&QCheckBox::clicked,this,[this]{CommitValues(_Ui->softShadowsCheck);});
     QObject::connect(_Ui->cacheStaticCastersCheck,&QCheckBox::clicked,this,[this]{CommitValues(_Ui->cacheStaticCastersCheck);});
     for(auto* combo:{_Ui->shadowResolutionCombo,_Ui->shadowCascadesCombo,_Ui->shadowUpdateModeCombo,
-        _Ui->shadowSplitModeCombo,_Ui->shadowFilterQualityCombo})
+        _Ui->shadowSplitModeCombo,_Ui->shadowFilterQualityCombo,_Ui->typeCombo})
         QObject::connect(combo,qOverload<int>(&QComboBox::currentIndexChanged),this,[this,combo](int){CommitValues(combo);});
     QObject::connect(_Ui->shadowAdvancedToggle,&QToolButton::toggled,this,[this](bool expanded) {
         _Ui->shadowAdvancedOptions->setVisible(expanded);
@@ -53,7 +55,31 @@ LightComponentEditor::LightComponentEditor(QWidget* parent,ILightingAuthoring* a
 }
 LightComponentEditor::~LightComponentEditor(){delete _Ui;}
 void LightComponentEditor::ReadValues(GameSproutRuntime::IComponent& component) {
+    using GameSproutRuntime::LightType;
     const auto& settings=static_cast<GameSproutRuntime::ILightComponent&>(component).GetSettings();
+    const bool directional=settings.Type==LightType::Directional;
+    const bool spot=settings.Type==LightType::Spot;
+    _Ui->typeCombo->setCurrentIndex(static_cast<int>(settings.Type));
+    _Ui->formLayout->setRowVisible(_Ui->rangeEdit,!directional);
+    _Ui->formLayout->setRowVisible(_Ui->innerAngleEdit,spot);
+    _Ui->formLayout->setRowVisible(_Ui->outerAngleEdit,spot);
+    ShowNumbers({_Ui->rangeEdit,_Ui->innerAngleEdit,_Ui->outerAngleEdit},
+        {settings.Range,settings.InnerSpotAngleDegrees,settings.OuterSpotAngleDegrees});
+    _Ui->directionHint->setText(directional?tr("沿对象局部 +Z 方向照射。旋转对象调整方向。"):
+        spot?tr("从对象位置沿局部 +Z 投射锥形光束。"):
+        tr("从对象位置向各方向发光。当前实时阴影由方向光和聚光灯提供。"));
+    _Ui->shadowGroup->setVisible(directional||spot);
+    _Ui->shadowGroup->setToolTip(directional?tr("最亮且启用实时阴影的方向光提供主阴影。"):
+        tr("聚光灯共享视口阴影图集，按优先级和摄像机距离分配瓦片。"));
+    _Ui->shadowResolutionLabel->setText(directional?tr("图集分辨率"):tr("瓦片分辨率"));
+    _Ui->shadowLayout->setRowVisible(_Ui->shadowCascadesCombo,directional);
+    _Ui->shadowLayout->setRowVisible(_Ui->cacheStaticCastersCheck,directional);
+    _Ui->shadowLayout->setRowVisible(_Ui->shadowNearPlaneEdit,spot);
+    _Ui->shadowLayout->setRowVisible(_Ui->shadowPrioritySpin,spot);
+    _Ui->shadowAdvancedLayout->setRowVisible(_Ui->shadowUpdateModeCombo,directional);
+    _Ui->shadowAdvancedLayout->setRowVisible(_Ui->shadowSplitModeCombo,directional);
+    ShowNumber(_Ui->shadowNearPlaneEdit,settings.Shadows.NearPlane);
+    _Ui->shadowPrioritySpin->setValue(static_cast<int>(settings.Shadows.Priority));
     _Ui->enabledCheck->setChecked(settings.Enabled);
     ShowNumbers({_Ui->redEdit,_Ui->greenEdit,_Ui->blueEdit,_Ui->intensityEdit},
         {settings.Color.R,settings.Color.G,settings.Color.B,settings.Intensity});
@@ -77,7 +103,7 @@ void LightComponentEditor::ReadValues(GameSproutRuntime::IComponent& component) 
     const std::array labels{_Ui->shadowSplit1Label,_Ui->shadowSplit2Label,_Ui->shadowSplit3Label};
     const std::array edits{_Ui->shadowSplit1Edit,_Ui->shadowSplit2Edit,_Ui->shadowSplit3Edit};
     for(std::size_t index=0;index<edits.size();++index) {
-        const bool visible=manualSplits&&index+1<settings.Shadows.CascadeCount;
+        const bool visible=directional&&manualSplits&&index+1<settings.Shadows.CascadeCount;
         labels[index]->setVisible(visible);
         edits[index]->setVisible(visible);
         if(visible)ShowNumber(edits[index],settings.Shadows.CascadeSplits[index]*100);
@@ -95,11 +121,17 @@ void LightComponentEditor::CommitValues(QWidget* changed) {
     const ObjectEditTarget target{_Context.SceneID,_Context.ObjectID,_Context.ComponentID};
     GameSproutRuntime::LightSettings value;std::string error;
     if(!_Authoring->ReadLight(target,value,error)){Fail(error);return;}
+    if(changed==_Ui->typeCombo)value.Type=static_cast<GameSproutRuntime::LightType>(_Ui->typeCombo->currentIndex());
     for(const auto& [edit,number]:{std::pair<QLineEdit*,float*>{_Ui->redEdit,&value.Color.R},
         {_Ui->greenEdit,&value.Color.G},{_Ui->blueEdit,&value.Color.B},{_Ui->intensityEdit,&value.Intensity}})
         if((changed==edit||changed==_Ui->colorButton)&&!ReadNumber(edit,*number)){Fail("光照参数须为有限非负数值。");return;}
     if(changed==_Ui->enabledCheck)value.Enabled=_Ui->enabledCheck->isChecked();
     if(changed==_Ui->maskCombo)value.CullingMask=_Ui->maskCombo->GetMask();
+    for(const auto& [edit,number]:{std::pair<QLineEdit*,float*>{_Ui->rangeEdit,&value.Range},
+        {_Ui->innerAngleEdit,&value.InnerSpotAngleDegrees},{_Ui->outerAngleEdit,&value.OuterSpotAngleDegrees},
+        {_Ui->shadowNearPlaneEdit,&value.Shadows.NearPlane}})
+        if(changed==edit&&!ReadNumber(edit,*number)){Fail("范围、角度与阴影近裁剪必须是有限数值。");return;}
+    if(changed==_Ui->shadowPrioritySpin)value.Shadows.Priority=static_cast<std::uint32_t>(_Ui->shadowPrioritySpin->value());
     for(const auto& [edit,number]:{std::pair<QLineEdit*,float*>{_Ui->shadowStrengthEdit,&value.Shadows.Strength},
         {_Ui->shadowDistanceEdit,&value.Shadows.Distance},{_Ui->shadowDepthBiasEdit,&value.Shadows.DepthBias},
         {_Ui->shadowNormalBiasEdit,&value.Shadows.NormalBias}})
@@ -140,6 +172,9 @@ void LightComponentEditor::CommitValues(QWidget* changed) {
         if(percent==value.Shadows.FadeStart*100) {FinishInput();return;}
         value.Shadows.FadeStart=percent/100;
     }
+    if(!GameSproutRuntime::IsValidLocalLightGeometry(value)) {
+        Fail("请检查照射范围、内外锥角及阴影近裁剪。外锥角须在 1° 到 179°，聚光灯阴影近裁剪须小于范围。");return;
+    }
     FinishInput();if(!_Authoring->SetLight(target,value,error)){Fail(error);return;}Reload();
 }
 void LightComponentEditor::RebuildShadows() {
@@ -152,7 +187,7 @@ void LightComponentEditor::RebuildShadows() {
 void LightComponentEditor::ChooseColor() {
     if(_Loading||!_PropertiesEditable)return;
     float r=0,g=0,b=0;if(!ReadNumber(_Ui->redEdit,r)||!ReadNumber(_Ui->greenEdit,g)||!ReadNumber(_Ui->blueEdit,b))return;
-    const QColor selected=QColorDialog::getColor(QColor::fromRgbF(std::clamp(ToSRGB(r),0.0,1.0),std::clamp(ToSRGB(g),0.0,1.0),std::clamp(ToSRGB(b),0.0,1.0)),this,tr("方向光颜色"));
+    const QColor selected=QColorDialog::getColor(QColor::fromRgbF(std::clamp(ToSRGB(r),0.0,1.0),std::clamp(ToSRGB(g),0.0,1.0),std::clamp(ToSRGB(b),0.0,1.0)),this,tr("光源颜色"));
     if(!selected.isValid())return;
     ShowNumbers({_Ui->redEdit,_Ui->greenEdit,_Ui->blueEdit},{ToLinear(selected.redF()),ToLinear(selected.greenF()),ToLinear(selected.blueF())});
     CommitValues(_Ui->colorButton);

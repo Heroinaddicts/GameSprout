@@ -1,12 +1,16 @@
 #pragma once
 #include "Header.h"
 #include "InspectorPanel.h"
+#include "RuntimeLightingApi.h"
 #include <QPointer>
 class ILightingAuthoring;
 class IHierarchyUI;
 class IInspectorUI;
 class IIDEWindow;
 class IIDEMenu;
+class IAssetsManager;
+class ILibraryManager;
+class ISelectionManager;
 class EnvironmentLightingWindow;
 class QMenu;
 class QDialog;
@@ -25,13 +29,16 @@ private:
     bool Initialize(GameSproutEditor::GameSproutViewApi*) override;
     bool Launch(GameSproutEditor::GameSproutViewApi*) override;
     void Release(GameSproutEditor::GameSproutViewApi*) override;
-    void Create();
-    static void CreateMenu();
+    void Create(GameSproutRuntime::LightType);
+    template<GameSproutRuntime::LightType> static void CreateMenu();
     static void ShowEnvironmentMenu();
     ILightingAuthoring* _Authoring=nullptr;
     IHierarchyUI* _Hierarchy=nullptr;
     IInspectorUI* _Inspector=nullptr;
     IIDEWindow* _IDE=nullptr;
+    IAssetsManager* _Assets=nullptr;
+    ILibraryManager* _Library=nullptr;
+    ISelectionManager* _Selection=nullptr;
     IIDEMenu* _EnvironmentMenu=nullptr;
     EnvironmentLightingWindow* _EnvironmentWindow=nullptr;
     QMenu* _Actions=nullptr;

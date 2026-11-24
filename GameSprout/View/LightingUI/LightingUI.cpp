@@ -4,6 +4,9 @@
 #include "IHierarchyUI.h"
 #include "IInspectorUI.h"
 #include "IIDEWindow.h"
+#include "IAssetsManager.h"
+#include "ILibraryManager.h"
+#include "ISelectionManager.h"
 #include "EnvironmentLightingWindow.h"
 #include "ui_LightingUI.h"
 #include "ui_LightingErrorDialog.h"
@@ -19,6 +22,9 @@ void LightingUI::BeforeInitialize(GameSproutEditor::GameSproutViewApi* editor) {
     _Hierarchy=editor?editor->GetGameSproutView<IHierarchyUI>("HierarchyUI"):nullptr;
     _Inspector=editor?editor->GetGameSproutView<IInspectorUI>("InspectorUI"):nullptr;
     _IDE=editor?editor->GetGameSproutView<IIDEWindow>("IDEWindow"):nullptr;
+    _Assets=editor?editor->GetGameSproutModule<IAssetsManager>("AssetsManager"):nullptr;
+    _Library=editor?editor->GetGameSproutModule<ILibraryManager>("LibraryManager"):nullptr;
+    _Selection=editor?editor->GetGameSproutModule<ISelectionManager>("SelectionManager"):nullptr;
 }
 bool LightingUI::Initialize(GameSproutEditor::GameSproutViewApi*) {
     if(_Actions)return true;if(!qobject_cast<QApplication*>(QCoreApplication::instance()))return false;
@@ -27,24 +33,30 @@ bool LightingUI::Initialize(GameSproutEditor::GameSproutViewApi*) {
 }
 bool LightingUI::Launch(GameSproutEditor::GameSproutViewApi*) {
     if(!_Authoring||!_Hierarchy||!_Inspector||!_IDE||!_Actions||!_EnvironmentWindow)return false;
-    if(!_EnvironmentWindow->Bind(_Authoring))return false;
+    if(!_EnvironmentWindow->Bind(_Authoring,_Assets,_Library,_Selection))return false;
     auto* bar=_IDE->GetMenuBar();auto* window=bar?bar->CreateChildMenu(_Ui->windowMenuAction->text()):nullptr;
     _EnvironmentMenu=window?window->CreateChildMenu(_Ui->environmentLightingAction->text()):nullptr;
     if(!_EnvironmentMenu)return false;
     _EnvironmentMenu->SetClickCallback(&ShowEnvironmentMenu);_EnvironmentMenu->SetEnabled(true);
     _Registered=_Inspector->RegisterExtension(this);if(!_Registered)return false;
-    return _Hierarchy->RegisterContextAction(this,{_Ui->lightMenu->title().toStdString(),_Ui->directionalLightAction->text().toStdString()},&CreateMenu,
-        [this](const HierarchyActionContext& context){std::string error;return _Authoring&&_Authoring->CanCreate(context.SceneID,context.ObjectID,error);});
+    using GameSproutRuntime::LightType;
+    const auto registerLight=[this](QAction* action,IHierarchyUI::fContextActionCallback callback) {
+        return _Hierarchy->RegisterContextAction(this,{_Ui->lightMenu->title().toStdString(),action->text().toStdString()},callback,
+            [this](const HierarchyActionContext& context){std::string error;return _Authoring&&_Authoring->CanCreate(context.SceneID,context.ObjectID,error);});
+    };
+    return registerLight(_Ui->directionalLightAction,&CreateMenu<LightType::Directional>)&&
+        registerLight(_Ui->pointLightAction,&CreateMenu<LightType::Point>)&&registerLight(_Ui->spotLightAction,&CreateMenu<LightType::Spot>);
 }
 ComponentEditor* LightingUI::CreateComponentEditor(const std::type_info& type,QWidget* parent) {
     return type==typeid(GameSproutRuntime::ILightComponent)?new LightComponentEditor(parent,_Authoring):nullptr;
 }
-void LightingUI::CreateMenu(){if(ActiveLightingView)ActiveLightingView->Create();}
+template<GameSproutRuntime::LightType Type>
+void LightingUI::CreateMenu(){if(ActiveLightingView)ActiveLightingView->Create(Type);}
 void LightingUI::ShowEnvironmentMenu(){if(ActiveLightingView)ActiveLightingView->Show();}
-void LightingUI::Create() {
+void LightingUI::Create(GameSproutRuntime::LightType type) {
     if(!_Authoring||!_Hierarchy)return;
     const auto context=_Hierarchy->GetActionContext();std::uint64_t created=0;std::string error;
-    if(_Authoring->CreateDirectionalLight(context.SceneID,context.ObjectID,created,error))return;
+    if(_Authoring->CreateLight(context.SceneID,context.ObjectID,type,created,error))return;
     delete _ErrorDialog.data();auto* dialog=new QDialog(QApplication::activeWindow());_ErrorDialog=dialog;
     Ui::LightingErrorDialogForm form;form.setupUi(dialog);form.messageLabel->setText(QString::fromStdString(error));
     dialog->setAttribute(Qt::WA_DeleteOnClose);dialog->setWindowModality(Qt::WindowModal);
@@ -60,5 +72,7 @@ void LightingUI::Release(GameSproutEditor::GameSproutViewApi*) {
     delete _ErrorDialog.data();_ErrorDialog=nullptr;
     delete _EnvironmentWindow;_EnvironmentWindow=nullptr;
     delete _Actions;_Actions=nullptr;delete _Ui;_Ui=nullptr;
-    _Authoring=nullptr;_Hierarchy=nullptr;_Inspector=nullptr;_IDE=nullptr;if(ActiveLightingView==this)ActiveLightingView=nullptr;
+    _Authoring=nullptr;_Hierarchy=nullptr;_Inspector=nullptr;_IDE=nullptr;
+    _Assets=nullptr;_Library=nullptr;_Selection=nullptr;
+    if(ActiveLightingView==this)ActiveLightingView=nullptr;
 }

@@ -200,7 +200,9 @@ int main(int argc,char** argv) {
         auto* instancing=content->findChild<QCheckBox*>("enableGPUInstancingCheck");
         auto* priority=content->findChild<QSpinBox*>("sortingPrioritySpin");
         auto* specular=content->findChild<QCheckBox*>("specularHighlightsCheck");
-        Check(instancing&&priority&&specular&&instancing->isChecked()&&priority->value()==0&&!specular->isVisible(),
+        auto* reflections=content->findChild<QCheckBox*>("environmentReflectionsCheck");
+        Check(instancing&&priority&&specular&&reflections&&instancing->isChecked()&&priority->value()==0&&
+            !specular->isVisible()&&!reflections->isVisible(),
             "Preview advanced options or Lit-only visibility are incorrect");
         const QByteArray originalMeta=ReadFile(root.filePath("Assets/Editable.mat.meta"));
         spin("material.BaseColor.0")->setValue(0.75);
@@ -230,7 +232,8 @@ int main(int argc,char** argv) {
         Check(assets->SaveMaterialSource(Guid(independent.Guid),AssetArtifactIO::JsonText(document),baseline,error),error);pump(idle);
         resources=new LibraryRuntimeResources(assets,library);GameSproutRuntime::MaterialRenderData render;
         Check(resources->LoadMaterial(independent,render,error) && render.BaseColorTexture==texture && render.BaseColorTextureST.X==2 && render.BaseColorTextureST.W>0.19f,error);
-        Check(!render.EnableGPUInstancing&&render.SortingPriority==7&&render.SpecularHighlights,"Prepared material advanced options did not reach Runtime");
+        Check(!render.EnableGPUInstancing&&render.SortingPriority==7&&render.SpecularHighlights&&render.EnvironmentReflections,
+            "Prepared material advanced options did not reach Runtime");
         auto* baseTextureField=content->findChild<QWidget*>("material.BaseColorTexture")->findChild<QWidget*>("textureResource");
         baseTextureField->findChild<QAction*>("clearResourceAction")->trigger();
         Check(inspector->ApplyChanges(),"Clearing material texture did not save");pump(idle);
@@ -249,9 +252,12 @@ int main(int argc,char** argv) {
         stage="shader-driven controls";
         content->findChild<QComboBox*>("shaderModeCombo")->setCurrentIndex(2);
         Check(specular->isVisible()&&specular->isChecked(),"Lit specular option is missing");
+        Check(reflections->isVisible()&&reflections->isChecked(),"Lit environment-reflections option is missing");
         specular->setChecked(false);
+        reflections->setChecked(false);
         Check(inspector->ApplyChanges(),"Lit advanced option save failed");pump(idle);
-        Check(resources->LoadMaterial(independent,render,error)&&!render.SpecularHighlights&&!render.EnableGPUInstancing&&render.SortingPriority==7,
+        Check(resources->LoadMaterial(independent,render,error)&&!render.SpecularHighlights&&!render.EnvironmentReflections&&
+            !render.EnableGPUInstancing&&render.SortingPriority==7,
             "Lit advanced values were not decoded from the prepared material");
         content->findChild<QComboBox*>("shaderModeCombo")->setCurrentIndex(1);
         auto* shaderField=content->findChild<QWidget*>("shaderResource");

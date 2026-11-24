@@ -1,4 +1,5 @@
 #include "EnvironmentLightingWindow.h"
+#include <QAction>
 #include <QApplication>
 #include <QComboBox>
 #include <QCheckBox>
@@ -22,7 +23,7 @@ public:
     mutable int Reads=0;
     int Writes=0,Unregisters=0;
     bool CanCreate(std::uint64_t,std::uint64_t,std::string&) const override{return false;}
-    bool CreateDirectionalLight(std::uint64_t,std::uint64_t,std::uint64_t&,std::string&) override{return false;}
+    bool CreateLight(std::uint64_t,std::uint64_t,GameSproutRuntime::LightType,std::uint64_t&,std::string&) override{return false;}
     bool ReadLight(const ObjectEditTarget&,GameSproutRuntime::LightSettings&,std::string&)const override{return false;}
     bool SetLight(const ObjectEditTarget&,const GameSproutRuntime::LightSettings&,std::string&)override{return false;}
     bool RequestShadowRefresh(const ObjectEditTarget&,std::string&)override{return false;}
@@ -81,6 +82,46 @@ int main(int argc,char** argv) {
         authoring.Value.Settings.Intensity=1e10f;authoring.Publish();
         Check(intensity->text().toDouble()==1e10,"HDR intensity was clamped for display");
         authoring.Value.Settings.Intensity=2.5f;authoring.Publish();
+        auto* skyEnvironment=window.findChild<QWidget*>("skyEnvironmentField");
+        auto* skyRotation=window.findChild<QLineEdit*>("skyRotationEdit");
+        auto* skyIntensity=window.findChild<QLineEdit*>("skyIntensityEdit");
+        auto* reflection=window.findChild<QLineEdit*>("reflectionIntensityEdit");
+        auto* hdr=window.findChild<QCheckBox*>("hdrCheck");
+        auto* exposure=window.findChild<QLineEdit*>("exposureEVEdit");
+        auto* tonemap=window.findChild<QComboBox*>("tonemapCombo");
+        auto* spotCount=window.findChild<QComboBox*>("spotShadowLightsCombo");
+        auto* spotResolution=window.findChild<QComboBox*>("spotShadowResolutionCombo");
+        Check(skyEnvironment&&skyRotation&&skyIntensity&&reflection&&hdr&&exposure&&tonemap,
+            "Designer skybox, reflection and HDR controls are missing");
+        Check(!exposure->isEnabled()&&!tonemap->isEnabled(),"HDR-dependent controls are active in SDR");
+        Check(spotCount&&spotCount->currentIndex()==2&&spotResolution&&spotResolution->currentIndex()==2,
+            "Spot shadow budget controls did not load the defaults");
+        spotCount->setCurrentIndex(4);spotResolution->setCurrentIndex(1);
+        Check(authoring.Value.Settings.SpotShadows==GameSproutRuntime::SpotShadowBudgetSettings{4,512},
+            "Spot shadow budget edits did not reach authoring");
+        mode->setCurrentIndex(int(GameSproutRuntime::AmbientLightMode::SkyEnvironment));
+        skyRotation->setText("-35");QMetaObject::invokeMethod(skyRotation,"editingFinished");
+        skyIntensity->setText("1.5");QMetaObject::invokeMethod(skyIntensity,"editingFinished");
+        reflection->setText("0.25");QMetaObject::invokeMethod(reflection,"editingFinished");
+        hdr->setChecked(true);
+        exposure->setText("-1.25");QMetaObject::invokeMethod(exposure,"editingFinished");
+        tonemap->setCurrentIndex(int(GameSproutRuntime::ToneMapping::ACES));
+        Check(authoring.Value.Settings.Mode==GameSproutRuntime::AmbientLightMode::SkyEnvironment&&
+            authoring.Value.Settings.SkyRotationDegrees==-35&&authoring.Value.Settings.SkyIntensity==1.5f&&
+            authoring.Value.Settings.ReflectionIntensity==.25f&&authoring.Value.Settings.HDREnabled&&
+            authoring.Value.Settings.ExposureEV==-1.25f&&authoring.Value.Settings.Tonemap==GameSproutRuntime::ToneMapping::ACES,
+            "Skybox, reflection or HDR settings failed to reach authoring");
+        const auto beforeBadExposure=authoring.Writes;
+        exposure->setText("17");QMetaObject::invokeMethod(exposure,"editingFinished");
+        Check(authoring.Writes==beforeBadExposure&&!error->isHidden(),"Invalid exposure reached authoring");
+        authoring.Value.Settings.ExposureEV=1.75;
+        authoring.Value.Settings.SkyEnvironment={"abcdef1234567890abcdef1234567890",7};
+        authoring.Publish();
+        auto* clearResource=skyEnvironment->findChild<QAction*>("clearResourceAction");
+        Check(exposure->text()=="1.75"&&clearResource&&clearResource->isEnabled()&&authoring.Reads==1,
+            "Source snapshot did not refresh HDR controls and the resource field");
+        clearResource->trigger();
+        Check(authoring.Value.Settings.SkyEnvironment.Guid.empty(),"Clearing the environment field did not reach authoring");
         mode->setCurrentIndex(int(GameSproutRuntime::AmbientLightMode::Gradient));QCoreApplication::processEvents();
         Check(window.findChild<QWidget*>("skyRow")->isVisibleTo(&window)&&window.findChild<QWidget*>("ambientRow")->isHidden(),"Mode-specific rows are incorrect");
         authoring.Value.Settings.Mode=GameSproutRuntime::AmbientLightMode::SphericalHarmonics;
@@ -101,7 +142,8 @@ int main(int argc,char** argv) {
         Check(authoring.Writes==beforeSwitch&&red->text()=="0.125","Scene switch committed old text to new scene");
         authoring.Value.Available=authoring.Value.Editable=false;authoring.Publish();
         Check(!window.findChild<QGroupBox*>("settingsGroup")->isEnabled(),"Unavailable/Prefab environment remains editable");
-        Check(!atmosphere->isEnabled(),"Unavailable atmosphere remains editable");
+        Check(!atmosphere->isEnabled()&&!skyEnvironment->isEnabled()&&!hdr->isEnabled(),"Unavailable atmosphere, resource or HDR remains editable");
+        Check(!spotCount->isEnabled()&&!spotResolution->isEnabled(),"Unavailable scene shadow budget remains editable");
         const int reads=authoring.Reads;for(int i=0;i<4;++i)QCoreApplication::processEvents();
         Check(authoring.Reads==reads,"Idle UI is querying the business module");
         window.Shutdown();Check(authoring.Listeners.empty()&&authoring.Unregisters==1,"Environment listener outlives window");

@@ -20,7 +20,7 @@ class ILightingAuthoring : public GameSproutEditor::IGameSproutModule {
 public:
     virtual ~ILightingAuthoring() = default;
     virtual bool CanCreate(std::uint64_t sceneID,std::uint64_t parentID,std::string& error) const = 0;
-    virtual bool CreateDirectionalLight(std::uint64_t sceneID,std::uint64_t parentID,
+    virtual bool CreateLight(std::uint64_t sceneID,std::uint64_t parentID,GameSproutRuntime::LightType,
         std::uint64_t& createdObjectID,std::string& error) = 0;
     virtual bool ReadLight(const ObjectEditTarget&,GameSproutRuntime::LightSettings&,std::string& error) const = 0;
     virtual bool SetLight(const ObjectEditTarget&,const GameSproutRuntime::LightSettings&,std::string& error) = 0;

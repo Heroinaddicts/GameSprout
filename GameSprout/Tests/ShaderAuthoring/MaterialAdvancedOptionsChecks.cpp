@@ -23,27 +23,30 @@ int main(int argc,char** argv) {
         inspector.Load(document);QCoreApplication::processEvents();
         auto* instancing=inspector.findChild<QCheckBox*>("enableGPUInstancingCheck");
         auto* highlights=inspector.findChild<QCheckBox*>("specularHighlightsCheck");
+        auto* reflections=inspector.findChild<QCheckBox*>("environmentReflectionsCheck");
         auto* priority=inspector.findChild<QSpinBox*>("sortingPrioritySpin");
-        Check(instancing&&highlights&&priority,"Advanced options are missing from Designer form");
-        Check(!changes&&instancing->isChecked()&&highlights->isChecked()&&highlights->isVisible()&&priority->value()==0,
+        Check(instancing&&highlights&&reflections&&priority,"Advanced options are missing from Designer form");
+        Check(!changes&&instancing->isChecked()&&highlights->isChecked()&&highlights->isVisible()&&
+            reflections->isChecked()&&reflections->isVisible()&&priority->value()==0,
             "Loading defaults emitted changes or displayed wrong options");
-        instancing->setChecked(false);highlights->setChecked(false);priority->setValue(17);
-        Check(changes==3,"Explicit user changes did not emit editor events");
+        instancing->setChecked(false);highlights->setChecked(false);reflections->setChecked(false);priority->setValue(17);
+        Check(changes==4,"Explicit user changes did not emit editor events");
         std::string error;Json::Value captured;
         Check(inspector.Read(captured,error),error);
-        Check(captured["EnableGPUInstancing"]==false&&captured["SpecularHighlights"]==false&&captured["SortingPriority"]==17,
+        Check(captured["EnableGPUInstancing"]==false&&captured["SpecularHighlights"]==false&&
+            captured["EnvironmentReflections"]==false&&captured["SortingPriority"]==17,
             "Advanced options were not captured for source saving");
         QByteArray bytes;Json::Value restored;
         Check(AssetValueBinary::Encode(captured,bytes)&&AssetValueBinary::Decode(bytes,restored)&&restored==captured,
             "Material engine options did not survive the current binary artifact encoding");
         inspector.Load(restored);
-        Check(changes==3&&!instancing->isChecked()&&!highlights->isChecked()&&priority->value()==17,
+        Check(changes==4&&!instancing->isChecked()&&!highlights->isChecked()&&!reflections->isChecked()&&priority->value()==17,
             "Saved material values did not reload silently");
         inspector.SetContext("embedded",true);inspector.Load(restored);
-        Check(!instancing->isEnabled()&&!highlights->isEnabled()&&!priority->isEnabled(),
+        Check(!instancing->isEnabled()&&!highlights->isEnabled()&&!reflections->isEnabled()&&!priority->isEnabled(),
             "Embedded material advanced options became editable");
         inspector.SetContext("material",false);restored["Shader"]="GameSprout/Preview";inspector.Load(restored);
-        Check(!highlights->isVisible()&&instancing->isEnabled(),"Lit-only option leaked into preview material");
+        Check(!highlights->isVisible()&&!reflections->isVisible()&&instancing->isEnabled(),"Lit-only option leaked into preview material");
         restored["SortingPriority"]="not-an-integer";inspector.Load(restored);
         Check(!inspector.Read(captured,error)&&!priority->isEnabled(),"Invalid authored render option was accepted by the Inspector");
         std::cout<<"PASS material engine options, typed validation, Designer events, embedded read-only and binary roundtrip\n";

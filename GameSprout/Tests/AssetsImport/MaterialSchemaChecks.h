@@ -15,7 +15,7 @@ inline void CheckMaterialSchemas() {
         "Material defaults discarded authoring fields or omitted texture transforms");
     Check(source["EnableGPUInstancing"]==true && source["SortingPriority"]==0,
         "Automatic batching defaults are missing");
-    for (const char* name : {"EnableGPUInstancing","SpecularHighlights"}) {
+    for (const char* name : {"EnableGPUInstancing","SpecularHighlights","EnvironmentReflections"}) {
         Json::Value badOption=source;badOption[name]=1;
         Check(!MaterialDefinition::ValidateValues(schema,badOption,error),"Non-boolean material render option accepted");
     }
@@ -86,7 +86,7 @@ inline void CheckMaterialSchemas() {
     Json::Value broken=schema;
     broken["Properties"].append(schema["Properties"][0]);
     Check(!MaterialDefinition::ValidateSchema(broken,error),"Duplicate material property names were accepted");
-    for (const char* name : {"EnableGPUInstancing","SpecularHighlights","SortingPriority"}) {
+    for (const char* name : {"EnableGPUInstancing","SpecularHighlights","EnvironmentReflections","SortingPriority"}) {
         broken=schema;broken["Properties"][0]["Name"]=name;
         Check(!MaterialDefinition::ValidateSchema(broken,error),"Custom Shader property collided with engine material option");
     }

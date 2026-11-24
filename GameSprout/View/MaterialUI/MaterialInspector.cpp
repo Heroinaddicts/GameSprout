@@ -24,6 +24,7 @@ MaterialInspector::MaterialInspector(QWidget * parent) : ImportSettingsInspector
     QObject::connect(_Ui->extractMaterialButton,&QPushButton::clicked,this,[this] { ExtractMaterial(); });
     const auto changed=[this] { if (!_Loading && !_Embedded && Changed) Changed(); };
     QObject::connect(_Ui->specularHighlightsCheck,&QCheckBox::toggled,this,changed);
+    QObject::connect(_Ui->environmentReflectionsCheck,&QCheckBox::toggled,this,changed);
     QObject::connect(_Ui->enableGPUInstancingCheck,&QCheckBox::toggled,this,changed);
     QObject::connect(_Ui->sortingPrioritySpin,qOverload<int>(&QSpinBox::valueChanged),this,changed);
 }
@@ -61,7 +62,10 @@ bool MaterialInspector::Capture(Json::Value & document,std::string & error) cons
     for (const auto * row:_Rows) if (!row->Write(document,error)) return false;
     document["EnableGPUInstancing"]=_Ui->enableGPUInstancingCheck->isChecked();
     document["SortingPriority"]=_Ui->sortingPrioritySpin->value();
-    if (_Document["Shader"]=="GameSprout/Lit") document["SpecularHighlights"]=_Ui->specularHighlightsCheck->isChecked();
+    if (_Document["Shader"]=="GameSprout/Lit") {
+        document["SpecularHighlights"]=_Ui->specularHighlightsCheck->isChecked();
+        document["EnvironmentReflections"]=_Ui->environmentReflectionsCheck->isChecked();
+    }
     return true;
 }
 void MaterialInspector::Rebuild() {
@@ -93,7 +97,10 @@ void MaterialInspector::Rebuild() {
     _Ui->enableGPUInstancingCheck->setChecked(_Error.empty()?_Document.get("EnableGPUInstancing",true).asBool():true);
     _Ui->sortingPrioritySpin->setValue(_Error.empty()?_Document.get("SortingPriority",0).asInt():0);
     _Ui->specularHighlightsCheck->setChecked(_Error.empty()?_Document.get("SpecularHighlights",true).asBool():true);
-    _Ui->specularHighlightsCheck->setVisible(_Document["Shader"]=="GameSprout/Lit");
+    _Ui->environmentReflectionsCheck->setChecked(_Error.empty()?_Document.get("EnvironmentReflections",true).asBool():true);
+    const bool lit=_Document["Shader"]=="GameSprout/Lit";
+    _Ui->specularHighlightsCheck->setVisible(lit);
+    _Ui->environmentReflectionsCheck->setVisible(lit);
     _Ui->advancedOptionsGroup->setEnabled(!_Embedded && _Error.empty());
     _Loading=wasLoading;
 }

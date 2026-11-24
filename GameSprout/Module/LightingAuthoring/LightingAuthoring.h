@@ -12,7 +12,7 @@ class LightingAuthoring final : public ILightingAuthoring, public ISceneListener
 public:
     ~LightingAuthoring() override;
     bool CanCreate(std::uint64_t,std::uint64_t,std::string&) const override;
-    bool CreateDirectionalLight(std::uint64_t,std::uint64_t,std::uint64_t&,std::string&) override;
+    bool CreateLight(std::uint64_t,std::uint64_t,GameSproutRuntime::LightType,std::uint64_t&,std::string&) override;
     bool ReadLight(const ObjectEditTarget&,GameSproutRuntime::LightSettings&,std::string&) const override;
     bool SetLight(const ObjectEditTarget&,const GameSproutRuntime::LightSettings&,std::string&) override;
     bool RequestShadowRefresh(const ObjectEditTarget&,std::string&) override;

@@ -109,7 +109,14 @@
             <item>
               <widget class="QCheckBox" name="specularHighlightsCheck">
                 <property name="text"><string>镜面高光</string></property>
-                <property name="toolTip"><string>控制内置 Lit 材质受灯光照射产生的镜面高光，不影响环境漫反射。</string></property>
+                <property name="toolTip"><string>控制内置 Lit 材质受灯光照射产生的镜面高光。</string></property>
+                <property name="checked"><bool>true</bool></property>
+              </widget>
+            </item>
+            <item>
+              <widget class="QCheckBox" name="environmentReflectionsCheck">
+                <property name="text"><string>环境反射</string></property>
+                <property name="toolTip"><string>勾选后，内置 Lit 材质会采样场景天空的预滤波反射。</string></property>
                 <property name="checked"><bool>true</bool></property>
               </widget>
             </item>

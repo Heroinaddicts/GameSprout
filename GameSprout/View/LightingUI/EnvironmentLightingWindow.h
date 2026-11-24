@@ -6,6 +6,9 @@
 class QLineEdit;
 class QLabel;
 class QPushButton;
+class IAssetsManager;
+class ILibraryManager;
+class ISelectionManager;
 namespace Ui {class EnvironmentLightingForm;}
 
 // Presentation only. Settings, scene identities and authoring transactions are
@@ -14,7 +17,8 @@ class EnvironmentLightingWindow final : public QDialog,public ILightingEnvironme
 public:
     explicit EnvironmentLightingWindow(QWidget* parent=nullptr);
     ~EnvironmentLightingWindow() override;
-    bool Bind(ILightingAuthoring* authoring);
+    bool Bind(ILightingAuthoring* authoring,IAssetsManager* assets=nullptr,ILibraryManager* library=nullptr,
+              ISelectionManager* selection=nullptr);
     void Shutdown();
     void OnEnvironmentLightingChanged(const EnvironmentLightingSnapshot&) override;
 private:

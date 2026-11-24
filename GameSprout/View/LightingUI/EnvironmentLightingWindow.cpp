@@ -30,7 +30,7 @@ EnvironmentLightingWindow::EnvironmentLightingWindow(QWidget* parent)
         QObject::connect(_Colors[row].Button,&QPushButton::clicked,this,[this,row]{ChooseColor(row);});
     }
     QObject::connect(_Ui->modeCombo,&QComboBox::currentIndexChanged,this,[this](int mode){
-        if(_Loading||mode<0||mode>3)return;
+        if(_Loading||mode<0||mode>static_cast<int>(GameSproutRuntime::AmbientLightMode::SkyEnvironment))return;
         auto value=_Snapshot.Settings;value.Mode=static_cast<GameSproutRuntime::AmbientLightMode>(mode);Commit(value);
     });
     QObject::connect(_Ui->intensityEdit,&QLineEdit::editingFinished,this,[this]{
@@ -38,6 +38,39 @@ EnvironmentLightingWindow::EnvironmentLightingWindow(QWidget* parent)
         bool valid=false;const double number=QLocale::c().toDouble(_Ui->intensityEdit->text().trimmed(),&valid);
         if(!valid||!std::isfinite(number)||number<0||number>std::numeric_limits<float>::max()) {Error("强度须为有限非负数值。");return;}
         auto value=_Snapshot.Settings;value.Intensity=float(number);Commit(value);
+    });
+    using Settings=GameSproutRuntime::EnvironmentLightingSettings;
+    const auto editSetting=[this](QLineEdit* field,float Settings::* member,double low,double high,const char* error){
+        QObject::connect(field,&QLineEdit::editingFinished,this,[this,field,member,low,high,error]{
+            if(_Loading)return;
+            bool valid=false;
+            const double number=QLocale::c().toDouble(field->text().trimmed(),&valid);
+            if(!valid||!std::isfinite(number)||number<low||number>high){Error(error);return;}
+            auto value=_Snapshot.Settings;
+            value.*member=float(number);
+            Commit(value);
+        });
+    };
+    constexpr auto floatLimit=std::numeric_limits<float>::max();
+    editSetting(_Ui->skyRotationEdit,&Settings::SkyRotationDegrees,-floatLimit,floatLimit,"天空旋转须为有限数值。");
+    editSetting(_Ui->skyIntensityEdit,&Settings::SkyIntensity,0,floatLimit,"天空亮度须为有限非负数值。");
+    editSetting(_Ui->reflectionIntensityEdit,&Settings::ReflectionIntensity,0,floatLimit,"反射强度须为有限非负数值。");
+    editSetting(_Ui->exposureEVEdit,&Settings::ExposureEV,-16,16,"曝光补偿须在 -16 EV 到 16 EV 之间。");
+    QObject::connect(_Ui->hdrCheck,&QCheckBox::toggled,this,[this](bool enabled){
+        if(_Loading)return;
+        auto value=_Snapshot.Settings;value.HDREnabled=enabled;Commit(value);
+    });
+    QObject::connect(_Ui->tonemapCombo,&QComboBox::currentIndexChanged,this,[this](int mode){
+        if(_Loading||mode<0||mode>static_cast<int>(GameSproutRuntime::ToneMapping::ACES))return;
+        auto value=_Snapshot.Settings;value.Tonemap=static_cast<GameSproutRuntime::ToneMapping>(mode);Commit(value);
+    });
+    QObject::connect(_Ui->spotShadowLightsCombo,&QComboBox::currentIndexChanged,this,[this](int count){
+        if(_Loading||count<0||count>4)return;
+        auto value=_Snapshot.Settings;value.SpotShadows.MaxLights=static_cast<std::uint32_t>(count);Commit(value);
+    });
+    QObject::connect(_Ui->spotShadowResolutionCombo,&QComboBox::currentIndexChanged,this,[this](int index){
+        if(_Loading||index<0||index>4)return;
+        auto value=_Snapshot.Settings;value.SpotShadows.MaxResolution=256u<<index;Commit(value);
     });
     QObject::connect(_Ui->atmosphereGroup,&QGroupBox::toggled,this,[this](bool enabled){
         if(_Loading)return;auto value=_Snapshot.Settings;value.Atmosphere.Enabled=enabled;Commit(value);
@@ -72,18 +105,28 @@ EnvironmentLightingWindow::EnvironmentLightingWindow(QWidget* parent)
     UpdateControls();
 }
 EnvironmentLightingWindow::~EnvironmentLightingWindow(){Shutdown();delete _Ui;}
-bool EnvironmentLightingWindow::Bind(ILightingAuthoring* authoring) {
+bool EnvironmentLightingWindow::Bind(ILightingAuthoring* authoring,IAssetsManager* assets,ILibraryManager* library,
+                                     ISelectionManager* selection) {
     Shutdown();_Authoring=authoring;
     if(!_Authoring)return false;
     _Subscribed=_Authoring->RegisterEnvironmentListener(this);
     if(!_Subscribed){_Authoring=nullptr;Error("环境照明事件订阅失败。");return false;}
     EnvironmentLightingSnapshot value;std::string error;
-    if(!_Authoring->ReadEnvironment(value,error)){Error(error);return false;}
+    if(!_Authoring->ReadEnvironment(value,error)){Shutdown();Error(error);return false;}
+    auto* field=_Ui->skyEnvironmentField;
+    field->Bind(assets,library,selection,eAssetType::Environment);
+    field->Changed=[this](const GameSproutRuntime::ResourceReference& reference){
+        auto value=_Snapshot.Settings;value.SkyEnvironment=reference;Commit(value);
+    };
     OnEnvironmentLightingChanged(value);return true;
 }
 void EnvironmentLightingWindow::Shutdown() {
     if(_Subscribed&&_Authoring)_Authoring->UnregisterEnvironmentListener(this);
     _Subscribed=false;_Authoring=nullptr;_Snapshot={};
+    _Ui->skyEnvironmentField->Changed={};
+    _Ui->skyEnvironmentField->SetValue({});
+    _Ui->skyEnvironmentField->Bind(nullptr,nullptr,nullptr,eAssetType::Unknown);
+    _Ui->skyEnvironmentField->SetContextKey({});
 }
 void EnvironmentLightingWindow::OnEnvironmentLightingChanged(const EnvironmentLightingSnapshot& value) {
     const bool switched=_Snapshot.SceneID!=value.SceneID;
@@ -102,14 +145,33 @@ void EnvironmentLightingWindow::UpdateControls() {
     _Loading=true;
     const auto mode=_Snapshot.Settings.Mode;const bool enabled=_Snapshot.Available&&_Snapshot.Editable;
     _Ui->settingsGroup->setEnabled(enabled);_Ui->resetButton->setEnabled(enabled);
+    _Ui->skyEnvironmentGroup->setEnabled(enabled);
+    _Ui->hdrGroup->setEnabled(enabled);
+    const auto& shadowBudget=_Snapshot.Settings.SpotShadows;
+    _Ui->spotShadowBudgetGroup->setEnabled(enabled);
+    _Ui->spotShadowLightsCombo->setCurrentIndex(static_cast<int>(shadowBudget.MaxLights));
+    int shadowResolutionIndex=0;
+    for(auto edge=shadowBudget.MaxResolution;edge>256;edge>>=1)++shadowResolutionIndex;
+    _Ui->spotShadowResolutionCombo->setCurrentIndex(shadowResolutionIndex);
+    _Ui->skyEnvironmentField->SetContextKey(enabled?std::to_string(_Snapshot.SceneID):std::string{});
+    if(_Ui->skyEnvironmentField->GetValue()!=_Snapshot.Settings.SkyEnvironment)
+        _Ui->skyEnvironmentField->SetValue(_Snapshot.Settings.SkyEnvironment);
+    _Ui->hdrCheck->setChecked(_Snapshot.Settings.HDREnabled);
+    _Ui->exposureEVEdit->setEnabled(_Snapshot.Settings.HDREnabled);
+    _Ui->tonemapCombo->setEnabled(_Snapshot.Settings.HDREnabled);
+    _Ui->tonemapCombo->setCurrentIndex(static_cast<int>(_Snapshot.Settings.Tonemap));
     _Ui->atmosphereGroup->setEnabled(enabled);
     _Ui->atmosphereGroup->setChecked(_Snapshot.Settings.Atmosphere.Enabled);
     _Ui->drawSkyCheck->setChecked(_Snapshot.Settings.Atmosphere.DrawSky);
-    const std::array<std::pair<QLineEdit*,float>,3> fogFields{{
+    const std::array<std::pair<QLineEdit*,float>,7> fields{{
+        {_Ui->skyRotationEdit,_Snapshot.Settings.SkyRotationDegrees},
+        {_Ui->skyIntensityEdit,_Snapshot.Settings.SkyIntensity},
+        {_Ui->reflectionIntensityEdit,_Snapshot.Settings.ReflectionIntensity},
+        {_Ui->exposureEVEdit,_Snapshot.Settings.ExposureEV},
         {_Ui->fogStartEdit,_Snapshot.Settings.Atmosphere.FogStart},
         {_Ui->fogEndEdit,_Snapshot.Settings.Atmosphere.FogEnd},
         {_Ui->fogMaxOpacityEdit,_Snapshot.Settings.Atmosphere.FogMaxOpacity}}};
-    for(const auto& [field,value]:fogFields)if(!field->hasFocus()||_Committing)field->setText(QString::number(value,'g',8));
+    for(const auto& [field,value]:fields)if(!field->hasFocus()||_Committing)field->setText(QString::number(value,'g',8));
     _Ui->availabilityLabel->setVisible(!enabled);
     _Ui->modeCombo->setCurrentIndex(static_cast<int>(mode));
     if(!_Ui->intensityEdit->hasFocus()||_Committing)_Ui->intensityEdit->setText(QString::number(_Snapshot.Settings.Intensity,'g',8));

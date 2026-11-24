@@ -10,7 +10,7 @@ namespace {
 Json::Value Values(std::initializer_list<float> values) {
     Json::Value array(Json::arrayValue);for(float value:values)array.append(value);return array;
 }
-Json::Value LightDocument(const std::string& name) {
+Json::Value LightDocument(const std::string& name,const char* type) {
     Json::Value document(Json::objectValue),node(Json::objectValue),transform(Json::objectValue),light(Json::objectValue);
     document["Version"]=Json::UInt(GameSproutRuntime::SceneDocumentVersion);document["Name"]=name;document["NextObjectID"]=Json::UInt64(2);
     document["MainCameraID"]=Json::UInt64(0);document["Objects"]=Json::Value(Json::arrayValue);
@@ -19,6 +19,8 @@ Json::Value LightDocument(const std::string& name) {
     transform["Type"]="GameSproutRuntime.Transform";transform["Position"]=Values({0,0,0});
     transform["Rotation"]=Values({0,0,0,1});transform["Scale"]=Values({1,1,1});
     light["Type"]="GameSproutRuntime.Light";
+    light["Settings"]["Type"]=type;
+    if(std::string_view(type)=="Spot")light["Settings"]["Shadows"]["Resolution"]=Json::UInt(512);
     node["Components"].append(std::move(transform));node["Components"].append(std::move(light));
     document["Objects"].append(std::move(node));return document;
 }
@@ -45,23 +47,32 @@ GameSproutRuntime::IGameObject* LightingAuthoring::Parent(std::uint64_t id) cons
 bool LightingAuthoring::CanCreate(std::uint64_t sceneID,std::uint64_t parentID,std::string& error) const {
     error.clear();
     if(!_Runtime||!_Host||!_Scenes||!_Play||QThread::currentThread()!=_OwnerThread||_Runtime->IsExecuting()||_Host->IsFrameActive()) {
-        error="方向光只能在所属主线程的 Runtime 空闲阶段创建。";return false;
+        error="光源只能在所属主线程的 Runtime 空闲阶段创建。";return false;
     }
-    if(_Play->GetState().State!=EditorPlayState::Edit||_Scenes->IsPlaySessionActive()){error="请先停止游戏，再创建方向光。";return false;}
+    if(_Play->GetState().State!=EditorPlayState::Edit||_Scenes->IsPlaySessionActive()){error="请先停止游戏，再创建光源。";return false;}
     if(_Scenes->HasTransformEdit()||_Scenes->HasPropertyPreview()){error="请先结束当前连续编辑。";return false;}
     auto* scene=_Scenes->GetActiveScene();
     if(!scene||scene->GetInstanceID()!=sceneID||!Parent(parentID)){error="创建目标已失效或不属于当前文档。";return false;}
     return true;
 }
-bool LightingAuthoring::CreateDirectionalLight(std::uint64_t sceneID,std::uint64_t parentID,std::uint64_t& created,std::string& error) {
+bool LightingAuthoring::CreateLight(std::uint64_t sceneID,std::uint64_t parentID,GameSproutRuntime::LightType type,
+    std::uint64_t& created,std::string& error) {
     created=0;if(!CanCreate(sceneID,parentID,error))return false;
-    auto* parent=Parent(parentID);std::string name="Directional Light";
+    using GameSproutRuntime::LightType;
+    const char* typeName=nullptr;
+    switch(type) {
+    case LightType::Directional:typeName="Directional";break;
+    case LightType::Point:typeName="Point";break;
+    case LightType::Spot:typeName="Spot";break;
+    }
+    if(!typeName){error="未知光源类型。";return false;}
+    auto* parent=Parent(parentID);const std::string baseName=std::string(typeName)+" Light";std::string name=baseName;
     for(std::uint64_t suffix=1;parent->FindChild(name);++suffix) {
-        if(suffix==std::numeric_limits<std::uint64_t>::max()){error="方向光名称已耗尽。";return false;}
-        name="Directional Light ("+std::to_string(suffix)+")";
+        if(suffix==std::numeric_limits<std::uint64_t>::max()){error="光源名称已耗尽。";return false;}
+        name=baseName+" ("+std::to_string(suffix)+")";
     }
     SceneDocumentEditRequest request;request.ParentObjectID=parent->GetInstanceID();request.RemapDocumentIDs=true;
-    request.Label="创建方向光";request.DocumentJson=AssetArtifactIO::JsonText(LightDocument(name));
+    request.Label="创建光源";request.DocumentJson=AssetArtifactIO::JsonText(LightDocument(name,typeName));
     SceneSubtreeDocument result;if(!_Scenes->EditObjectDocument(request,result,error))return false;
     created=result.RootObjectID;_Selection->SetSceneObjectSelection({sceneID,created});return true;
 }
@@ -77,11 +88,11 @@ GameSproutRuntime::ILightComponent* LightingAuthoring::Resolve(const ObjectEditT
     return nullptr;
 }
 bool LightingAuthoring::ReadLight(const ObjectEditTarget& target,GameSproutRuntime::LightSettings& value,std::string& error) const {
-    error.clear();auto* light=Resolve(target);if(!light){error="方向光已失效或场景已切换。";return false;}
+    error.clear();auto* light=Resolve(target);if(!light){error="光源已失效或场景已切换。";return false;}
     value=light->GetSettings();return true;
 }
 bool LightingAuthoring::SetLight(const ObjectEditTarget& target,const GameSproutRuntime::LightSettings& value,std::string& error) {
-    auto* light=Resolve(target);if(!light||!_Objects){error="方向光已失效或场景已切换。";return false;}
+    auto* light=Resolve(target);if(!light||!_Objects){error="光源已失效或场景已切换。";return false;}
     const auto previous=light->GetSettings();
     const auto instanceID=light->GetComponentInstanceID();
     const auto fileID=_Scenes->GetComponentFileID(target.ObjectID,instanceID);
@@ -94,16 +105,16 @@ bool LightingAuthoring::SetLight(const ObjectEditTarget& target,const GameSprout
                 if(candidate&&candidate->GetComponentInstanceID()==instanceID){current=dynamic_cast<GameSproutRuntime::ILightComponent*>(candidate);break;}
             }
             if(current&&current->SetSettings(settings))return true;
-            failure="方向光参数无效或组件已移除；请检查颜色、强度及阴影参数范围。";return false;
+            failure="光源参数无效或组件已移除。请检查颜色、强度及阴影参数范围。";return false;
         };
     };
-    return _Objects->EditObject(target,"修改方向光",operation(value),operation(previous),error);
+    return _Objects->EditObject(target,"修改光源",operation(value),operation(previous),error);
 }
 bool LightingAuthoring::RequestShadowRefresh(const ObjectEditTarget& target,std::string& error) {
-    if(!_Objects){error="方向光编辑模块尚未就绪。";return false;}
+    if(!_Objects){error="光源编辑模块尚未就绪。";return false;}
     if(!_Objects->CanEdit(target,error))return false;
     auto* light=Resolve(target);
-    if(!light){error="方向光已失效或场景已切换。";return false;}
+    if(!light){error="光源已失效或场景已切换。";return false;}
     light->RequestShadowRefresh();
     return true;
 }

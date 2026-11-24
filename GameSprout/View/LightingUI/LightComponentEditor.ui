@@ -7,7 +7,11 @@
    <property name="labelAlignment"><set>Qt::AlignLeft|Qt::AlignVCenter</set></property>
    <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
    <item row="0" column="0"><widget class="QLabel" name="typeLabel"><property name="text"><string>类型</string></property></widget></item>
-   <item row="0" column="1"><widget class="QLabel" name="typeValue"><property name="text"><string>Directional · 方向光</string></property></widget></item>
+   <item row="0" column="1"><widget class="QComboBox" name="typeCombo">
+    <item><property name="text"><string>方向光</string></property></item>
+    <item><property name="text"><string>点光源</string></property></item>
+    <item><property name="text"><string>聚光灯</string></property></item>
+   </widget></item>
    <item row="1" column="0"><widget class="QLabel" name="stateLabel"><property name="text"><string>状态</string></property></widget></item>
    <item row="1" column="1"><widget class="QCheckBox" name="enabledCheck"><property name="text"><string>启用光源</string></property></widget></item>
    <item row="2" column="0"><widget class="QLabel" name="colorLabel"><property name="text"><string>颜色</string></property><property name="toolTip"><string>RGB 数值为线性颜色，可大于 1；色块与拾色器按 sRGB 显示。</string></property></widget></item>
@@ -21,8 +25,14 @@
    <item row="3" column="1"><widget class="QLineEdit" name="intensityEdit"><property name="toolTip"><string>与 URP 对齐的相对强度，0 关闭照明；通过 Transform 旋转改变照射方向。</string></property></widget></item>
    <item row="4" column="0"><widget class="QLabel" name="maskLabel"><property name="text"><string>影响层</string></property></widget></item>
    <item row="4" column="1"><widget class="LayerMaskCombo" name="maskCombo"><property name="sizePolicy"><sizepolicy hsizetype="Ignored" vsizetype="Fixed"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property></widget></item>
-   <item row="5" column="0" colspan="2"><widget class="QLabel" name="directionHint"><property name="text"><string>沿对象局部 +Z 方向照射；旋转对象调整方向。当前位置不影响方向光。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-   <item row="6" column="0" colspan="2"><widget class="QGroupBox" name="shadowGroup">
+   <item row="5" column="0"><widget class="QLabel" name="rangeLabel"><property name="text"><string>范围（米）</string></property></widget></item>
+   <item row="5" column="1"><widget class="QLineEdit" name="rangeEdit"><property name="toolTip"><string>照明强度随世界距离平方衰减，在此范围边缘平滑降到零。</string></property></widget></item>
+   <item row="6" column="0"><widget class="QLabel" name="innerAngleLabel"><property name="text"><string>内锥角（°）</string></property></widget></item>
+   <item row="6" column="1"><widget class="QLineEdit" name="innerAngleEdit"><property name="toolTip"><string>完整锥角，0° 至外锥角。由内锥向外锥平滑衰减。</string></property></widget></item>
+   <item row="7" column="0"><widget class="QLabel" name="outerAngleLabel"><property name="text"><string>外锥角（°）</string></property></widget></item>
+   <item row="7" column="1"><widget class="QLineEdit" name="outerAngleEdit"><property name="toolTip"><string>完整锥角，1° 至 179°。</string></property></widget></item>
+   <item row="8" column="0" colspan="2"><widget class="QLabel" name="directionHint"><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item row="9" column="0" colspan="2"><widget class="QGroupBox" name="shadowGroup">
     <property name="title"><string>实时阴影</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property>
     <property name="toolTip"><string>开启方向光阴影。当前由最亮且开启阴影的方向光提供主阴影。</string></property>
     <layout class="QFormLayout" name="shadowLayout">
@@ -47,14 +57,18 @@
      <item row="5" column="1"><widget class="QLineEdit" name="shadowNormalBiasEdit"><property name="toolTip"><string>0 到 10 个阴影纹素，沿接收表面法线偏移阴影查询位置。过大可能造成漏光。</string></property></widget></item>
      <item row="6" column="1"><widget class="QCheckBox" name="softShadowsCheck"><property name="text"><string>软阴影</string></property><property name="toolTip"><string>使用邻近深度样本平滑阴影边缘，会增加采样成本。</string></property></widget></item>
      <item row="7" column="1"><widget class="QCheckBox" name="cacheStaticCastersCheck"><property name="text"><string>缓存静态阴影</string></property><property name="toolTip"><string>复用在 Static 菜单标记为 Shadow Caster Static 的物体阴影，其余物体的阴影单独实时更新。</string></property></widget></item>
-     <item row="8" column="0" colspan="2"><widget class="QToolButton" name="shadowAdvancedToggle">
+     <item row="8" column="0"><widget class="QLabel" name="shadowNearPlaneLabel"><property name="text"><string>近裁剪（米）</string></property></widget></item>
+     <item row="8" column="1"><widget class="QLineEdit" name="shadowNearPlaneEdit"><property name="toolTip"><string>聚光灯阴影图的近裁剪面。须为正数且小于照射范围。</string></property></widget></item>
+     <item row="9" column="0"><widget class="QLabel" name="shadowPriorityLabel"><property name="text"><string>阴影优先级</string></property></widget></item>
+     <item row="9" column="1"><widget class="QSpinBox" name="shadowPrioritySpin"><property name="maximum"><number>255</number></property><property name="toolTip"><string>聚光灯阴影数量达到视口预算时，优先为较高优先级的灯分配图集。</string></property></widget></item>
+     <item row="10" column="0" colspan="2"><widget class="QToolButton" name="shadowAdvancedToggle">
       <property name="text"><string>高级选项</string></property>
       <property name="checkable"><bool>true</bool></property>
       <property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property>
       <property name="arrowType"><enum>Qt::RightArrow</enum></property>
       <property name="autoRaise"><bool>true</bool></property>
      </widget></item>
-     <item row="9" column="0" colspan="2"><widget class="QWidget" name="shadowAdvancedOptions">
+     <item row="11" column="0" colspan="2"><widget class="QWidget" name="shadowAdvancedOptions">
       <property name="visible"><bool>false</bool></property>
       <layout class="QFormLayout" name="shadowAdvancedLayout">
        <property name="formAlignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property>
@@ -91,7 +105,7 @@
         </widget></item>
         <item row="7" column="0" colspan="2"><widget class="QPushButton" name="rebuildShadowsButton">
          <property name="text"><string>重建阴影一次</string></property>
-         <property name="toolTip"><string>在使用此方向光的视口下一次绘制时重建阴影图。</string></property>
+         <property name="toolTip"><string>在使用此光源阴影的视口下一次绘制时重建阴影图。</string></property>
         </widget></item>
       </layout>
      </widget></item>

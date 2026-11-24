@@ -140,7 +140,7 @@ int main(int argc,char** argv) {
         Check(AssetArtifactIO::Parse(Read(temporary.path()+"/Assets/Materials/Lit.mat").toStdString(),material)
             &&material["Shader"]=="GameSprout/Lit"&&material["Roughness"].asDouble()==.5
             &&material["NormalTexture"].isNull()&&material["NormalTextureST"][0].asInt()==1&&material["Emission"][0].asInt()==0,"Lit preset defaults missing");
-        Check(material["EnableGPUInstancing"]==true&&material["SortingPriority"]==0&&material["SpecularHighlights"]==true,
+        Check(material["EnableGPUInstancing"]==true&&material["SortingPriority"]==0&&material["SpecularHighlights"]==true&&material["EnvironmentReflections"]==true,
             "Lit preset render options missing");
         auto invalid=material;invalid["NormalScale"]=-1;
         Check(!MaterialDefinition::ValidateValues(MaterialDefinition::LitSchema(),invalid,error),"Negative normal scale accepted");

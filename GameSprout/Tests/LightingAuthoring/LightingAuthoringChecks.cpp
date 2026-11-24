@@ -172,13 +172,51 @@ int main(int argc,char** argv) {
             "Atmosphere-only transaction did not publish its new value");
         Check(scenes.Undo(environmentError)&&!scenes.GetActiveScene()->GetEnvironmentLighting().Atmosphere.Enabled,"Atmosphere Undo failed: "+environmentError);
         Check(scenes.Redo(environmentError)&&scenes.GetActiveScene()->GetEnvironmentLighting().Atmosphere.Enabled,"Atmosphere Redo failed: "+environmentError);
+        environmentValue.SkyEnvironment={"abcdef1234567890abcdef1234567890",7};
+        environmentValue.SkyRotationDegrees=-35;environmentValue.SkyIntensity=1.5f;environmentValue.ReflectionIntensity=.5f;
+        environmentValue.HDREnabled=true;environmentValue.ExposureEV=-.75f;environmentValue.Tonemap=GameSproutRuntime::ToneMapping::ACES;
+        const auto beforeSky=environmentEvents.Events.size();
+        Check(lighting.SetEnvironment(environment.SceneID,environmentValue,environmentError),environmentError);
+        Check(environmentEvents.Events.size()==beforeSky+1&&environmentEvents.Events.back().Settings.SkyEnvironment==environmentValue.SkyEnvironment&&
+            environmentEvents.Events.back().Settings.Tonemap==GameSproutRuntime::ToneMapping::ACES,
+            "Skybox and HDR-only transaction did not publish its new values");
+        Check(scenes.Undo(environmentError)&&!scenes.GetActiveScene()->GetEnvironmentLighting().HDREnabled&&
+            scenes.GetActiveScene()->GetEnvironmentLighting().SkyEnvironment.Guid.empty(),"Skybox and HDR Undo failed: "+environmentError);
+        Check(scenes.Redo(environmentError)&&scenes.GetActiveScene()->GetEnvironmentLighting().ExposureEV==-.75f&&
+            scenes.GetActiveScene()->GetEnvironmentLighting().SkyEnvironment==environmentValue.SkyEnvironment,"Skybox and HDR Redo failed: "+environmentError);
         auto invalidEnvironment=environmentValue;invalidEnvironment.Intensity=-1;
         Check(!lighting.SetEnvironment(environment.SceneID,invalidEnvironment,environmentError)&&scenes.GetActiveScene()->GetEnvironmentLighting().Intensity==2,"Invalid environment changed source");
         host.Frame=true;Check(!lighting.SetEnvironment(environment.SceneID,environmentValue,environmentError),"Host-frame environment mutation accepted");host.Frame=false;
         Check(!lighting.SetEnvironment(environment.SceneID+100,environmentValue,environmentError),"Stale environment scene identity accepted");
         Check(GameSproutEditor::GameSproutEditorFinal::Start(view,editor),"LightingUI startup");
-        Check(hierarchy.Actions.contains({"Light","Directional Light"})&&inspector.Extension,"Directional Light menu/Inspector not registered");
-        hierarchy.Context={scenes.GetActiveScene()->GetInstanceID(),0};hierarchy.Actions.at({"Light","Directional Light"})();
+        Check(hierarchy.Actions.contains({"Light","Directional Light"})&&hierarchy.Actions.contains({"Light","Point Light"})&&
+            hierarchy.Actions.contains({"Light","Spot Light"})&&inspector.Extension,"Light menus/Inspector not registered");
+        hierarchy.Context={scenes.GetActiveScene()->GetInstanceID(),0};
+        std::string localError;
+        for(const auto& [name,type]:{std::pair{"Point Light",GameSproutRuntime::LightType::Point},
+                std::pair{"Spot Light",GameSproutRuntime::LightType::Spot}}) {
+            hierarchy.Actions.at({"Light",name})();
+            const auto id=selection.Current.ObjectID;
+            auto* localObject=runtime->QueryGameObject(id);
+            auto* local=localObject?localObject->GetComponent<GameSproutRuntime::ILightComponent>():nullptr;
+            Check(local&&localObject->GetName()==name&&local->GetLightType()==type,"Local light menu created the wrong type");
+            std::unique_ptr<ComponentEditor> localPanel(view.CreateComponentEditor(typeid(GameSproutRuntime::ILightComponent),nullptr));
+            Check(bool(localPanel),"Local light component editor missing");
+            ComponentEditContext localContext;localContext.Runtime=runtime;localContext.Scenes=&scenes;localContext.Editing=&objects;
+            localContext.SceneID=hierarchy.Context.SceneID;localContext.ObjectID=id;localContext.ComponentID=local->GetComponentInstanceID();
+            localPanel->Bind(localContext);localPanel->Load(*local);
+            auto* range=localPanel->findChild<QLineEdit*>("rangeEdit");
+            auto* outerAngle=localPanel->findChild<QLineEdit*>("outerAngleEdit");
+            auto* shadowGroup=localPanel->findChild<QGroupBox*>("shadowGroup");
+            auto* cascades=localPanel->findChild<QComboBox*>("shadowCascadesCombo");
+            const bool spot=type==GameSproutRuntime::LightType::Spot;
+            Check(range&&!range->isHidden()&&outerAngle&&outerAngle->isHidden()!=spot&&
+                shadowGroup&&shadowGroup->isHidden()!=spot&&cascades&&cascades->isHidden(),"Local Inspector exposed the wrong fields");
+            range->setText("17");QMetaObject::invokeMethod(range,"editingFinished");
+            Check(local->GetRange()==17&&scenes.Undo(localError)&&local->GetRange()==10,"Local range edit did not support Undo");
+            Check(scenes.Undo(localError)&&!runtime->QueryGameObject(id),"Local light creation undo failed");
+        }
+        hierarchy.Actions.at({"Light","Directional Light"})();
         auto selected=selection.Current;auto* object=runtime->QueryGameObject(selected.ObjectID);
         auto* light=object?object->GetComponent<GameSproutRuntime::ILightComponent>():nullptr;
         Check(light&&object->GetName()=="Directional Light","Designer menu did not create a Light transaction");

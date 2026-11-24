@@ -8,7 +8,12 @@ namespace {
 bool Same(const EnvironmentLightingSnapshot& a,const EnvironmentLightingSnapshot& b) {
     if(a.SceneID!=b.SceneID||a.Available!=b.Available||a.Editable!=b.Editable||
        a.Settings.Mode!=b.Settings.Mode||a.Settings.Intensity!=b.Settings.Intensity||
-       !(a.Settings.Atmosphere==b.Settings.Atmosphere))return false;
+       a.Settings.Atmosphere!=b.Settings.Atmosphere||
+       a.Settings.SkyEnvironment!=b.Settings.SkyEnvironment||
+       a.Settings.SkyRotationDegrees!=b.Settings.SkyRotationDegrees||
+       a.Settings.SkyIntensity!=b.Settings.SkyIntensity||a.Settings.ReflectionIntensity!=b.Settings.ReflectionIntensity||
+       a.Settings.HDREnabled!=b.Settings.HDREnabled||a.Settings.ExposureEV!=b.Settings.ExposureEV||
+       a.Settings.Tonemap!=b.Settings.Tonemap||a.Settings.SpotShadows!=b.Settings.SpotShadows)return false;
     const auto color=[](GameSproutRuntime::Color x,GameSproutRuntime::Color y){return x.R==y.R&&x.G==y.G&&x.B==y.B&&x.A==y.A;};
     if(!color(a.Settings.AmbientColor,b.Settings.AmbientColor)||!color(a.Settings.SkyColor,b.Settings.SkyColor)||
        !color(a.Settings.EquatorColor,b.Settings.EquatorColor)||!color(a.Settings.GroundColor,b.Settings.GroundColor))return false;
@@ -51,7 +56,7 @@ bool LightingAuthoring::SetEnvironment(std::uint64_t sceneID,
         error="环境光照目标已切换、正在切换运行模式或处于 Prefab 编辑。";return false;
     }
     if(!GameSproutRuntime::IsValidEnvironmentLighting(value)) {
-        error="环境光照参数无效；颜色、强度须为有限非负值，SH 系数须为有限值。";return false;
+        error="环境光照参数无效。请检查资源引用、强度、旋转角度和曝光范围。";return false;
     }
     const auto operation=[](GameSproutRuntime::EnvironmentLightingSettings settings) {
         return [settings](GameSproutRuntime::IGameObject& object,std::string& failure) {

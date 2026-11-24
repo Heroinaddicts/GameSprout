@@ -69,7 +69,7 @@ inline bool ValidateSchema(const Json::Value & schema, std::string & error) {
     }
     const std::set<std::string> types{"Float","Int","Range","Color","Vector","Texture","Toggle","Enum"};
     const std::set<std::string> reserved{"Version","Name","Shader","ExternalMaterial","Textures","UnresolvedTextures",
-        "EnableGPUInstancing","SpecularHighlights","SortingPriority"};
+        "EnableGPUInstancing","SpecularHighlights","EnvironmentReflections","SortingPriority"};
     std::set<std::string> names;
     std::set<std::string> textureTransforms;
     for (const auto & property : schema["Properties"]) {
@@ -175,7 +175,7 @@ inline bool ValidateValues(const Json::Value & schema, const Json::Value & docum
     if (!ValidateSchema(schema,error) || !ShaderReference(document,error)) return false;
     // Engine rendering options are independent of Shader author properties and
     // reflection. A user Shader cannot claim their names as material uniforms.
-    for (const char* name : {"EnableGPUInstancing","SpecularHighlights"}) {
+    for (const char* name : {"EnableGPUInstancing","SpecularHighlights","EnvironmentReflections"}) {
         if (document.isMember(name) && !document[name].isBool()) {
             error=std::string("Material ")+name+" must be boolean";return false;
         }
@@ -201,7 +201,10 @@ inline bool NormalizeValues(const Json::Value & schema, Json::Value & document, 
     if (!normalized.isMember("Shader")) normalized["Shader"]="GameSprout/Preview";
     if (!normalized.isMember("EnableGPUInstancing")) normalized["EnableGPUInstancing"]=true;
     if (!normalized.isMember("SortingPriority")) normalized["SortingPriority"]=0;
-    if (normalized["Shader"]=="GameSprout/Lit" && !normalized.isMember("SpecularHighlights")) normalized["SpecularHighlights"]=true;
+    if (normalized["Shader"]=="GameSprout/Lit") {
+        for (const char* name : {"SpecularHighlights","EnvironmentReflections"})
+            if (!normalized.isMember(name)) normalized[name]=true;
+    }
     for (const auto & property : schema["Properties"]) {
         const std::string name=property["Name"].asString();
         if (!normalized.isMember(name)) normalized[name]=property["Default"];

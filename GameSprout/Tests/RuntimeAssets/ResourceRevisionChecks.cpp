@@ -256,6 +256,21 @@ void ArtifactRebuild(Assets& assets,Library& library) {
     Check(provider.GetResourceRevision(repaired)!=restored&&provider.GetResourceRevision(healthy)==healthyRevision&&
         provider.LoadMaterial(alias,data,error),"A later same-content rebuild did not recover the failed reader");
 }
+void MaterialEnvironmentReflections(Assets& assets,Library& library) {
+    const auto reference=Reference(MaterialGuid,1);
+    Json::Value body(Json::objectValue);body["Shader"]="GameSprout/Lit";body["SpecularHighlights"]=false;
+    LibraryRuntimeResources provider(&assets,&library);
+    std::string error;GameSproutRuntime::MaterialRenderData data;
+    const auto publish=[&] {library.Material(reference,body);assets.Publish(reference.Guid);};
+    publish();
+    Check(provider.LoadMaterial(reference,data,error)&&data.EnvironmentReflections&&!data.SpecularHighlights,
+        "Legacy Lit material did not default to enabled environment reflections independent of direct specular");
+    body["EnvironmentReflections"]=false;publish();
+    Check(provider.LoadMaterial(reference,data,error)&&!data.EnvironmentReflections,
+        "Prepared Lit material lost its disabled environment reflections");
+    body["EnvironmentReflections"]=0;publish();
+    Check(!provider.LoadMaterial(reference,data,error),"Prepared material accepted a non-boolean environment reflection option");
+}
 }
 int main(int argc,char** argv) {
     QCoreApplication app(argc,argv);
@@ -267,6 +282,8 @@ int main(int argc,char** argv) {
         MaterialDependencies(assets,library);Check(assets.Listeners.empty(),"Material provider retained event listener");
         library.Manifests.clear();library.Prepared.clear();
         ArtifactRebuild(assets,library);Check(assets.Listeners.empty(),"Artifact rebuild provider retained event listener");
+        library.Manifests.clear();library.Prepared.clear();
+        MaterialEnvironmentReflections(assets,library);Check(assets.Listeners.empty(),"Material render options provider retained event listener");
         std::cout<<"PASS per-subresource publication revisions, memory-only reads, Missing recovery, material/shader dependencies and same-content Artifact repair\n";
         return 0;
     }catch(const std::exception& exception){std::cerr<<"FAIL "<<exception.what()<<'\n';return 1;}

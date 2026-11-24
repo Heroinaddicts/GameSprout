@@ -69,6 +69,8 @@ namespace GameSprout.UnitySceneBridge
                 context.AddWarning("material.emission-map-unsupported", "Current Lit uses constant emission; _EmissionMap modulation is omitted.", source);
             }
             bool specularHighlights = ReadFloat(source, "_SpecularHighlights", 1) >= .5f;
+            bool environmentReflections = ReadFloat(source, "_EnvironmentReflections", 1) != 0 &&
+                !source.IsKeywordEnabled("_ENVIRONMENTREFLECTIONS_OFF");
             float sourceQueueOffset = ReadFloat(source, "_QueueOffset", 0);
             int sortingPriority = Mathf.Clamp(Mathf.RoundToInt(sourceQueueOffset), -50, 50);
             if (Math.Abs(sourceQueueOffset - sortingPriority) > .001f)
@@ -89,7 +91,8 @@ namespace GameSprout.UnitySceneBridge
                 "Metallic", metallic, "Roughness", 1f - smoothness,
                 "NormalTexture", ReferenceJson(normalReference), "NormalTextureST", textureST, "NormalScale", normalScale,
                 "Emission", ColorArray(emission), "DoubleSided", ReadFloat(source, "_Cull", 2) < .5f,
-                "SpecularHighlights", specularHighlights, "SortingPriority", sortingPriority,
+                "SpecularHighlights", specularHighlights, "EnvironmentReflections", environmentReflections,
+                "SortingPriority", sortingPriority,
                 // Unity's legacy material checkbox does not control its GPU
                 // Resident Drawer. Keep GameSprout's automatic grouping enabled
                 // rather than translating a false legacy checkbox into a ban.
@@ -106,7 +109,8 @@ namespace GameSprout.UnitySceneBridge
                 "SourceAlphaClip", alphaClip, "SourceCull", ReadFloat(source, "_Cull", 2), "SourceRenderQueue", source.renderQueue,
                 "SourceEnableGPUInstancing", source.enableInstancing, "ExportedEnableGPUInstancing", true,
                 "InstancingPolicy", "RuntimeAutomaticGroupingNotUnityLegacyMaterialCheckbox",
-                "SourceSpecularHighlights", specularHighlights, "SourceQueueOffset", sourceQueueOffset, "ExportedSortingPriority", sortingPriority,
+                "SourceSpecularHighlights", specularHighlights, "SourceEnvironmentReflections", environmentReflections,
+                "SourceQueueOffset", sourceQueueOffset, "ExportedSortingPriority", sortingPriority,
                 "OmittedTextureProperties", ignoredTextures,
                 "SourceSmoothness", smoothness, "ExportedRoughness", 1f - smoothness,
                 "BaseMapST", textureST, "NormalUsesBaseMapST", true));
