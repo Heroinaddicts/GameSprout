@@ -8,7 +8,11 @@ bool SkinnedMeshRendererComponent::SetAnimatorObjectID(std::uint64_t id){
     auto* access=dynamic_cast<ObjectAccess*>(_GameObject);if(!access)return false;
     auto& runtime=access->State().Owner;
     if(id){auto* state=runtime.Find(id);if(!runtime.IsUsable(state)||state->GetScene()!=_GameObject->GetScene()||!state->Object->GetComponent<IAnimatorComponent>())return false;}
-    if(_AnimatorID==id)return true;_AnimatorID=id;NotifyComponentChanged(_GameObject,this);return true;
+    if(_AnimatorID==id)return true;
+    runtime.SetSkinAnimatorReference(_GameObject->GetInstanceID(),_AnimatorID,id);
+    _AnimatorID=id;
+    NotifyComponentChanged(_GameObject,this);
+    return true;
 }
 bool SkinnedMeshRendererComponent::GetSkinMatrices(const std::vector<SkinBinding>& bones,std::vector<Mat4>& output,std::string& error) const {
     return BuildSkinMatrices(bones,output,error,false);

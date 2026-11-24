@@ -34,7 +34,13 @@ bool AnimatorComponent::SetNodeBindings(const std::vector<AnimationNodeBinding>&
     for(const auto& binding:bindings){if(binding.Path.empty()||!paths.insert(binding.Path).second)return false;
         if(binding.ObjectID){if(_RootMotionMode!=RootMotionMode::Disabled&&binding.ObjectID==_GameObject->GetInstanceID())return false;auto* state=Owner().Find(binding.ObjectID);if(!Owner().IsUsable(state)||state->GetScene()!=_GameObject->GetScene()||state->Object==state->GetScene()||!ids.insert(binding.ObjectID).second)return false;}}
     bool same=bindings.size()==_Bindings.size();if(same)for(std::size_t i=0;i<bindings.size();++i)if(bindings[i].Path!=_Bindings[i].Path||bindings[i].ObjectID!=_Bindings[i].ObjectID){same=false;break;}
-    if(same)return true;ClearPoses();_Bindings=bindings;ConfigurationChanged();return true;
+    if(same)return true;
+    auto next=bindings;
+    ClearPoses();
+    Owner().SetAnimationBindingOwners(_GameObject->GetInstanceID(),_Bindings,ids);
+    _Bindings.swap(next);
+    ConfigurationChanged();
+    return true;
 }
 bool AnimatorComponent::SetSpeed(float value){if(!std::isfinite(value)||value<0)return false;if(_Speed!=value){_Speed=value;NotifyComponentChanged(_GameObject,this);}return true;}
 void AnimatorComponent::SetPlayOnStart(bool value){if(value==_PlayOnStart)return;_PlayOnStart=value;NotifyComponentChanged(_GameObject,this);}

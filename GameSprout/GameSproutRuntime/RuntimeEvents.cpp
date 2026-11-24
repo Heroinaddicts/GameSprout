@@ -79,23 +79,7 @@ void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char*
                 type == SceneNodeEventType::Reparent || screenCanvas)) {
                 // An animator can bind to nodes outside its own hierarchy.
                 // The bound bone may only have its intrinsic Transform.
-                const auto affectedBone = [&](const AnimationNodeBinding& binding) {
-                    if (!screenCanvas && type != SceneNodeEventType::Reparent) return binding.ObjectID == object.ID;
-                    for (auto* node = Find(binding.ObjectID); node; node = node->Parent)
-                        if (node == &object) return true;
-                    return false;
-                };
-                for (const auto& [id, count] : _AnimationObjects) {
-                    const auto* node = Find(id);
-                    if (!node || node->SceneOwner != object.SceneOwner) continue;
-                    const auto* animator = node->Object->GetComponent<IAnimatorComponent>();
-                    if (!animator) continue;
-                    const auto& bindings = animator->GetNodeBindings();
-                    if (std::any_of(bindings.begin(), bindings.end(), affectedBone)) {
-                        worldChanged = true;
-                        break;
-                    }
-                }
+                worldChanged=AffectsAnimationBindings(object,screenCanvas||type==SceneNodeEventType::Reparent);
             }
             if (worldChanged)
                 object.SceneOwner->InvalidateRenderSnapshot(transform ? object.ID : 0);

@@ -184,6 +184,9 @@ public:
     IGameObject* InstantiatePrefabData(IScene*,const PrefabData&,IGameObject*,std::vector<PrefabObjectMapping>&,std::string&) override;
     IGameObject* InstantiatePrefab(IScene*,const ResourceReference&,IGameObject*,std::vector<PrefabObjectMapping>&,std::string&) override;
     AnimationResources& GetAnimationResources() {return _AnimationResources;}
+    void SetAnimationBindingOwners(std::uint64_t owner,const std::vector<AnimationNodeBinding>& oldBindings,
+        const std::set<std::uint64_t>& newTargets);
+    void SetSkinAnimatorReference(std::uint64_t owner,std::uint64_t oldAnimator,std::uint64_t newAnimator);
     void ForgetObjectAnimationBindings(std::uint64_t objectID);
     void ForgetAnimatorReferences(std::uint64_t objectID);
     bool DispatchAnimatorIK(AnimatorComponent&,std::uint32_t);
@@ -295,6 +298,13 @@ private:
     struct TickCounts {std::size_t Variable=0,Fixed=0,Early=0,Late=0;};
     std::map<std::uint64_t,TickCounts> _TickObjects;
     std::map<std::uint64_t,std::size_t> _AnimationObjects;
+    // Non-owning, stable IDs. A changed bone/Animator can affect a renderer
+    // outside its own hierarchy, so track which objects actually reference it.
+    using AnimationReferenceIndex=std::map<std::uint64_t,std::set<std::uint64_t>>;
+    AnimationReferenceIndex _AnimatorsByBone;
+    AnimationReferenceIndex _SkinsByAnimator;
+    bool AffectsAnimationBindings(const GameObjectState& root,bool descendants) const;
+    void ForgetAnimationReferences(std::uint64_t target,bool forgetBoneBindings);
     std::set<std::pair<std::uint64_t,std::uint64_t>> _ScriptIdentities;
 
     RuntimeProjectSettings _ProjectSettings;

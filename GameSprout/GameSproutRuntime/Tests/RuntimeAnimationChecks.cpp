@@ -62,6 +62,63 @@ static Character Create(GameSproutRuntime::IScene& scene){
     c.Animator=c.Root->AddComponent<GameSproutRuntime::IAnimatorComponent>();Check(c.Animator,"Animator factory is unavailable");
     c.Animator->SetSkeleton({Guid,10});c.Animator->SetController({Guid,11});Check(c.Animator->SetNodeBindings({{"/Root#0",importedRoot->GetInstanceID()},{"/Root#0/Bone#0",c.Bone->GetInstanceID()}}),"Explicit skeleton binding failed");return c;
 }
+
+static void CheckBindingLifecycle(GameSproutRuntime::IGameSproutRuntime& runtime) {
+    using namespace GameSproutRuntime;
+    auto* scene=runtime.CreateScene("External animation bindings");
+    auto* foreign=runtime.CreateScene("Other animation scene");
+    auto* firstBone=scene->CreateGameObject("Old external bone");
+    auto* boneParent=scene->CreateGameObject("External bone parent");
+    auto* secondBone=scene->CreateGameObject("New external bone",boneParent);
+    auto* first=scene->CreateGameObject("First animator");
+    auto* second=scene->CreateGameObject("Second animator");
+    auto* firstAnimator=first->AddComponent<IAnimatorComponent>();
+    auto* secondAnimator=second->AddComponent<IAnimatorComponent>();
+    auto* mesh=scene->CreateGameObject("External skinned renderer")->AddComponent<ISkinnedMeshRendererComponent>();
+    Check(firstAnimator&&secondAnimator&&mesh,"Unable to create reverse binding fixtures");
+    Check(firstAnimator->SetNodeBindings({{"/bone",firstBone->GetInstanceID()}})&&
+          firstAnimator->SetNodeBindings({{"/bone",secondBone->GetInstanceID()}})&&
+          secondAnimator->SetNodeBindings({{"/bone",secondBone->GetInstanceID()}}),
+          "Cannot remap or share an external bone");
+    auto* foreignBone=foreign->CreateGameObject("Foreign bone");
+    Check(!secondAnimator->SetNodeBindings({{"/bone",foreignBone->GetInstanceID()}}),
+          "A cross-scene animation binding was accepted");
+    Check(mesh->SetAnimatorObjectID(first->GetInstanceID())&&mesh->SetAnimatorObjectID(second->GetInstanceID()),
+          "Cannot retarget an external skinned renderer");
+    Check(scene->DestroyGameObject(firstBone)&&first->RemoveComponent<IAnimatorComponent>(),
+          "Cannot remove replaced binding targets");
+    std::uint64_t resolved=0;
+    Check(secondAnimator->ResolveBone("/bone",resolved)&&resolved==secondBone->GetInstanceID()&&
+          mesh->GetAnimatorObjectID()==second->GetInstanceID(),"Removing replaced bindings affected their current targets");
+    Check(boneParent->SetParent(nullptr,false)&&!secondAnimator->ResolveBone("/bone",resolved),
+          "Detached external bone still resolved");
+    Check(scene->AddChild(boneParent,false)&&secondAnimator->ResolveBone("/bone",resolved),
+          "Reattaching external bone lost its binding");
+    Check(scene->DestroyGameObject(boneParent)&&secondAnimator->GetNodeBindings().front().ObjectID==0,
+          "Removing a bound subtree did not clear its external owner");
+    Check(scene->DestroyGameObject(second)&&mesh->GetAnimatorObjectID()==0,
+          "Removing the current external animator did not clear its skinned renderer");
+
+    auto* detachedAnimator=runtime.CreateGameObject("Detached animator");
+    auto* detachedMesh=runtime.CreateGameObject("Detached skin");
+    auto* detachedSkin=detachedMesh->AddComponent<ISkinnedMeshRendererComponent>();
+    const auto detachedAnimatorID=detachedAnimator->GetInstanceID();
+    Check(detachedAnimator->AddComponent<IAnimatorComponent>()&&
+          detachedSkin->SetAnimatorObjectID(detachedAnimatorID)&&
+          scene->AddChild(detachedAnimator,false)&&foreign->AddChild(detachedMesh,false),
+          "Cannot stage the temporarily inaccessible animation owner");
+    std::string error;
+    Check(runtime.ParkAuthoringScenes({foreign->GetInstanceID()},error)&&
+          detachedAnimator->RemoveComponent<IAnimatorComponent>()&&
+          runtime.RestoreAuthoringScenes(error),error);
+    Check(detachedSkin->GetAnimatorObjectID()==detachedAnimatorID&&
+          detachedMesh->SetParent(nullptr,false)&&scene->AddChild(detachedMesh,false)&&
+          detachedAnimator->AddComponent<IAnimatorComponent>()&&
+          detachedAnimator->RemoveComponent<IAnimatorComponent>()&&detachedSkin->GetAnimatorObjectID()==0,
+          "A temporarily inaccessible skin lost its removal tracking");
+    Check(runtime.DestroyScene(scene)&&runtime.DestroyScene(foreign),"Cannot retire animation binding fixtures");
+}
+
 int main(int argc,char** argv){
     if(argc!=2)return 2;
     auto* runtime=Export(argv[1]);if(!runtime)return 3;
@@ -116,6 +173,7 @@ int main(int argc,char** argv){
         Check(Near(matrices[0](0,3),0),"Mesh-local bone palette contains object transform twice");
         const auto count=scene->GetChildCount();resources.InvalidModel=true;Check(!runtime->InstantiateModel(scene,{Guid,40},nullptr,error)&&scene->GetChildCount()==count,"Invalid model partially mutated the scene");
         resources.InvalidClip=true;++resources.ResourceRevisions[1];++resources.Revision;Check(!second.Animator->Play("Idle")&&!second.Animator->GetLastError().empty(),"Malformed changed Clip was accepted");
+        CheckBindingLifecycle(*runtime);
         runtime->UnregisterListener(&events);runtime->SetResourceProvider(nullptr);delete runtime;runtime=nullptr;
         std::cout<<"Runtime animation, model instantiation and isolation checks passed\n";return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';delete runtime;return 1;}

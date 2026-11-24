@@ -8,7 +8,12 @@ void Runtime::RegisterAnimationComponent(std::uint64_t objectID,const IComponent
         ++_AnimationObjects[objectID];
 }
 void Runtime::UnregisterAnimationComponent(std::uint64_t objectID,const IComponent* component) {
-    if(component->GetComponentType()!=typeid(IAnimatorComponent)&&component->GetComponentType()!=typeid(ISkinnedMeshRendererComponent))return;
+    const auto& type=component->GetComponentType();
+    if(type==typeid(IAnimatorComponent))
+        SetAnimationBindingOwners(objectID,static_cast<const IAnimatorComponent*>(component)->GetNodeBindings(),{});
+    else if(type==typeid(ISkinnedMeshRendererComponent))
+        SetSkinAnimatorReference(objectID,static_cast<const ISkinnedMeshRendererComponent*>(component)->GetAnimatorObjectID(),0);
+    else return;
     const auto found=_AnimationObjects.find(objectID);if(found==_AnimationObjects.end())return;
     if(found->second>1)--found->second;else _AnimationObjects.erase(found);
 }
