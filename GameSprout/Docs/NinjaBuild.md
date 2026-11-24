@@ -62,6 +62,12 @@ GameSproutEditor 已经统一构建其 Module 和 View 插件，日常构建 Edi
 
 Foundation、GRHI、Runtime 和 ShaderTools 继续独立构建，通过公共 SDK 与已有二进制接入 Editor；没有修改的上游不必每次重建。Ninja 不会自动补齐尚未构建的 IMPORTED SDK。单个 Module/View 的独立工程也可以使用 `-G Ninja` 配置，其现有公共并发设置会自动生效。
 
+## Debug 运行性能
+
+AppleClang、Clang 和 GNU 工具链下，GRHI、GameSproutRuntime 和本机 GameLogic 的 Debug 构建默认用 `-O2` 优化，保留 Debug 配置的调试符号和断言。GameLogic 的代码反射和原生编译使用同一组配置参数，参数变动会使脚本缓存自动更新。Kit 的显式 Debug 优化等级可以覆盖 GameLogic 的默认值。优化后，调试时部分变量可能被内联或优化掉。
+
+现有 Ninja 预设分别保留 Debug 和 Release 的中间文件，两者默认写入共用的 `Bin`。更新上游库时，先构建 GRHI 和 Runtime，再构建 GameSproutEditor 将对应 SDK 和脚本编译器放入应用包。重新启动 Editor 后，进程会加载应用包中更新的动态库。做性能对比时同时记录窗口尺寸、场景和实际加载的 Runtime、GRHI、GameLogic 构建配置。
+
 ## 本机验证记录
 
 2026-11-01，在本机 10 核、32 GB 内存环境下进行 Debug 验证：
@@ -73,3 +79,10 @@ Foundation、GRHI、Runtime 和 ShaderTools 继续独立构建，通过公共 SD
 - Qt Creator 普通构建按钮已在 Runtime 工程验证，执行 `cmake --build ... --target all`，由 Ninja 执行并成功结束，没有附加 `--parallel` 参数。
 
 这些是当前代码和本机环境下的记录，不代表所有机器的固定耗时，也未据此推算其他生成器的加速倍数。
+
+### 2026-11-25 · MountAndBlade 骑兵压测
+
+- macOS Metal，旧 Editor 的 Game 窗口读到 8.5 FPS。主线程采样显示，GRHI 上传缓冲的逐字节初始化和销毁约占 23%。GRHI 改为直接把上传数据复制到未初始化的暂存区，Runtime 将每个网格固定的骨骼包围盒数据移到加载阶段。
+- 重建 Debug 依赖并重启 Editor 后，用原项目已保存的 `MedievalCastle.scene` 运行 1000 骑。2292 × 952 的 Game 窗口三次读数为 30.7、35.0 和 39.3 FPS。旧窗口为 2292 × 954，含临时测试改动。新版数值是现场读数，持续 60 FPS 尚未达到。
+- 独立 MountAndBlade 项目的 `Assets/Scripts/CavalryStress.cpp` 和 `CavalryStress.h` 修复了骑兵横滑。生成时保留 `Mount Visual` 的本地位置和缩放，模型校准角取自子节点 `Warhorse Rig`，移除从玩家继承的额外 −90° 朝向。每匹马在出生时初始化视觉坡面法线，逐帧用 `1 - exp(-14 * deltaSeconds)` 平滑，只影响视觉倾角。全量验证 480 帧共 469,174 个移动样本，1000 骑持续更新实际骨骼姿态。马身和骑手的可见朝向相对移动方向的最大偏差分别为 15.1° 和 6.6°。
+- 本机 Debug 验证通过 Runtime 50 项 CTest、GRHI 4 项 CTest 和 `ScriptCompiler.CommandLine`。真实 GPU 验证在 macOS Metal 上执行。

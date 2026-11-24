@@ -98,6 +98,10 @@ if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 
 target_compile_features(GRHI PUBLIC cxx_std_20)
+# Command recording and replay run on the Editor frame thread in Debug builds too.
+if(NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang|GNU)$")
+    target_compile_options(GRHI PRIVATE "$<$<CONFIG:Debug>:-O2>")
+endif()
 # Matches GRHIExport.h; consumers must not inherit the export definition.
 target_compile_definitions(GRHI PRIVATE EXPORTS)
 option(GRHI_GPU_DEBUG "Enable SDL GPU validation (requires a compatible SDL build)" OFF)

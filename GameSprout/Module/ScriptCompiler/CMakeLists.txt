@@ -99,6 +99,12 @@ function(ScriptCompilerEscapeCString input output)
 endfunction()
 string(TOUPPER "${script_build_configuration}" script_configuration_upper)
 set(script_native_configuration_flags "${CMAKE_CXX_FLAGS_${script_configuration_upper}}")
+# Keep Debug symbols and assertions for GameLogic with an optimized frame loop.
+# An explicit optimization level in the kit's Debug flags takes precedence.
+if(script_configuration_upper STREQUAL "DEBUG" AND NOT MSVC AND
+   CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang|GNU)$")
+    string(PREPEND script_native_configuration_flags "-O2 ")
+endif()
 ScriptCompilerEscapeCString("${CMAKE_CXX_FLAGS}" script_base_flags_escaped)
 ScriptCompilerEscapeCString("${script_native_configuration_flags}" script_configuration_flags_escaped)
 separate_arguments(script_ast_flags NATIVE_COMMAND "${CMAKE_CXX_FLAGS} ${script_native_configuration_flags}")

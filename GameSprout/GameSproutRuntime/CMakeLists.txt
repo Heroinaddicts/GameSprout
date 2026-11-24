@@ -58,17 +58,9 @@ target_include_directories(GameSproutRuntime PRIVATE
 )
 target_compile_definitions(GameSproutRuntime PRIVATE GAMESPROUT_RUNTIME_EXPORTS)
 
-# Keep Debug symbols while optimizing the Runtime paths used by large scene edits.
+# Keep Debug symbols and assertions while optimizing the Runtime frame loop.
 if(NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang|GNU)$")
-    if(CMAKE_GENERATOR STREQUAL "Xcode")
-        # Xcode cannot vary per-source compiler flags by configuration.
-        target_compile_options(GameSproutRuntime PRIVATE "$<$<CONFIG:Debug>:-O2>")
-    else()
-        set_property(SOURCE
-            GameObject.cpp GameSproutRuntime.cpp RuntimeCommands.cpp RuntimeEvents.cpp
-            RuntimeInitialization.cpp RuntimeObjectReferences.cpp Scene.cpp
-            APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:-O2>")
-    endif()
+    target_compile_options(GameSproutRuntime PRIVATE "$<$<CONFIG:Debug>:-O2>")
 endif()
 
 get_filename_component(gamesprout_runtime_output_directory
