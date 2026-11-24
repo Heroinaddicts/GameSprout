@@ -1,5 +1,7 @@
 #include "RuntimeRenderer.h"
 #include "RuntimeRenderResourceCache.h"
+#include "RuntimeTextureUpload.h"
+#include "../Api/Internal/PreparedTextureLayout.h"
 #include "RuntimeMath.h"
 #include "Resources/BuiltinMeshes.h"
 #include <algorithm>
@@ -81,6 +83,8 @@ GRHI::SamplerDesc ToGRHISampler(const SamplerSettings& settings) {
     result.MinFilter=settings.MinFilter==TextureFilter::Nearest?GRHI::FilterMode::Nearest:GRHI::FilterMode::Linear;
     result.MagFilter=settings.MagFilter==TextureFilter::Nearest?GRHI::FilterMode::Nearest:GRHI::FilterMode::Linear;
     const auto address=[](TextureAddressMode mode){switch(mode){case TextureAddressMode::Repeat:return GRHI::AddressMode::Repeat;case TextureAddressMode::ClampToEdge:return GRHI::AddressMode::ClampToEdge;case TextureAddressMode::MirroredRepeat:return GRHI::AddressMode::MirroredRepeat;}return GRHI::AddressMode::ClampToEdge;};
+    result.MipFilter=settings.MipFilter==TextureFilter::Nearest?GRHI::FilterMode::Nearest:GRHI::FilterMode::Linear;
+    result.MaxAnisotropy=settings.MaxAnisotropy;
     result.AddressU=address(settings.AddressU);result.AddressV=address(settings.AddressV);return result;
 }
 }
@@ -203,6 +207,30 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
 GRHI::ISampler* Renderer::CreateTextureSampler(const SamplerSettings& settings) {
     return _Device.CreateSampler(ToGRHISampler(settings));
 }
+GRHI::ITexture* Renderer::UploadPreparedTexture(const TextureRenderData& data,std::string& error) {
+    TexturePrefetchSource layout;
+    layout.Width=data.Width;layout.Height=data.Height;layout.Format=data.Format;
+    layout.Dimension=data.Dimension;layout.MipLevels=data.MipLevels;layout.SRGB=data.SRGB;
+    layout.Subresources=data.Subresources;
+    if(!PreparedTextureLayout::Validate(layout,data.Pixels.size())) {
+        error="Invalid prepared texture subresource layout";
+        return nullptr;
+    }
+    std::unique_ptr<GRHI::ITexture> texture(_Device.CreateTexture(PreparedTextureDescription(data)));
+    if(!texture) {
+        error=DeviceError("Allocate prepared texture");
+        return nullptr;
+    }
+    for(const auto& sub:layout.Subresources) {
+        const GRHI::TextureInitialData initial{data.Pixels.data()+sub.Offset,
+            std::size_t(sub.RowPitch)*sub.Height,sub.RowPitch};
+        if(!_Device.UploadTextureSubresourceRows(texture.get(),sub.MipLevel,sub.ArrayLayer,0,sub.Height,initial)) {
+            error=DeviceError("Upload prepared texture");
+            return nullptr;
+        }
+    }
+    return texture.release();
+}
 Renderer::TextureGPU* Renderer::Texture(const ResourceReference& reference,bool* pending) {
     if(pending)*pending=false;
     if(reference.Guid.empty() || !reference.LocalID) {Diagnostic("Texture reference is invalid");return nullptr;}
@@ -216,17 +244,11 @@ Renderer::TextureGPU* Renderer::Texture(const ResourceReference& reference,bool*
             entry.ResourceRevision=_Resources.GetResourceRevision(reference);
             TextureRenderData data;
             if(_Resources.LoadTexture(reference,data,entry.Error)) {
-                if(!data.Width || !data.Height || std::uint64_t(data.Width)*data.Height>128u*1024u*1024u ||
-                    std::uint64_t(data.Width)*data.Height*4!=data.Pixels.size()) entry.Error="Invalid tightly packed RGBA8 texture";
-                else {
-                    GRHI::TextureDesc description;description.Width=data.Width;description.Height=data.Height;
-                    description.Format=data.SRGB?GRHI::TextureFormat::RGBA8_UNorm_sRGB:GRHI::TextureFormat::RGBA8_UNorm;
-                    entry.SRGB=data.SRGB;
-                    description.Usage=GRHI::TextureUsage::Sampled;
-                    GRHI::TextureInitialData initial{data.Pixels.data(),data.Pixels.size(),0};
-                    entry.Texture=_Device.CreateTexture(description,&initial);
-                    if(entry.Texture) entry.Sampler=CreateTextureSampler(data.Sampler);
-                    if(!entry.Texture || !entry.Sampler) {entry.Error=DeviceError("Create prepared texture/sampler");delete entry.Texture;delete entry.Sampler;entry.Texture=nullptr;entry.Sampler=nullptr;}
+                entry.SRGB=data.SRGB;
+                entry.Texture=UploadPreparedTexture(data,entry.Error);
+                if(entry.Texture) {
+                    entry.Sampler=CreateTextureSampler(data.Sampler);
+                    if(!entry.Sampler)entry.Error=DeviceError("Create prepared texture sampler");
                 }
             }
         } catch(const std::exception& exception) {entry.Error=exception.what();}

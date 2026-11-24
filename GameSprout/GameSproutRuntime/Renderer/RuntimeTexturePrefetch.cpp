@@ -1,4 +1,6 @@
 #include "RuntimeRenderResourceCache.h"
+#include "RuntimeTextureUpload.h"
+#include "../Api/Internal/PreparedTextureLayout.h"
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -30,7 +32,8 @@ bool Renderer::PrefetchTexture(const ResourceReference& reference,bool visible) 
     const auto failed=cache.TexturePrefetchFailures.find(key);
     if(failed!=cache.TexturePrefetchFailures.end()&&failed->second==revision)return false;
     TexturePrefetchSource source;
-    if(!_Resources.ResolveTexturePrefetch(reference,source))return false;
+    if(!_Resources.ResolveTexturePrefetch(reference,source)||
+       !PreparedTextureLayout::Validate(source,source.ArtifactSize))return false;
     cache.TextureRequests.push_back({reference,revision,std::move(source),visible});
     return true;
 }
@@ -71,34 +74,38 @@ void Renderer::BeginTexturePrefetchFrame(bool enabled) {
             ++cache.TexturePrefetchRevision;
         } else {
             cache.TextureUploading=std::move(result);
+            cache.TextureUploadSubresource=0;
             cache.TextureUploadRow=0;
         }
     }
     if(cache.TextureUploading) {
         const auto& upload=*cache.TextureUploading;
         const auto& source=upload.Request.Source;
-        const auto rowBytes=std::uint64_t(source.Width)*4;
-        if(!cache.TextureUploadTarget) {
-            GRHI::TextureDesc desc;
-            desc.Width=source.Width;desc.Height=source.Height;
-            desc.Format=source.SRGB?GRHI::TextureFormat::RGBA8_UNorm_sRGB:GRHI::TextureFormat::RGBA8_UNorm;
-            desc.Usage=GRHI::TextureUsage::Sampled;
-            cache.TextureUploadTarget=_Device.CreateTexture(desc);
-        }
+        if(!cache.TextureUploadTarget)
+            cache.TextureUploadTarget=_Device.CreateTexture(PreparedTextureDescription(source));
         bool uploaded=cache.TextureUploadTarget!=nullptr;
-        if(uploaded&&cache.TextureUploadRow<source.Height) {
+        std::uint64_t budget=UploadBytesPerFrame;
+        while(uploaded&&budget&&cache.TextureUploadSubresource<source.Subresources.size()) {
+            const auto& sub=source.Subresources[cache.TextureUploadSubresource];
+            if(budget<sub.RowPitch&&budget!=UploadBytesPerFrame)break;
             const auto rows=static_cast<std::uint32_t>(std::min<std::uint64_t>(
-                source.Height-cache.TextureUploadRow,std::max<std::uint64_t>(1,UploadBytesPerFrame/rowBytes)));
-            const auto offset=cache.TextureUploadRow*rowBytes;
-            const auto bytes=rows*rowBytes;
-            const GRHI::TextureInitialData data{upload.Pixels.data()+offset,static_cast<std::size_t>(bytes),0};
-            uploaded=_Device.UploadTextureRows(cache.TextureUploadTarget,cache.TextureUploadRow,rows,data);
+                sub.Height-cache.TextureUploadRow,std::max<std::uint64_t>(1,budget/sub.RowPitch)));
+            const auto offset=sub.Offset+std::uint64_t(cache.TextureUploadRow)*sub.RowPitch;
+            const auto bytes=std::uint64_t(rows)*sub.RowPitch;
+            const GRHI::TextureInitialData data{upload.Pixels.data()+offset,static_cast<std::size_t>(bytes),sub.RowPitch};
+            uploaded=_Device.UploadTextureSubresourceRows(cache.TextureUploadTarget,sub.MipLevel,sub.ArrayLayer,
+                cache.TextureUploadRow,rows,data);
             if(uploaded) {
                 cache.TextureUploadRow+=rows;
                 _Statistics.PrefetchUploadBytes+=bytes;
+                budget-=std::min(budget,bytes);
+                if(cache.TextureUploadRow==sub.Height) {
+                    cache.TextureUploadRow=0;
+                    ++cache.TextureUploadSubresource;
+                }
             }
         }
-        if(!uploaded||cache.TextureUploadRow==source.Height) {
+        if(!uploaded||cache.TextureUploadSubresource==source.Subresources.size()) {
             const auto position=_Textures.try_emplace(ResourceKey(upload.Request.Reference)).first;
             auto& entry=position->second;
             entry.ResourceRevision=upload.Request.Revision;
@@ -147,13 +154,14 @@ void Renderer::EndTexturePrefetchFrame() {
             const auto& source=result.Request.Source;
             try {
                 const auto path=std::filesystem::u8path(source.ArtifactPath);
-                const auto rowBytes=std::uint64_t(source.Width)*4;
-                if(!path.is_absolute()||!rowBytes||!source.Height||source.Height>source.ArtifactSize/rowBytes||
-                   std::uint64_t(source.Width)*source.Height>128u*1024u*1024u||
+                const auto& last=source.Subresources.back();
+                const auto bytes=last.Offset+std::uint64_t(last.RowPitch)*last.Height;
+                if(!path.is_absolute()||bytes>std::uint64_t(std::numeric_limits<std::streamsize>::max())||
+                   bytes>std::numeric_limits<std::size_t>::max()||
                    source.ArtifactSize>std::uint64_t(std::numeric_limits<std::streamoff>::max()))return result;
                 std::ifstream file(path,std::ios::binary|std::ios::ate);
                 if(!file||file.tellg()!=static_cast<std::streamoff>(source.ArtifactSize))return result;
-                result.Pixels.resize(static_cast<std::size_t>(rowBytes*source.Height));
+                result.Pixels.resize(static_cast<std::size_t>(bytes));
                 if(!file.seekg(0)||!file.read(reinterpret_cast<char*>(result.Pixels.data()),
                     static_cast<std::streamsize>(result.Pixels.size())))result.Pixels={};
             } catch(...) {result.Pixels={};}

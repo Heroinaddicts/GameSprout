@@ -5,6 +5,7 @@
 #include "RuntimeFrustum.h"
 #include "GRHIApi.h"
 #include <map>
+#include <memory>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -281,6 +282,7 @@ private:
     MeshGPU* Mesh(const ResourceReference& reference);
     ColliderMeshWire* ColliderMesh(IColliderComponent& collider,const ResourceReference& reference,bool convex,const Mat4& relative);
     TextureGPU* Texture(const ResourceReference& reference,bool* pending=nullptr);
+    GRHI::ITexture* UploadPreparedTexture(const TextureRenderData&,std::string&);
     GRHI::ISampler* CreateTextureSampler(const SamplerSettings&);
     TextureGPU* MaterialTexture(Material&,bool normal,bool& pending);
     void BeginTexturePrefetchFrame(bool enabled);

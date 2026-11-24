@@ -52,19 +52,33 @@ enum class TextureAddressMode : std::uint8_t { Repeat, ClampToEdge, MirroredRepe
 struct SamplerSettings {
     TextureFilter MinFilter = TextureFilter::Linear, MagFilter = TextureFilter::Linear;
     TextureAddressMode AddressU = TextureAddressMode::ClampToEdge, AddressV = TextureAddressMode::ClampToEdge;
+    TextureFilter MipFilter = TextureFilter::Nearest;
+    float MaxAnisotropy = 1;
+};
+enum class TexturePixelFormat : std::uint8_t { RGBA8, RGBA16Float };
+enum class TextureDimension : std::uint8_t { Texture2D, Cube };
+// Each cube level contains +X, -X, +Y, -Y, +Z, -Z, in that order.
+struct TextureSubresource {
+    std::uint32_t MipLevel = 0, ArrayLayer = 0;
+    std::uint32_t Width = 0, Height = 0;
+    std::uint32_t RowPitch = 0;
+    std::uint64_t Offset = 0;
 };
 struct TextureRenderData {
     std::uint32_t Width = 0;
     std::uint32_t Height = 0;
     bool SRGB = true;
-    // 第一版上传 mip0；此处已是紧密排列的 RGBA8，无源图片解码。
-    // Owning bulk byte storage. Rebuild all SDK consumers after this API layout
-    // change; the prepared RGBA8 file format itself is unchanged.
+    // Subresources address this byte buffer. An empty list means one packed
+    // 2D level supplied directly by a runtime provider.
     ByteBuffer Pixels;
     SamplerSettings Sampler;
+    TexturePixelFormat Format = TexturePixelFormat::RGBA8;
+    TextureDimension Dimension = TextureDimension::Texture2D;
+    std::uint32_t MipLevels = 1;
+    std::vector<TextureSubresource> Subresources;
 };
 
-// Immutable prepared mip-0 descriptor. The provider resolves it on its owning
+// Immutable prepared texture descriptor. The provider resolves it on its owning
 // thread and the Runtime may read the named file on a worker.
 struct TexturePrefetchSource {
     std::string ArtifactPath;
@@ -72,6 +86,10 @@ struct TexturePrefetchSource {
     std::uint32_t Width = 0, Height = 0;
     bool SRGB = true;
     SamplerSettings Sampler;
+    TexturePixelFormat Format = TexturePixelFormat::RGBA8;
+    TextureDimension Dimension = TextureDimension::Texture2D;
+    std::uint32_t MipLevels = 1;
+    std::vector<TextureSubresource> Subresources;
 };
 
 struct FontGlyph {
@@ -157,8 +175,8 @@ public:
                                    std::vector<std::uint8_t>& bytes, std::string& error) {
         bytes.clear();error.clear();return true;
     }
-    // Optional: return an absolute UTF-8 path to immutable prepared RGBA8
-    // data, with mip 0 at offset zero. Returning false retains LoadTexture().
+    // Optional: return an absolute UTF-8 path to immutable prepared texture
+    // data. Returning false retains LoadTexture().
     virtual bool ResolveTexturePrefetch(const ResourceReference&, TexturePrefetchSource& source) {
         source={};return false;
     }

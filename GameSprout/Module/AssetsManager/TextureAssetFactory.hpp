@@ -59,6 +59,7 @@ public:
         result["AlphaIsTransparency"] = _AlphaIsTransparency;
         result["MaxSize"] = static_cast<Json::UInt>(_MaxSize);
         result["GenerateMipmaps"] = _GenerateMipmaps;
+        if (_Anisotropy > 1) result["Anisotropy"] = _Anisotropy;
         result["KeepCPUCopy"] = _KeepCPUCopy;
 
         // 所有字段有效后才替换调用者提供的 JSON 对象。
@@ -124,6 +125,12 @@ public:
             }
         }
 
+        if (value.isMember("Anisotropy")) {
+            const auto& field = value["Anisotropy"];
+            if ((field.type() != Json::intValue && field.type() != Json::uintValue) ||
+                !field.isUInt() || !settings.SetAnisotropy(field.asUInt())) return false;
+        }
+
         if (value.isMember("MaxSize")) {
             const Json::Value & field = value["MaxSize"];
             // 不接受浮点数、字符串、负数或超出 uint32_t 范围的值。
@@ -180,6 +187,13 @@ public:
 
         // 具体目标平台的尺寸限制，由管线生成输出方案时检查。
         _MaxSize = maxSize;
+        return true;
+    }
+
+    uint32_t GetAnisotropy() const override { return _Anisotropy; }
+    bool SetAnisotropy(uint32_t samples) override {
+        if (samples < 1 || samples > 16) return false;
+        _Anisotropy = samples;
         return true;
     }
 
@@ -281,6 +295,7 @@ private:
     bool _AlphaIsTransparency = false;
 
     uint32_t _MaxSize = 2048;
+    uint32_t _Anisotropy = 1;
     bool _GenerateMipmaps = true;
     bool _KeepCPUCopy = false;
 

@@ -1,45 +1,60 @@
 #include "PreparedResourceDecode.h"
-using PreparedResourceDecode::Unsigned;
+#include "Internal/PreparedTextureLayout.h"
+
 namespace {
-using GameSproutRuntime::TexturePrefetchSource;
+using namespace GameSproutRuntime;
+using PreparedResourceDecode::Unsigned;
+
 bool DecodeTexture(const Json::Value& descriptor,std::uint64_t fileSize,TexturePrefetchSource& data) {
-    if (descriptor["Encoding"] != "RawBytes" || descriptor["Format"] != "RGBA8"
-        || !Unsigned(descriptor["Width"], data.Width) || !Unsigned(descriptor["Height"], data.Height)
-        || data.Width == 0 || data.Height == 0 || !descriptor["Mips"].isArray() || descriptor["Mips"].empty()) return false;
-    const Json::Value& mip = descriptor["Mips"][0];
-    if (std::uint64_t(data.Width) * 4 > fileSize
-        || data.Height > fileSize / (std::uint64_t(data.Width) * 4)) return false;
-    const std::uint64_t size = std::uint64_t(data.Width) * data.Height * 4;
-    if (!mip.isObject() || !mip["Offset"].isUInt64() || !mip["Size"].isUInt64() || !mip["RowPitch"].isUInt64()
-        || mip["Offset"].asUInt64() != 0 || mip["Size"].asUInt64() != size
-        || mip["RowPitch"].asUInt64() != std::uint64_t(data.Width)*4 || size > fileSize
-        || mip["Width"] != descriptor["Width"] || mip["Height"] != descriptor["Height"]) return false;
-    const Json::Value& settings = descriptor["Settings"];
-    if (!settings.isObject()) return false;
-    for (const char* key : {"ColorSpace","FilterMode","WrapU","WrapV"})
-        if (settings.isMember(key) && !settings[key].isString()) return false;
-    const std::string colorSpace = settings.get("ColorSpace","SRGB").asString();
-    if (colorSpace != "SRGB" && colorSpace != "Linear") return false;
-    data.SRGB = colorSpace == "SRGB";
-    const std::string filter = settings.get("FilterMode","Bilinear").asString();
-    if (filter != "Point" && filter != "Bilinear" && filter != "Trilinear") return false;
-    data.Sampler.MinFilter = data.Sampler.MagFilter = filter == "Point" ? GameSproutRuntime::TextureFilter::Nearest : GameSproutRuntime::TextureFilter::Linear;
-    const auto wrap = [](const std::string& value, GameSproutRuntime::TextureAddressMode& mode) {
-        if (value == "Repeat") mode = GameSproutRuntime::TextureAddressMode::Repeat;
-        else if (value == "ClampToEdge") mode = GameSproutRuntime::TextureAddressMode::ClampToEdge;
-        else if (value == "MirrorRepeat") mode = GameSproutRuntime::TextureAddressMode::MirroredRepeat;
+    if(descriptor["Encoding"]!="RawBytes"||descriptor["Format"]!="RGBA8"||
+       !Unsigned(descriptor["Width"],data.Width)||!Unsigned(descriptor["Height"],data.Height))return false;
+    const auto& mips=descriptor["Mips"];
+    if(!mips.isArray()||mips.empty()||mips.size()>32)return false;
+    data.MipLevels=mips.size();
+    std::uint64_t end=0;
+    for(Json::ArrayIndex level=0;level<mips.size();++level) {
+        const auto& mip=mips[level];
+        TextureSubresource sub;
+        sub.MipLevel=level;
+        if(!mip.isObject()||!Unsigned(mip["Width"],sub.Width)||!Unsigned(mip["Height"],sub.Height)||
+           !Unsigned(mip["RowPitch"],sub.RowPitch)||!mip["Offset"].isUInt64()||!mip["Size"].isUInt64()||
+           mip["Offset"].asUInt64()!=end||!sub.RowPitch||
+           sub.Height>(fileSize-end)/sub.RowPitch||
+           mip["Size"].asUInt64()!=std::uint64_t(sub.RowPitch)*sub.Height)return false;
+        sub.Offset=end;
+        end+=mip["Size"].asUInt64();
+        data.Subresources.push_back(sub);
+    }
+    if(end!=fileSize||!PreparedTextureLayout::Validate(data,fileSize))return false;
+    const auto& settings=descriptor["Settings"];
+    if(!settings.isObject())return false;
+    for(const char* key:{"ColorSpace","FilterMode","WrapU","WrapV"})
+        if(settings.isMember(key)&&!settings[key].isString())return false;
+    const auto space=settings.get("ColorSpace","SRGB").asString();
+    if(space!="SRGB"&&space!="Linear")return false;
+    data.SRGB=space=="SRGB";
+    const auto filter=settings.get("FilterMode","Bilinear").asString();
+    if(filter!="Point"&&filter!="Bilinear"&&filter!="Trilinear")return false;
+    data.Sampler.MinFilter=data.Sampler.MagFilter=filter=="Point"?TextureFilter::Nearest:TextureFilter::Linear;
+    data.Sampler.MipFilter=filter=="Trilinear"?TextureFilter::Linear:TextureFilter::Nearest;
+    const auto aniso=settings.get("Anisotropy",1);
+    if(!aniso.isUInt()||aniso.asUInt()<1||aniso.asUInt()>16)return false;
+    data.Sampler.MaxAnisotropy=data.MipLevels>1&&filter!="Point"?aniso.asFloat():1.f;
+    const auto wrap=[](const std::string& value,TextureAddressMode& mode) {
+        if(value=="Repeat")mode=TextureAddressMode::Repeat;
+        else if(value=="ClampToEdge")mode=TextureAddressMode::ClampToEdge;
+        else if(value=="MirrorRepeat")mode=TextureAddressMode::MirroredRepeat;
         else return false;
         return true;
     };
-    if (!wrap(settings.get("WrapU","Repeat").asString(),data.Sampler.AddressU)
-        || !wrap(settings.get("WrapV","Repeat").asString(),data.Sampler.AddressV)) return false;
+    if(!wrap(settings.get("WrapU","Repeat").asString(),data.Sampler.AddressU)||
+       !wrap(settings.get("WrapV","Repeat").asString(),data.Sampler.AddressV))return false;
     data.ArtifactSize=fileSize;
     return true;
 }
 }
 
-bool PreparedResources::ResourceProvider::ResolveTexturePrefetch(const GameSproutRuntime::ResourceReference& reference,
-    TexturePrefetchSource& output) {
+bool PreparedResources::ResourceProvider::ResolveTexturePrefetch(const ResourceReference& reference,TexturePrefetchSource& output) {
     output={};
     Artifact artifact;
     std::ifstream file;
@@ -52,20 +67,21 @@ bool PreparedResources::ResourceProvider::ResolveTexturePrefetch(const GameSprou
     return true;
 }
 
-bool PreparedResources::ResourceProvider::LoadTexture(const GameSproutRuntime::ResourceReference& reference,
-    GameSproutRuntime::TextureRenderData& output,std::string& error) {
+bool PreparedResources::ResourceProvider::LoadTexture(const ResourceReference& reference,TextureRenderData& output,std::string& error) {
     output={};
     Artifact artifact;
     std::ifstream file;
     if(!OpenArtifact(reference,eAssetType::Texture,artifact,file,error))return false;
     TexturePrefetchSource source;
-    if(!DecodeTexture(artifact.Descriptor,artifact.Size,source)) {
-        error="Invalid prepared RGBA8 texture layout or sampling settings";
+    if(!DecodeTexture(artifact.Descriptor,artifact.Size,source)||
+       artifact.Size>std::uint64_t(std::numeric_limits<std::size_t>::max())||
+       artifact.Size>std::uint64_t(std::numeric_limits<std::streamsize>::max())) {
+        error="Invalid prepared texture mip layout or sampler settings";
         return false;
     }
-    GameSproutRuntime::TextureRenderData data;
-    data.Width=source.Width;data.Height=source.Height;data.SRGB=source.SRGB;data.Sampler=source.Sampler;
-    data.Pixels.resize(std::uint64_t(data.Width)*data.Height*4);
+    TextureRenderData data;
+    PreparedTextureLayout::CopyDescriptor(data,source);
+    data.Pixels.resize(static_cast<std::size_t>(artifact.Size));
     if(!file.read(reinterpret_cast<char*>(data.Pixels.data()),static_cast<std::streamsize>(data.Pixels.size()))) {
         MarkReadFailed(reference,true);
         error="Incomplete prepared texture";

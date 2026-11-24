@@ -70,6 +70,8 @@ public:
     // Trilinear：同时平滑相邻 Mip 层之间的过渡。
     virtual eTextureFilterMode GetFilterMode() const = 0;
     virtual void SetFilterMode(const eTextureFilterMode filterMode) = 0;
+    virtual uint32_t GetAnisotropy() const = 0;
+    virtual bool SetAnisotropy(uint32_t samples) = 0;
 
     // 水平方向超出图片边界后的处理方式。
     virtual eTextureWrapMode GetWrapU() const = 0;

@@ -12,6 +12,7 @@ TextureInspector::TextureInspector(QWidget * parent) : ImportSettingsInspector(p
         QObject::connect(combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this] { if (!_Loading && Changed) Changed(); });
     }
     QObject::connect(_Ui->maxSizeCombo, &QComboBox::currentTextChanged, this, [this] { if (!_Loading && Changed) Changed(); });
+    QObject::connect(_Ui->anisotropySpin, &QSpinBox::valueChanged, this, [this] { if (!_Loading && Changed) Changed(); });
     for (QCheckBox * check : {_Ui->alphaTransparencyCheck, _Ui->mipmapsCheck, _Ui->cpuCopyCheck})
         QObject::connect(check, &QCheckBox::toggled, this, [this] { if (!_Loading && Changed) Changed(); });
 }
@@ -31,6 +32,7 @@ void TextureInspector::Load(const Json::Value & settings) {
     _Ui->alphaTransparencyCheck->setChecked(settings["AlphaIsTransparency"].asBool());
     _Ui->maxSizeCombo->setCurrentText(QString::number(settings["MaxSize"].asUInt()));
     _Ui->mipmapsCheck->setChecked(settings["GenerateMipmaps"].asBool());
+    _Ui->anisotropySpin->setValue(settings.get("Anisotropy", 1).asInt());
     _Ui->cpuCopyCheck->setChecked(settings["KeepCPUCopy"].asBool());
     _Loading = false;
 }
@@ -48,6 +50,8 @@ bool TextureInspector::Read(Json::Value & settings, std::string & error) const {
     settings["MaxSize"] = static_cast<Json::UInt>(maxSize);
     settings["AlphaIsTransparency"] = _Ui->alphaTransparencyCheck->isChecked();
     settings["GenerateMipmaps"] = _Ui->mipmapsCheck->isChecked();
+    if (_Ui->anisotropySpin->value() > 1) settings["Anisotropy"] = _Ui->anisotropySpin->value();
+    else settings.removeMember("Anisotropy");
     settings["KeepCPUCopy"] = _Ui->cpuCopyCheck->isChecked();
     error.clear();
     return true;

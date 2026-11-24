@@ -243,8 +243,11 @@ int main(int argc,char** argv) {
 
         // A material outside the view should become resident without a
         // synchronous provider read, even when mip 0 needs multiple frames.
+        // A minified draw must sample the uploaded green mip, not the blue base level.
         TextureFile artifact;
         constexpr std::uint32_t width=2048,height=1025;
+        constexpr std::uint64_t mipOffset=std::uint64_t(width)*height*4;
+        constexpr std::uint32_t mipWidth=width/2,mipHeight=height/2;
         {
             std::ofstream file(artifact.Path,std::ios::binary);
             const std::vector<std::uint8_t> row=[]{
@@ -253,12 +256,20 @@ int main(int argc,char** argv) {
                 return pixels;
             }();
             for(std::uint32_t y=0;y<height;++y)file.write(reinterpret_cast<const char*>(row.data()),row.size());
+            std::vector<std::uint8_t> lowerRow(mipWidth*4);
+            for(std::size_t x=0;x<lowerRow.size();x+=4)lowerRow[x+1]=lowerRow[x+3]=255;
+            for(std::uint32_t y=0;y<mipHeight;++y)
+                file.write(reinterpret_cast<const char*>(lowerRow.data()),lowerRow.size());
             Check(bool(file),"Cannot write texture prefetch fixture");
         }
         const auto path=artifact.Path.u8string();
         prefetched.PrefetchSource.ArtifactPath.assign(path.begin(),path.end());
-        prefetched.PrefetchSource.ArtifactSize=std::uint64_t(width)*height*4;
+        prefetched.PrefetchSource.ArtifactSize=mipOffset+std::uint64_t(mipWidth)*mipHeight*4;
         prefetched.PrefetchSource.Width=width;prefetched.PrefetchSource.Height=height;prefetched.PrefetchSource.SRGB=false;
+        prefetched.PrefetchSource.MipLevels=2;
+        prefetched.PrefetchSource.Sampler.MipFilter=TextureFilter::Linear;
+        prefetched.PrefetchSource.Subresources={{0,0,width,height,width*4,0},
+                                                {1,0,mipWidth,mipHeight,mipWidth*4,mipOffset}};
         first=runtime->CreateOffscreenRenderer(64,64,&prefetched,error);Check(first,error);
         second=runtime->CreateOffscreenRenderer(64,64,&prefetched,error);Check(second,error);
         auto prefetchView=view;prefetchView.EnableTexturePrefetch=true;
@@ -279,7 +290,7 @@ int main(int argc,char** argv) {
         Check(completed==1&&uploadFrames>=2&&uploadBytes==prefetched.PrefetchSource.ArtifactSize,
             "A large prefetched texture was not uploaded incrementally");
         object->GetTransform()->SetLocalPosition({});
-        Blue(Pixel(*first,prefetchView));Blue(Pixel(*second,view));
+        Green(Pixel(*first,prefetchView));Green(Pixel(*second,view));
         Check(prefetched.TextureLoads==0&&prefetched.TextureResolutions==1,
             "Entering the view or reusing the texture in a sibling triggered a synchronous read");
         delete first;first=nullptr;delete second;second=nullptr;

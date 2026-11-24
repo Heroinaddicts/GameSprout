@@ -47,6 +47,7 @@ public:
     std::future<TextureReadResult> TextureRead;
     std::optional<TextureReadResult> TextureUploading;
     GRHI::ITexture* TextureUploadTarget=nullptr;
+    std::size_t TextureUploadSubresource=0;
     std::uint32_t TextureUploadRow=0;
     std::map<Renderer::ResourceKey,std::uint64_t> TexturePrefetchFailures;
     std::uint64_t TexturePrefetchRevision=0;

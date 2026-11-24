@@ -350,6 +350,18 @@
                 </property>
               </widget>
             </item>
+            <item row="9" column="0">
+              <widget class="QLabel" name="anisotropyLabel">
+                <property name="text"><string>各向异性过滤</string></property>
+              </widget>
+            </item>
+            <item row="9" column="1">
+              <widget class="QSpinBox" name="anisotropySpin">
+                <property name="minimum"><number>1</number></property>
+                <property name="maximum"><number>16</number></property>
+                <property name="toolTip"><string>1 为关闭。启用 Mip 且采用双线性或三线性过滤时生效。</string></property>
+              </widget>
+            </item>
           </layout>
         </widget>
       </item>
