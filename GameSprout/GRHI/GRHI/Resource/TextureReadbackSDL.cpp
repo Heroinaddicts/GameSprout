@@ -7,8 +7,10 @@ namespace GRHI {
 bool DeviceSDL::ReadTexture(ITexture* value,std::vector<uint8_t>& pixels) {
     pixels.clear();ClearError();
     auto* texture=Resource<TextureSDL>(value,ResourceKindSDL::Texture);
-    if(!_Device || !OnMainThread() || !_Commands.empty() || !texture || !texture->Native || texture->Desc.Format==TextureFormat::D32_Float) {
-        return Fail("ReadTexture requires a live local color texture, the device thread and no outstanding commands.");
+    if(!_Device || !OnMainThread() || !_Commands.empty() || !texture || !texture->Native ||
+       texture->Desc.Dimension!=TextureDimension::Texture2D || texture->Desc.Format==TextureFormat::D32_Float ||
+       texture->Desc.Format==TextureFormat::RGBA16_Float) {
+        return Fail("ReadTexture requires a live local RGBA8/BGRA8 2D texture, the device thread and no outstanding commands.");
     }
     const uint64_t size=uint64_t(texture->Desc.Width)*texture->Desc.Height*4;
     if(!size || size>UINT32_MAX)return Fail("ReadTexture exceeds transfer-buffer limits.");

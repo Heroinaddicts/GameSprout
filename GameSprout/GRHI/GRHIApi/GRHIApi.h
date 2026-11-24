@@ -45,7 +45,8 @@ namespace GRHI {
         RGBA8_UNorm_sRGB, // RGBA 排列，RGB 使用 sRGB 编码，适合通常的彩色图片。
         BGRA8_UNorm,      // 每像素 4 字节，依次为 B、G、R、A，各通道 8 位，线性编码。
         BGRA8_UNorm_sRGB, // BGRA 排列，RGB 使用 sRGB 编码，也可能用于窗口画面。
-        D32_Float        // 单通道 32 位浮点深度，可作深度目标并由后续 Pass 采样。
+        D32_Float,       // 单通道 32 位浮点深度，可作深度目标并由后续 Pass 采样。
+        RGBA16_Float     // 每像素 8 字节，四个线性 IEEE 754 半精度浮点通道。
     };
 
     // 纹理允许的使用方式，可通过 | 组合；实际组合还须得到设备支持。
@@ -68,21 +69,28 @@ namespace GRHI {
             static_cast<uint8_t>(left) & static_cast<uint8_t>(right));
     }
 
-    // 创建纹理所需的固定属性；首版为二维、单层、单 mip、单采样纹理。
+    enum class TextureDimension : uint8_t {
+        Texture2D, // 单层二维纹理。
+        Cube       // 六个正方形面，层索引依次为 +X、-X、+Y、-Y、+Z、-Z。
+    };
+
+    // 创建纹理所需的固定属性，全部使用单采样。
     struct TextureDesc {
         uint32_t Width = 0;    // 像素宽度，创建时必须大于 0。
         uint32_t Height = 0;   // 像素高度，创建时必须大于 0。
         TextureFormat Format = TextureFormat::RGBA8_UNorm; // 每个像素的格式。
         TextureUsage Usage = TextureUsage::Sampled;      // D32 须含 DepthStencilTarget，可附加 Sampled；不允许 ColorTarget 或初始像素上传。
+        uint32_t MipLevels = 1;                           // 1 至完整 mip 链长度，0 号 mip 对应 Width 和 Height。
+        TextureDimension Dimension = TextureDimension::Texture2D;
     };
 
     // CPU 内存中的初始像素数据；像素排列必须与 TextureDesc::Format 一致。
     // 行按从上到下排列，每行像素从左到右排列，不包含 PNG/JPG 文件头等编码数据。
     struct TextureInitialData {
-        const void* Pixels = nullptr; // 第一行像素的地址，仅在 CreateTexture 调用期间借用。
+        const void* Pixels = nullptr; // 第一行像素的地址，仅在本次创建或上传调用期间借用。
         size_t DataSize = 0;          // 从 Pixels 开始可读取的总字节数，不是像素数量。
         // 0 表示紧密排列；否则必须至少能容纳一行像素。
-        // DataSize 至少为 (Height - 1) * 有效 RowPitch + 一行像素字节数。
+        // DataSize 至少为 (上传行数 - 1) * 有效 RowPitch + 一行像素字节数。
         size_t RowPitch = 0;
     };
 
@@ -125,6 +133,9 @@ namespace GRHI {
         FilterMode MagFilter = FilterMode::Linear; // 图片被放大时使用的过滤方式。
         AddressMode AddressU = AddressMode::ClampToEdge; // UV 横向越界的处理方式。
         AddressMode AddressV = AddressMode::ClampToEdge; // UV 纵向越界的处理方式。
+        FilterMode MipFilter = FilterMode::Nearest;     // 缩小时在相邻 mip 之间选取或插值。
+        float MaxAnisotropy = 1.0f;                     // [1, 16]，1 关闭各向异性过滤。
+        AddressMode AddressW = AddressMode::ClampToEdge;
     };
 
     // Shader 在一次绘制中负责的阶段，首版仅提供顶点和片元阶段。
@@ -337,7 +348,7 @@ namespace GRHI {
         virtual BufferUsage GetUsage() const = 0;
     };
 
-    // GPU 上的二维像素资源，可以存放图片，也可以按用途作为离屏绘制目标。
+    // GPU 上的二维或立方体纹理，可以按用途作为离屏绘制目标。
     class ITexture : public IResource {
     public:
         // 删除纹理包装对象，并由具体实现释放纹理资源。
@@ -352,12 +363,14 @@ namespace GRHI {
         // 返回像素通道排列及颜色编码，例如 RGBA8_UNorm_sRGB。
         virtual TextureFormat GetFormat() const = 0;
 
-        // 获取把这张纹理作为绘制输出时使用的视图，不新建或复制纹理。
+        // 获取第 0 级 mip、第 0 层的绘制目标视图，不新建或复制纹理。
         // 仅 ColorTarget 用途的纹理可取得有效视图，其他纹理返回无效视图。
         // 视图有效至纹理 Release 或销毁，不得用于引用此纹理的同一 Pass 采样。
         virtual ColorTargetView GetColorTargetView() const = 0;
         // 仅 DepthStencilTarget 用途可取得有效视图；D32_Float 没有 stencil 分量。
         virtual DepthTargetView GetDepthTargetView() const = 0;
+        virtual uint32_t GetMipLevels() const { return 1; }
+        virtual TextureDimension GetDimension() const { return TextureDimension::Texture2D; }
     };
 
     // 独立的纹理采样规则对象，不存储图片像素。
@@ -538,14 +551,14 @@ namespace GRHI {
         // 在创建宿主窗口的线程调用；Surface 不接管窗口所有权，返回对象由调用方 delete。
         virtual ISurface * CreateSurface(GRHIWindowHandle const handle) = 0;
 
-        // 按 desc 创建二维纹理，失败返回 nullptr，成功对象由调用方 delete。
+        // 按 desc 创建二维或立方体纹理，失败返回 nullptr，成功对象由调用方 delete。
         // 描述及其指针数据仅在创建调用期间借用。
-        // 初始像素在返回前复制到 GRHI 持有的内存并安排上传；之后的绘制可直接使用。
-        // initialData 为空时内容未定义，读取前须先写入或清屏。
+        // 初始像素用于第 0 级 mip、第 0 层，在返回前复制到 GRHI 持有的内存并安排上传。
+        // 没有初始化的 mip 和层内容未定义，采样前须先上传或绘制。
         virtual ITexture* CreateTexture(const TextureDesc& desc, const TextureInitialData* initialData = nullptr) = 0;
         // 当前 SDL 后端单缓冲区不超过 UINT32_MAX 字节。
         virtual IBuffer* CreateBuffer(const BufferDesc& desc, const BufferInitialData* initialData = nullptr) = 0;
-        // 显式同步截图入口。只读取本 Device 的普通 RGBA8/BGRA8 纹理，返回紧密排列的 RGBA bytes。
+        // 显式同步截图入口。读取本 Device 的 RGBA8/BGRA8 二维纹理的第 0 级 mip，返回紧密排列的 RGBA bytes。
         // 须先提交/取消本设备全部命令；失败清空 pixels。此调用等待 GPU，不能放到每帧热路径。
         virtual bool ReadTexture(ITexture* texture, std::vector<uint8_t>& pixels) = 0;
         // 按 desc 创建过滤和 UV 寻址规则；可与多张图片搭配使用。
@@ -580,15 +593,19 @@ namespace GRHI {
         // 无效绘制操作须标记命令失败，不得传入底层；Submit 返回 false 并回收命令。
         // 引用有效至下一次相关操作或 Device 销毁；Get* 查询不清空错误。
         virtual const std::string& GetLastError() const = 0;
-        // Upload contiguous rows of a color texture's mip 0. The source starts
-        // at firstRow in the destination and is borrowed only during this call.
-        // The upload is submitted before subsequent draws. Publish a texture
-        // to samplers only once all its required rows have been initialized.
+        // 上传第 0 级 mip、第 0 层的连续行。
         virtual bool UploadTextureRows(ITexture*, uint32_t firstRow, uint32_t rowCount,
                                        const TextureInitialData&) = 0;
         // Borrow an SDL_Window* from the same SDL library. The host destroys
         // the window after releasing this surface.
         virtual ISurface* CreateSDLSurface(void*) { return nullptr; }
+        // 上传指定颜色纹理子资源的连续行。Data 的第一行对应目标中的 firstRow。
+        // 数据仅在调用期间借用，上传在后续绘制前提交。先初始化采样需要的全部子资源。
+        virtual bool UploadTextureSubresourceRows(ITexture* texture, uint32_t mipLevel, uint32_t arrayLayer,
+                                                   uint32_t firstRow, uint32_t rowCount,
+                                                   const TextureInitialData& data) {
+            return mipLevel == 0 && arrayLayer == 0 && UploadTextureRows(texture, firstRow, rowCount, data);
+        }
     };
 
     // GRHI 的入口，负责枚举物理显卡和创建渲染设备，不直接记录绘制命令。

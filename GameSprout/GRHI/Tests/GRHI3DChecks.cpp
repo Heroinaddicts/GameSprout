@@ -1,6 +1,7 @@
 #include "GRHIExport.h"
 #include <array>
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <iostream>
@@ -399,6 +400,121 @@ fragment float4 imageFragment(Output in [[stage_in]],texture2d<float> image [[te
     std::cout<<"PASS compatible procedural image draw, texture/sampler bindings and BGRA-to-RGBA readback\n";
 }
 
+static void HDRTextureChecks(Fixture& f) {
+    static const char source[]=R"(
+#include <metal_stdlib>
+using namespace metal;
+struct Output { float4 position [[position]]; float2 uv; };
+vertex Output hdrVertex(uint id [[vertex_id]]) {
+    const float2 position[3]={float2(-1,1), float2(3,1), float2(-1,-3)};
+    const float2 texcoord[3]={float2(0,0), float2(2,0), float2(0,2)};
+    return {float4(position[id],0,1),texcoord[id]};
+}
+fragment float4 hdrFragment() { return float4(2,0,0,1); }
+fragment float4 inspectFragment(Output in [[stage_in]],
+                                texture2d<float> hdr [[texture(0)]], texturecube<float> cube [[texture(1)]],
+                                sampler hdrSampler [[sampler(0)]], sampler cubeSampler [[sampler(1)]]) {
+    const float3 directions[6]={float3(1,0,0),float3(-1,0,0),float3(0,1,0),
+                                float3(0,-1,0),float3(0,0,1),float3(0,0,-1)};
+    const float lods[4]={0,.5,1,2};
+    float4 color=cube.sample(cubeSampler,directions[min(uint(in.uv.x*6),5u)],level(lods[min(uint(in.uv.y*4),3u)]));
+    return float4(hdr.sample(hdrSampler,in.uv).r*.25,color.gb*.25,color.a);
+}
+)";
+    const auto shader=[&](GRHI::ShaderStage stage,const char* entry,uint32_t samplers=0) {
+        GRHI::ShaderCode code;
+        code.Format=GRHI::ShaderCodeFormat::MSL;code.Data=source;code.DataSize=sizeof(source);
+        code.EntryPoint=entry;code.SamplerCount=samplers;
+        GRHI::ShaderDesc desc;desc.Stage=stage;desc.Codes=&code;desc.CodeCount=1;
+        return f.Keep(f.Device->CreateShader(desc),entry);
+    };
+    GRHI::GraphicsPipelineDesc pipeline;
+    pipeline.VertexShader=shader(GRHI::ShaderStage::Vertex,"hdrVertex");
+    pipeline.FragmentShader=shader(GRHI::ShaderStage::Fragment,"hdrFragment");
+    pipeline.ColorFormat=GRHI::TextureFormat::RGBA16_Float;
+    auto* hdrPipeline=f.Keep(f.Device->CreateGraphicsPipeline(pipeline),"HDR draw pipeline");
+    pipeline.FragmentShader=shader(GRHI::ShaderStage::Fragment,"inspectFragment",2);
+    pipeline.ColorFormat=GRHI::TextureFormat::RGBA8_UNorm;
+    auto* inspectPipeline=f.Keep(f.Device->CreateGraphicsPipeline(pipeline),"HDR sampling pipeline");
+
+    GRHI::TextureDesc texture;
+    texture.Format=GRHI::TextureFormat::RGBA16_Float;
+    texture.Width=texture.Height=4;
+    texture.MipLevels=3;
+    texture.Dimension=GRHI::TextureDimension::Cube;
+    auto* cube=f.Keep(f.Device->CreateTexture(texture),"HDR cube");
+    Check(cube->GetMipLevels()==3 && cube->GetDimension()==GRHI::TextureDimension::Cube,"Cube description lost");
+    auto invalid=texture;
+    invalid.Width=2;Check(!f.Device->CreateTexture(invalid),"Non-square cube accepted");
+    invalid=texture;invalid.MipLevels=4;Check(!f.Device->CreateTexture(invalid),"Excessive mip count accepted");
+    // Half-precision blue values .25, .5, .75, 1, 1.25 and 1.5 identify the native face ordering.
+    const uint16_t faceBlue[]={0x3400,0x3800,0x3a00,0x3c00,0x3d00,0x3e00};
+    for(uint32_t face=0;face<6;++face) {
+        using Texel=std::array<uint16_t,4>;
+        std::array<Texel,20> base{};
+        const Texel baseTexel{0,0x3800,faceBlue[face],0x3c00};
+        for(uint32_t row=0;row<4;++row)std::fill_n(base.begin()+row*5,4,baseTexel);
+        const GRHI::TextureInitialData basePixels{base.data(),sizeof(base),5*sizeof(Texel)};
+        Check(f.Device->UploadTextureSubresourceRows(cube,0,face,0,4,basePixels),f.Device->GetLastError());
+        for(uint32_t row=0;row<2;++row) {
+            const Texel pixel{0,row?uint16_t{0x4000}:uint16_t{0x3c00},faceBlue[face],0x3c00};
+            const Texel line[]={pixel,pixel};
+            const GRHI::TextureInitialData rowPixels{line,sizeof(line),0};
+            Check(f.Device->UploadTextureSubresourceRows(cube,1,face,row,1,rowPixels),f.Device->GetLastError());
+        }
+        const Texel pixel{0,0x4200,faceBlue[face],0x3c00};
+        const GRHI::TextureInitialData smallest{pixel.data(),sizeof(pixel),0};
+        Check(f.Device->UploadTextureSubresourceRows(cube,2,face,0,1,smallest),f.Device->GetLastError());
+        Check(!f.Device->UploadTextureSubresourceRows(cube,2,face,1,1,smallest),"Out-of-bounds mip row accepted");
+        Check(!f.Device->UploadTextureSubresourceRows(cube,3,face,0,1,smallest),"Out-of-bounds mip level accepted");
+        Check(!f.Device->UploadTextureSubresourceRows(cube,2,6,0,1,smallest),"Out-of-bounds cube face accepted");
+    }
+    texture.Width=texture.Height=64;
+    texture.Dimension=GRHI::TextureDimension::Texture2D;
+    texture.MipLevels=1;
+    texture.Usage=GRHI::TextureUsage::ColorTarget|GRHI::TextureUsage::Sampled;
+    auto* hdr=f.Keep(f.Device->CreateTexture(texture),"HDR render target");
+    GRHI::SamplerDesc sampler;
+    sampler.MaxAnisotropy=8.0f;
+    f.Keep(f.Device->CreateSampler(sampler),"anisotropic sampler");
+    sampler.MaxAnisotropy=17.0f;
+    Check(!f.Device->CreateSampler(sampler),"Invalid anisotropy accepted");
+    sampler.MaxAnisotropy=1.0f;
+    sampler.MipFilter=GRHI::FilterMode::Linear;
+    auto* trilinear=f.Keep(f.Device->CreateSampler(sampler),"trilinear sampler");
+    auto* output=Color(f);
+    Recording recording(f.Device);
+    GRHI::RenderPassDesc pass;
+    pass.ColorTarget=hdr->GetColorTargetView();
+    recording.Pass=recording.Command->BeginRenderPass(pass);
+    Check(recording.Pass,"Cannot begin HDR pass");
+    recording.Pass->SetPipeline(hdrPipeline);
+    recording.Pass->Draw(3);
+    recording.Command->EndRenderPass(recording.Pass);
+    recording.Pass=nullptr;
+    pass.ColorTarget=output->GetColorTargetView();
+    recording.Pass=recording.Command->BeginRenderPass(pass);
+    Check(recording.Pass,"Cannot begin HDR sampling pass");
+    recording.Pass->SetPipeline(inspectPipeline);
+    recording.Pass->SetFragmentTextureSampler(0,hdr,trilinear);
+    recording.Pass->SetFragmentTextureSampler(1,cube,trilinear);
+    recording.Pass->Draw(3);
+    Check(recording.Submit(),f.Device->GetLastError());
+    std::vector<uint8_t> pixels;
+    Check(!f.Device->ReadTexture(hdr,pixels) && pixels.empty(),"HDR target was interpreted as a byte screenshot");
+    Check(f.Device->ReadTexture(output,pixels),f.Device->GetLastError());
+    const int expectedGreen[]={32,64,96,191};
+    for(int face=0;face<6;++face) {
+        for(int band=0;band<4;++band) {
+            const auto pixel=Pixel(pixels,(2*face+1)*64/12,(2*band+1)*64/8);
+            Check(std::abs(int(pixel[0])-128)<=1 && std::abs(int(pixel[1])-expectedGreen[band])<=1 &&
+                  std::abs(int(pixel[2])-(face+1)*16)<=1 && pixel[3]==255,
+                  "HDR render target, cube face, mip level or trilinear sampling returned the wrong color");
+        }
+    }
+    std::cout<<"PASS real Metal HDR target and cube mip sampling, pitched and partial uploads, trilinear and anisotropic sampler creation\n";
+}
+
 static void SampledDepthChecks(Fixture& f) {
     static const char source[]=R"(
 #include <metal_stdlib>
@@ -502,7 +618,7 @@ int main(int argc,char** argv) {
 #if !defined(__APPLE__)
     (void)argc;(void)argv;std::cout<<"SKIP real GPU fixture currently supplies Metal source; API remains platform independent\n";return 77;
 #else
-    try {Check(argc==2,"Expected runtime binary directory");Fixture fixture;fixture.Api=ExportGRHIApi(argv[1]);Check(fixture.Api,"Cannot load GRHI");fixture.Device=fixture.Api->CreateDevice();Check(fixture.Device,"Cannot create Metal device");GPUChecks(fixture);InstanceChecks(fixture);ResidentUploadChecks(fixture);ReplayChecks(fixture);ImageCompatibility(fixture);SampledDepthChecks(fixture);return 0;}
+    try {Check(argc==2,"Expected runtime binary directory");Fixture fixture;fixture.Api=ExportGRHIApi(argv[1]);Check(fixture.Api,"Cannot load GRHI");fixture.Device=fixture.Api->CreateDevice();Check(fixture.Device,"Cannot create Metal device");GPUChecks(fixture);InstanceChecks(fixture);ResidentUploadChecks(fixture);ReplayChecks(fixture);ImageCompatibility(fixture);HDRTextureChecks(fixture);SampledDepthChecks(fixture);return 0;}
     catch(const std::exception& error){std::cerr<<"FAIL "<<error.what()<<"\n";return 1;}
 #endif
 }

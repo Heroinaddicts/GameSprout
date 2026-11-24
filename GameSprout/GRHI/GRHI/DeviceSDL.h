@@ -27,6 +27,8 @@ namespace GRHI {
         ISurface* CreateSDLSurface(void* window) override;
         ITexture* CreateTexture(const TextureDesc&, const TextureInitialData*) override;
         bool UploadTextureRows(ITexture*, uint32_t, uint32_t, const TextureInitialData&) override;
+        bool UploadTextureSubresourceRows(ITexture*, uint32_t, uint32_t, uint32_t, uint32_t,
+                                          const TextureInitialData&) override;
         IBuffer* CreateBuffer(const BufferDesc&, const BufferInitialData*) override;
         bool ReadTexture(ITexture*, std::vector<uint8_t>&) override;
         ISampler* CreateSampler(const SamplerDesc&) override;
