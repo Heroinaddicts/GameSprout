@@ -1,4 +1,5 @@
 #include "RuntimeRenderer.h"
+#include "GameSproutRuntime.h"
 #include "RuntimeMath.h"
 #include "Components/SkinnedMeshRendererComponent.h"
 #include <algorithm>
@@ -6,34 +7,45 @@
 #include <limits>
 
 namespace GameSproutRuntime {
-bool Renderer::SkinMatrices(IGameObject& object,const MeshGPU& mesh,std::vector<Mat4>& matrices) {
+std::optional<std::span<const Mat4>> Renderer::SkinMatrices(IGameObject& object,const MeshGPU& mesh,
+    std::vector<Mat4>& matrices,std::uint64_t& overrideRevision) {
     matrices.clear();
+    overrideRevision=0;
     auto* skin=object.GetComponent<ISkinnedMeshRendererComponent>();
-    if(!skin) return true;
+    if(!skin) return std::span<const Mat4>{};
     if(mesh.Data.Bones.empty() || mesh.Data.BoneIndicesOffset<0 || mesh.Data.BoneWeightsOffset<0 ||
        mesh.Skin.size()!=mesh.Positions.size()) {
-        Diagnostic("Skinned mesh has no complete prepared bone bindings: "+object.GetName());return false;
+        Diagnostic("Skinned mesh has no complete prepared bone bindings: "+object.GetName());return std::nullopt;
     }
     if(mesh.Data.Bones.size()>MaxSkinBones) {
-        Diagnostic("Skinned mesh exceeds the 128-bone palette limit: "+object.GetName());return false;
+        Diagnostic("Skinned mesh exceeds the 128-bone palette limit: "+object.GetName());return std::nullopt;
+    }
+    const auto* builtin=dynamic_cast<const SkinnedMeshRendererComponent*>(skin);
+    if(builtin&&!builtin->_SkinPose.empty()&&_Runtime.IsInScene(builtin->_OwnerState)) {
+        if(builtin->_SkinPose.size()!=mesh.Data.Bones.size()) {
+            Diagnostic("Cannot bind skinned mesh '"+object.GetName()+"': Runtime skin pose does not match the mesh bone count");
+            return std::nullopt;
+        }
+        // The component owns and validates the override. Borrow it only
+        // during preparation or picking, and cache the revision with the copy.
+        overrideRevision=builtin->_SkinPoseRevision;
+        return std::span<const Mat4>(builtin->_SkinPose);
     }
     std::string error;
-    const auto* builtin=dynamic_cast<const SkinnedMeshRendererComponent*>(skin);
     const bool sampled=builtin?builtin->GetPresentationSkinMatrices(mesh.Data.Bones,matrices,error):
         skin->GetSkinMatrices(mesh.Data.Bones,matrices,error);
     if(!sampled || matrices.size()!=mesh.Data.Bones.size()) {
-        Diagnostic("Cannot bind skinned mesh '"+object.GetName()+"': "+error);matrices.clear();return false;
+        Diagnostic("Cannot bind skinned mesh '"+object.GetName()+"': "+error);matrices.clear();return std::nullopt;
     }
     // The built-in component checks finiteness when supplying a pose or
     // constructing its Animator palette. Keep validation for other sources.
-    if(builtin)return true;
-    for(const auto& matrix:matrices) if(!RuntimeMath::IsFinite(matrix)) {
-        Diagnostic("Skinned mesh has a nonfinite pose matrix: "+object.GetName());matrices.clear();return false;
+    if(!builtin)for(const auto& matrix:matrices) if(!RuntimeMath::IsFinite(matrix)) {
+        Diagnostic("Skinned mesh has a nonfinite pose matrix: "+object.GetName());matrices.clear();return std::nullopt;
     }
-    return true;
+    return std::span<const Mat4>(matrices);
 }
 
-bool Renderer::SkinPoseBounds(const MeshGPU& mesh,const std::vector<Mat4>& matrices,Bounds& bounds) {
+bool Renderer::SkinPoseBounds(const MeshGPU& mesh,std::span<const Mat4> matrices,Bounds& bounds) {
     if(matrices.empty()) {
         bounds={mesh.CullMinimum*.5f+mesh.CullMaximum*.5f,mesh.CullMaximum*.5f-mesh.CullMinimum*.5f};
         return true;
@@ -100,11 +112,12 @@ bool Renderer::SkinPoseBounds(const MeshGPU& mesh,const std::vector<Mat4>& matri
 bool Renderer::PosedPositions(IGameObject& object,const MeshGPU& mesh,std::vector<Vector3>& positions) {
     positions.clear();
     std::vector<Mat4> matrices;
-    if(!SkinMatrices(object,mesh,matrices)) return false;
-    return PosedPositions(mesh,matrices,positions);
+    std::uint64_t overrideRevision=0;
+    const auto palette=SkinMatrices(object,mesh,matrices,overrideRevision);
+    return palette&&PosedPositions(mesh,*palette,positions);
 }
 
-bool Renderer::PosedPositions(const MeshGPU& mesh,const std::vector<Mat4>& matrices,std::vector<Vector3>& positions) {
+bool Renderer::PosedPositions(const MeshGPU& mesh,std::span<const Mat4> matrices,std::vector<Vector3>& positions) {
     positions.clear();
     if(matrices.empty()) {positions=mesh.Positions;return true;}
     positions.reserve(mesh.Positions.size());

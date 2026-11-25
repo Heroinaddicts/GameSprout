@@ -31,7 +31,7 @@ bool Renderer::SetDrawTransform(DrawObject& object,const Mat4& model) {
 
 bool Renderer::UpdateDrawTransform(DrawObject& draw,const Mat4& model,const RenderFrustum::Frustum& frustum) {
     if(!std::memcmp(draw.Model.Data,model.Data,sizeof(model.Data)))return true;
-    const bool hadCullBox=_PreparedKnown&&draw.CullBoxKnown;
+    const bool hadCullBox=_PreparedKnown&&!draw.Skinned&&draw.CullBoxKnown;
     const bool wasInFrustum=hadCullBox&&frustum.Intersects(draw.CullBox);
     const bool wasNegative=draw.Negative;
     if(!SetDrawTransform(draw,model))return false;
@@ -200,7 +200,10 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
         for(std::size_t slot=0;slot<renderer->GetMaterialCount();++slot) data.Materials.push_back(renderer->GetMaterial(slot));
         data.MaterialCache.resize(data.Materials.size(),nullptr);
         _SceneObjectIndices.emplace(data.ObjectID,objects.size());
-        if(data.Skinned)_SkinnedDraws.push_back({objects.size(),{}});
+        if(data.Skinned) {
+            data.SkinStateIndex=_SkinnedDraws.size();
+            _SkinnedDraws.push_back({objects.size(),{}});
+        }
         objects.push_back(std::move(data));
     }
     _ObjectSceneID=sceneID;_ObjectSceneRevision=revision;_ObjectCullingMask=mask;

@@ -91,14 +91,8 @@ bool Renderer::ExtractLights(IScene* scene,std::vector<DirectionalLight>& lights
 }
 
 RenderFrustum::Box Renderer::LocalLightObjectBounds(const DrawObject& object,const MeshGPU& mesh) const {
-    if(object.Skinned) {
-        const auto* node=_Runtime.QueryGameObject(object.ObjectID);
-        const auto* component=node?node->GetComponent<IMeshComponent>():nullptr;
-        if(!component)return {};
-        const auto bounds=component->GetLocalBounds();
-        return {bounds.Center-bounds.Extents,bounds.Center+bounds.Extents,object.Model};
-    }
     if(object.CullBoxKnown)return object.CullBox;
+    if(object.Skinned)return {};
     if(mesh.CullBoundsKnown)return {mesh.CullMinimum,mesh.CullMaximum,object.Model};
     const auto& bounds=mesh.Data.LocalBounds;
     return {bounds.Center-bounds.Extents,bounds.Center+bounds.Extents,object.Model};

@@ -72,8 +72,11 @@ int main(int argc,char** argv) {
         auto* floor=CreateMesh(*scene,"Water",1,3,{});
         auto* red=CreateMesh(*scene,"Above plane red",2,4,{-1,1,0});
         auto* green=CreateMesh(*scene,"Above plane green",2,5,{1,1,0});
+        auto* greenParent=scene->CreateGameObject("Parent outside the reflection mask");
+        Check(greenParent&&green->SetParent(greenParent,true),"Cannot parent the reflected card");
         CreateMesh(*scene,"Submerged blue",2,6,{0,-.9f,-2});
         red->SetLayer(2);
+        greenParent->SetLayer(2);
         green->SetLayer(3);
         RenderView view;
         view.Scene=scene;view.DrawGrid=false;view.ClearColor={0,0,0,1};
@@ -115,6 +118,18 @@ int main(int argc,char** argv) {
         Check(ProjectPixel(masked,camera,{-1,-1,0})[0]<8&&ProjectPixel(masked,camera,{1,-1,0})[1]>85,
             "Reflected layer filter was ignored or modified the main camera mask");
         Check(ProjectPixel(masked,camera,{-1,1,0})[0]>85,"Layer filter hid geometry in the main view");
+
+        greenParent->GetTransform()->SetLocalPosition({.85f,0,0});
+        const auto moved=render();
+        Check(ProjectPixel(moved,camera,{1,-1,0})[1]<8&&ProjectPixel(moved,camera,{1.85f,-1,0})[1]>85,
+            "Shared reflection snapshot did not follow the masked parent's transform");
+        auto* greenRenderer=green->GetComponent<IMeshRendererComponent>();
+        Check(greenRenderer->SetMaterial(0,{guid,6}),"Cannot replace reflected material");
+        const auto recolored=render();
+        Check(ProjectPixel(recolored,camera,{1.85f,-1,0})[2]>85&&ProjectPixel(recolored,camera,{1.85f,-1,0})[1]<8,
+            "Shared reflection snapshot did not follow the material replacement");
+        Check(greenRenderer->SetMaterial(0,{guid,5}),"Cannot restore reflected material");
+        greenParent->GetTransform()->SetLocalPosition({});
 
         view.EnablePlanarReflections=false;
         const auto disabled=render();

@@ -188,7 +188,7 @@ bool Renderer::UploadInstanceStream(GRHI::ICommandBuffer& command,InstanceStream
 bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
     if(_SkinnedDraws.empty())return true;
     _SkinPaletteOffsetScratch.assign(_SceneObjects.size(),0);
-    constexpr auto maxMatrices=std::numeric_limits<std::uint32_t>::max()/sizeof(Mat4);
+    constexpr auto maxMatrices=std::numeric_limits<std::uint32_t>::max()/sizeof(InstanceBoneMatrix);
     std::uint32_t matrixCount=0;
     for(const auto& skinned:_SkinnedDraws) {
         const auto& object=_SceneObjects[skinned.ObjectIndex];
@@ -217,7 +217,13 @@ bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
         if(!object.SkinPoseReady||(!layoutChanged&&!object.SkinUploadDirty))continue;
         const auto begin=_SkinPaletteOffsets[object.InstanceIndex];
         const auto end=begin+static_cast<std::uint32_t>(object.SkinMatrices.size());
-        std::copy(object.SkinMatrices.begin(),object.SkinMatrices.end(),_SkinPaletteMatrices.begin()+begin);
+        // Instanced skinning uses xyz of the transformed position and the
+        // linear part for normals. Preserve all of those coefficients.
+        std::transform(object.SkinMatrices.begin(),object.SkinMatrices.end(),_SkinPaletteMatrices.begin()+begin,
+            [](const Mat4& matrix) {
+                const auto& m=matrix.Data;
+                return InstanceBoneMatrix{{m[0],m[4],m[8],m[12]},{m[1],m[5],m[9],m[13]},{m[2],m[6],m[10],m[14]}};
+            });
         object.SkinUploadDirty=false;
         if(fullUpload)continue;
         if(spanCount&&spans[spanCount-1].End==begin)spans[spanCount-1].End=end;
@@ -226,7 +232,7 @@ bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
     }
     if(!fullUpload&&!spanCount)return true;
     const auto offsetBytes=_SkinPaletteOffsets.size()*sizeof(std::uint32_t);
-    const auto matrixBytes=_SkinPaletteMatrices.size()*sizeof(Mat4);
+    const auto matrixBytes=_SkinPaletteMatrices.size()*sizeof(InstanceBoneMatrix);
     if(!ReserveInstanceBuffer(_Device,_SkinPaletteOffsetsBuffer,offsetBytes,GRHI::BufferUsage::VertexStorage)||
        !ReserveInstanceBuffer(_Device,_SkinPaletteBuffer,matrixBytes,GRHI::BufferUsage::VertexStorage))
         return Fail(DeviceError("Allocate skinned instance buffers"));
@@ -236,7 +242,8 @@ bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
     if(fullUpload)uploads[uploadCount++]={_SkinPaletteBuffer,0,_SkinPaletteMatrices.data(),matrixBytes,true};
     else for(std::size_t i=0;i<spanCount;++i) {
         const auto [begin,end]=spans[i];
-        uploads[uploadCount++]={_SkinPaletteBuffer,begin*sizeof(Mat4),_SkinPaletteMatrices.data()+begin,(end-begin)*sizeof(Mat4)};
+        uploads[uploadCount++]={_SkinPaletteBuffer,begin*sizeof(InstanceBoneMatrix),
+            _SkinPaletteMatrices.data()+begin,(end-begin)*sizeof(InstanceBoneMatrix)};
     }
     if(!command.UploadBuffers(uploads.data(),uploadCount))return Fail(DeviceError("Upload skinned instance palettes"));
     ++_Statistics.InstanceBufferUploads;

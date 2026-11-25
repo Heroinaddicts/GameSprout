@@ -2,6 +2,8 @@
 #include "RuntimeRenderResourceCache.h"
 #include "RuntimeMath.h"
 #include "RuntimeEnvironment.h"
+#include "GameSproutRuntime.h"
+#include "Scene.h"
 #include <algorithm>
 #include <cmath>
 
@@ -75,6 +77,44 @@ bool Renderer::UsesPlanarReflection(const PreparedDraw& draw) const {
     return _PlanarParameters.X>0&&draw.Material->PlanarReflection;
 }
 
+bool Renderer::ExtractPlanarObjects(const RenderView& view,const Renderer& source) {
+    const auto& scene=static_cast<const Scene&>(*view.Scene);
+    const auto revision=scene.GetRenderRevision();
+    const auto mask=view.Camera.Projection.CullingMask;
+    if(!_ObjectSnapshotKnown||_ObjectSceneID!=scene.GetInstanceID()||_ObjectCullingMask!=mask||
+       _ObjectRequiredStaticFlags!=view.RequiredStaticFlags||!scene.HasSameRenderStructure(_ObjectSceneRevision)||
+       _SceneObjectIndices.size()!=_SceneObjects.size())return Extract(view,_SceneObjects);
+    if(_ObjectSceneRevision!=revision) {
+        if(revision-_ObjectSceneRevision<_SceneObjects.size())return Extract(view,_SceneObjects);
+        // The reflected layer mask is a subset of the main camera's mask.
+        // Read those drawables from the already extracted scene instead of
+        // visiting changed descendants excluded by the reflection mask.
+        const bool meshesChanged=scene.HasRenderMeshChanges(_ObjectSceneRevision);
+        const bool materialsChanged=scene.HasRenderMaterialChanges(_ObjectSceneRevision);
+        const RenderFrustum::Frustum frustum(_PreparedViewProjection);
+        for(auto& draw:_SceneObjects) {
+            const auto match=source._SceneObjectIndices.find(draw.ObjectID);
+            // Rescan through the ordinary path when a transform is no longer
+            // renderable. It also tracks singular objects becoming valid.
+            if(match==source._SceneObjectIndices.end()||match->second>=source._SceneObjects.size())
+                return Extract(view,_SceneObjects);
+            const auto& current=source._SceneObjects[match->second];
+            const bool changedMesh=meshesChanged&&draw.Mesh!=current.Mesh;
+            const bool changedMaterials=materialsChanged&&draw.Materials!=current.Materials;
+            if(changedMesh||changedMaterials) {
+                const auto* node=_Runtime.QueryGameObject(draw.ObjectID);
+                if(!node||(changedMesh&&!UpdateDrawMesh(draw,*node))||
+                   (changedMaterials&&!UpdateDrawMaterials(draw,*node)))return Extract(view,_SceneObjects);
+            }
+            if(!UpdateDrawTransform(draw,current.Model,frustum))return Extract(view,_SceneObjects);
+        }
+        _ObjectSceneRevision=revision;
+    }
+    _Statistics.SkippedObjects+=_ExtractionSkipped;
+    Diagnostic(_ExtractionDiagnostic);
+    return true;
+}
+
 void Renderer::BindPlanarReflection(GRHI::IRenderPass& pass,const PreparedDraw& draw,LitUniform& uniform) {
     const bool enabled=UsesPlanarReflection(draw);
     if(enabled)uniform.PlanarReflection=_PlanarParameters;
@@ -134,8 +174,16 @@ bool Renderer::RenderPlanarReflection(GRHI::ICommandBuffer& command,const Render
 
     auto* depth=capture.DepthTarget(desiredWidth,desiredHeight);
     if(!depth)return Fail("Planar reflection: "+capture._Error);
-    if(!capture.Extract(reflected,capture._SceneObjects)||
-       !capture.ExtractLights(reflected.Scene,capture._SceneLights))return Fail("Planar reflection: "+capture._Error);
+    if(!capture.ExtractPlanarObjects(reflected,*this))return Fail("Planar reflection: "+capture._Error);
+    // ExtractLights is camera-independent. Retain the capture's own selection
+    // caches while sharing the submitted frame's light values and revision.
+    if(!capture._LightSnapshotKnown||capture._LocalLightGeneration!=_LocalLightGeneration) {
+        capture._SceneLights=_SceneLights;
+        capture._LocalLights=_LocalLights;
+        capture._LocalLightGeneration=_LocalLightGeneration;
+        capture._LightSnapshotKnown=true;
+    }
+    capture.Diagnostic(_LightDiagnostic);
     capture._ShaderFrame=_ShaderFrame;
     capture._ShaderFrame.CameraPosition={reflected.Camera.Position.X,reflected.Camera.Position.Y,reflected.Camera.Position.Z,1};
     capture.PrepareDraws(reflected,reflectedViewProjection);

@@ -176,12 +176,25 @@ void CheckSkinnedInstances(IGameSproutRuntime& runtime,IRuntimeViewport& viewpor
         right->GetTransform()->SetLocalPosition({1.5f,0,0});
         const auto changed=Pixels(viewport,view);
         stats=viewport.GetStatistics();
-        Check(stats.DrawCalls==1&&stats.InstancedInstances==2&&stats.InstanceTransformUploadBytes==128,
+        Check(stats.DrawCalls==1&&stats.InstancedInstances==2&&stats.InstanceTransformUploadBytes==128&&
+            stats.InstanceSkinPaletteUploadBytes==2*48,
             "Skin pose or transform change dropped the compatible batch or failed to update its resident transform");
         Check(Sample(changed,stats,-1.2f,.72f,height)[0]>40&&Sample(changed,stats,1.5f,-.72f,height)[0]>40&&
             Sample(changed,stats,-1.2f,-.72f,height)[0]==0&&Sample(changed,stats,1.2f,-.72f,height)[0]==0,
             "Changing both poses and one transform retained stale resident data");
         CompareSingleDraws(viewport,view,changed,"Instanced skin layout differed from per-object skin uniform");
+        auto* skin=left->GetComponent<ISkinnedMeshRendererComponent>();
+        Mat4 overridePose;
+        overridePose(0,0)=.75f;overridePose(1,1)=1.125f;
+        overridePose(0,1)=.25f;overridePose(1,3)=.25f;
+        overridePose(3,0)=.25f;overridePose(3,3)=1.5f;
+        Check(skin->SetSkinPose(std::span(&overridePose,1)),"Cannot set a matrix override");
+        const auto overridden=Pixels(viewport,view);
+        Check(viewport.GetStatistics().InstanceSkinPaletteUploadBytes==48,
+            "Changing one override did not upload a single packed matrix");
+        CompareSingleDraws(viewport,view,overridden,"Packed override changed the instanced vertex output");
+        Check(skin->SetSkinPose({}),"Cannot clear the matrix override");
+        Equivalent(Pixels(viewport,view),changed,"Clearing a matrix override retained a stale instance pose");
         Check(runtime.DestroyScene(scene),"Cannot remove skinned instance scene");
     }
     runtime.SetResourceProvider(nullptr);

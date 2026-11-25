@@ -6,6 +6,8 @@
 #include "GRHIApi.h"
 #include <map>
 #include <memory>
+#include <optional>
+#include <span>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -154,6 +156,7 @@ private:
         RenderFrustum::Box CullBox;
         std::string Name;
         std::vector<Mat4> SkinMatrices;
+        std::size_t SkinStateIndex=0;
         bool Skinned=false;
         bool SkinPoseReady=false;
         bool SkinUploadDirty=false;
@@ -168,7 +171,7 @@ private:
         std::size_t ReflectionProbeIndex=0;
         std::array<std::uint32_t,MaxLocalLights> LocalLightIndices{};
     };
-    struct SkinnedDrawState {std::size_t ObjectIndex;Bounds LocalBounds;};
+    struct SkinnedDrawState {std::size_t ObjectIndex;Bounds LocalBounds;std::uint64_t OverrideRevision=0;};
     struct DrawUniform {Mat4 Model,ViewProjection,Normal;Color BaseColor;Vector4 TextureST{1,1,0,0};};
     struct FrameUniform {Vector4 Time,CameraPosition,MainLightDirection,MainLightColor;};
     static_assert(sizeof(FrameUniform)==64);
@@ -314,6 +317,7 @@ private:
     bool UploadSkinPalettes(GRHI::ICommandBuffer&);
     bool UploadInstanceStream(GRHI::ICommandBuffer&,InstanceStream&);
     bool PrepareColorInstances(GRHI::ICommandBuffer&,const RenderView&);
+    bool ExtractPlanarObjects(const RenderView&,const Renderer& source);
     bool RenderPlanarReflection(GRHI::ICommandBuffer&,const RenderView&,std::uint32_t width,std::uint32_t height,
         const RenderEnvironment::Uniform&,const EnvironmentGPU*,const EnvironmentGPU*);
     bool IsPlanarReceiver(const PreparedDraw&,const PlanarReflectionSettings&,Vector3 eye) const;
@@ -409,10 +413,11 @@ private:
                    const std::vector<DebugBatch>& batches,std::vector<GRHI::IBuffer*>& buffers);
     bool BeginQuery(IScene* scene);
     bool QueryObject(IScene* scene,std::uint64_t objectID,IGameObject*& object,MeshGPU*& mesh,Mat4& model);
-    bool SkinMatrices(IGameObject& object,const MeshGPU& mesh,std::vector<Mat4>& matrices);
-    bool SkinPoseBounds(const MeshGPU& mesh,const std::vector<Mat4>& matrices,Bounds& bounds);
+    std::optional<std::span<const Mat4>> SkinMatrices(IGameObject& object,const MeshGPU& mesh,
+        std::vector<Mat4>& scratch,std::uint64_t& overrideRevision);
+    bool SkinPoseBounds(const MeshGPU& mesh,std::span<const Mat4> matrices,Bounds& bounds);
     bool PosedPositions(IGameObject& object,const MeshGPU& mesh,std::vector<Vector3>& positions);
-    bool PosedPositions(const MeshGPU& mesh,const std::vector<Mat4>& matrices,std::vector<Vector3>& positions);
+    bool PosedPositions(const MeshGPU& mesh,std::span<const Mat4> matrices,std::vector<Vector3>& positions);
     void SyncRevision();
     void ClearResources();
     void Diagnostic(const std::string& error);
@@ -513,7 +518,11 @@ private:
     GRHI::IBuffer* _SkinPaletteOffsetsBuffer=nullptr;
     GRHI::IBuffer* _SkinPaletteBuffer=nullptr;
     std::vector<std::uint32_t> _SkinPaletteOffsets,_SkinPaletteOffsetScratch;
-    std::vector<Mat4> _SkinPaletteMatrices;
+    struct InstanceBoneMatrix {
+        float Row0[4],Row1[4],Row2[4];
+    };
+    static_assert(sizeof(InstanceBoneMatrix)==48);
+    std::vector<InstanceBoneMatrix> _SkinPaletteMatrices;
     bool _SkinPaletteLayoutDirty=true;
     std::vector<InstanceVertex> _InstanceTransforms;
     std::vector<std::uint32_t> _ChangedInstanceTransforms;

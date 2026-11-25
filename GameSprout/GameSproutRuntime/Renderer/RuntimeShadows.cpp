@@ -151,7 +151,7 @@ bool Renderer::DrawShadowAtlas(GRHI::ICommandBuffer& command,GRHI::ITexture& atl
             const RenderFrustum::Frustum frustum(projection);
             for(const auto& candidate:candidates) {
                 const auto& object=*candidate.Object;
-                if(object.CullBoxKnown) {
+                if(object.CullBoxKnown&&!object.Skinned) {
                     // Reuse the transformed local mesh bounds. A world AABB
                     // expands again when projected onto the light's tilted axes.
                     if(frustum.Intersects(object.CullBox))AppendShadowBatch(candidate,instancing,work.Batches,stream.Indices);
@@ -355,8 +355,7 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
         auto* mesh=object.Geometry;
         Bounds local=mesh->Data.LocalBounds;
         if(mesh->CullBoundsKnown)local={mesh->CullMinimum*.5f+mesh->CullMaximum*.5f,mesh->CullMaximum*.5f-mesh->CullMinimum*.5f};
-        if(object.Skinned)if(auto* node=_Runtime.QueryGameObject(object.ObjectID))
-            if(auto* component=node->GetComponent<IMeshComponent>())local=component->GetLocalBounds();
+        if(object.Skinned)local=_SkinnedDraws[object.SkinStateIndex].LocalBounds;
         const Bounds world=WorldBounds(local,object.Model);
         auto& casters=dynamic?dynamicCasters:staticCasters;
         auto& bounds=dynamic?dynamicBounds:staticBounds;

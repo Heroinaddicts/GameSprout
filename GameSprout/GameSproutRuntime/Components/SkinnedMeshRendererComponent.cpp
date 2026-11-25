@@ -6,10 +6,17 @@
 #include <algorithm>
 #include <cstring>
 namespace GameSproutRuntime {
-SkinnedMeshRendererComponent::SkinnedMeshRendererComponent(IGameObject* object):BuiltinComponent<ISkinnedMeshRendererComponent>(object,"GameSproutRuntime.SkinnedMeshRenderer"){}
+namespace {
+GameObjectState* OwnerState(IGameObject* owner) {
+    const auto* access=dynamic_cast<const ObjectAccess*>(owner);
+    return access?&access->State():nullptr;
+}
+}
+SkinnedMeshRendererComponent::SkinnedMeshRendererComponent(IGameObject* object)
+    : BuiltinComponent<ISkinnedMeshRendererComponent>(object,"GameSproutRuntime.SkinnedMeshRenderer"),_OwnerState(OwnerState(object)) {}
 bool SkinnedMeshRendererComponent::SetAnimatorObjectID(std::uint64_t id){
-    auto* access=dynamic_cast<ObjectAccess*>(_GameObject);if(!access)return false;
-    auto& runtime=access->State().Owner;
+    if(!_OwnerState)return false;
+    auto& runtime=_OwnerState->Owner;
     if(id){auto* state=runtime.Find(id);if(!runtime.IsUsable(state)||state->GetScene()!=_GameObject->GetScene()||!state->Object->GetComponent<IAnimatorComponent>())return false;}
     if(_AnimatorID==id)return true;
     runtime.SetSkinAnimatorReference(_GameObject->GetInstanceID(),_AnimatorID,id);
@@ -18,14 +25,14 @@ bool SkinnedMeshRendererComponent::SetAnimatorObjectID(std::uint64_t id){
     return true;
 }
 bool SkinnedMeshRendererComponent::SetSkinPose(std::span<const Mat4> matrices) {
-    if(matrices.size()>128||!std::all_of(matrices.begin(),matrices.end(),
-        [](const Mat4& matrix){return RuntimeMath::IsFinite(matrix);}))return false;
-    auto* access=dynamic_cast<ObjectAccess*>(_GameObject);
-    if(!access||!access->State().Owner.IsUsable(&access->State()))return false;
+    if(matrices.size()>128||!_OwnerState||!_OwnerState->Owner.IsUsable(_OwnerState))return false;
     if(matrices.size()==_SkinPose.size()&&
        (matrices.empty()||!std::memcmp(matrices.data(),_SkinPose.data(),matrices.size_bytes())))return true;
+    if(!std::all_of(matrices.begin(),matrices.end(),
+        [](const Mat4& matrix){return RuntimeMath::IsFinite(matrix);}))return false;
     _SkinPose.assign(matrices.begin(),matrices.end());
-    if(auto* scene=access->State().SceneOwner)scene->InvalidateSkinPose();
+    ++_SkinPoseRevision;
+    if(auto* scene=_OwnerState->SceneOwner)scene->InvalidateSkinPose();
     return true;
 }
 bool SkinnedMeshRendererComponent::GetSkinMatrices(const std::vector<SkinBinding>& bones,std::vector<Mat4>& output,std::string& error) const {
@@ -35,10 +42,10 @@ bool SkinnedMeshRendererComponent::GetPresentationSkinMatrices(const std::vector
     return BuildSkinMatrices(bones,output,error,true);
 }
 bool SkinnedMeshRendererComponent::BuildSkinMatrices(const std::vector<SkinBinding>& bones,std::vector<Mat4>& output,std::string& error,bool presentation) const {
-    output.clear();error.clear();auto* access=dynamic_cast<ObjectAccess*>(_GameObject);
-    if(!access){error="SkinnedMeshRenderer has no live Runtime owner";return false;}
-    auto& runtime=access->State().Owner;
-    if(!runtime.IsInScene(&access->State())){error="SkinnedMeshRenderer is not attached to a live scene";return false;}
+    output.clear();error.clear();
+    if(!_OwnerState){error="SkinnedMeshRenderer has no live Runtime owner";return false;}
+    auto& runtime=_OwnerState->Owner;
+    if(!runtime.IsInScene(_OwnerState)){error="SkinnedMeshRenderer is not attached to a live scene";return false;}
     if(!_SkinPose.empty()) {
         if(_SkinPose.size()!=bones.size()){error="Runtime skin pose does not match the mesh bone count";return false;}
         output=_SkinPose;

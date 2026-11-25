@@ -116,28 +116,27 @@ cbuffer SkinUniform : register(b1, space1)
 };
 
 struct InstanceBoneMatrix {
-    float4 Column0;
-    float4 Column1;
-    float4 Column2;
-    float4 Column3;
+    float4 Row0;
+    float4 Row1;
+    float4 Row2;
 };
 StructuredBuffer<uint> InstanceSkinOffsets : register(t1, space0);
 StructuredBuffer<InstanceBoneMatrix> InstanceSkinMatrices : register(t2, space0);
 
-float4x4 LoadInstanceBoneMatrix(uint index)
+float3x4 LoadInstanceBoneMatrix(uint index)
 {
     InstanceBoneMatrix bone = InstanceSkinMatrices[index];
-    return transpose(float4x4(bone.Column0, bone.Column1, bone.Column2, bone.Column3));
+    return float3x4(bone.Row0, bone.Row1, bone.Row2);
 }
 
-float4x4 BlendInstanceSkin(uint slot, uint4 bones, float4 weights)
+float3x4 BlendInstanceSkin(uint slot, uint4 bones, float4 weights)
 {
     uint4 indices = bones + InstanceSkinOffsets[slot];
     return LoadInstanceBoneMatrix(indices.x) * weights.x + LoadInstanceBoneMatrix(indices.y) * weights.y
          + LoadInstanceBoneMatrix(indices.z) * weights.z + LoadInstanceBoneMatrix(indices.w) * weights.w;
 }
 
-float3 TransformSkinNormal(float4x4 skin, float3 normal)
+float3 TransformSkinNormal(float3x4 skin, float3 normal)
 {
     // Inverse transpose of the blended linear deformation, including nonuniform bone scale.
     float3 a = float3(skin[0][0], skin[1][0], skin[2][0]);
@@ -156,14 +155,14 @@ MeshOutput SkinVertex(float3 position, float3 normal, float4 color, float2 uv, u
     // Each matrix maps the bind mesh's local space into this instance's current mesh local space.
     float4x4 skin = SkinBones[bones.x] * weights.x + SkinBones[bones.y] * weights.y
                  + SkinBones[bones.z] * weights.z + SkinBones[bones.w] * weights.w;
-    return TransformVertex(mul(skin, float4(position, 1.0)).xyz, TransformSkinNormal(skin, normal), color, uv);
+    return TransformVertex(mul(skin, float4(position, 1.0)).xyz, TransformSkinNormal((float3x4)skin, normal), color, uv);
 }
 
 MeshOutput InstancedSkinVertex(float3 position, float3 normal, float4 color, float2 uv,
     uint4 bones, float4 weights, uint slot)
 {
-    float4x4 skin = BlendInstanceSkin(slot, bones, weights);
-    return TransformInstanceVertex(mul(skin, float4(position, 1.0)).xyz,
+    float3x4 skin = BlendInstanceSkin(slot, bones, weights);
+    return TransformInstanceVertex(mul(skin, float4(position, 1.0)),
         TransformSkinNormal(skin, normal), color, uv, slot);
 }
 MeshOutput SkinnedMeshVertex(MeshInput input,
@@ -700,7 +699,7 @@ float4 InstancedSkinnedShadowVertex([[vk::location(0)]] float3 position : TEXCOO
     [[vk::location(4)]] uint4 bones : TEXCOORD4, [[vk::location(5)]] float4 weights : TEXCOORD5,
     [[vk::location(6)]] uint slot : TEXCOORD6) : SV_Position
 {
-    float3 skinned = mul(BlendInstanceSkin(slot, bones, weights), float4(position, 1.0)).xyz;
+    float3 skinned = mul(BlendInstanceSkin(slot, bones, weights), float4(position, 1.0));
     InstanceTransform instance = InstanceTransforms[slot];
     float4 worldPosition = instance.Model0 * skinned.x + instance.Model1 * skinned.y
                          + instance.Model2 * skinned.z + instance.Model3;

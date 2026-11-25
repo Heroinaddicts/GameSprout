@@ -13,33 +13,41 @@ void Renderer::RefreshSkinPoses(const RenderFrustum::Frustum& frustum) {
         if(!object.Geometry)object.Geometry=Mesh(object.Mesh);
         auto* mesh=object.Geometry;
         auto* node=_Runtime.QueryGameObject(object.ObjectID);
-        bool ready=mesh&&node&&SkinMatrices(*node,*mesh,_SkinScratch);
+        std::uint64_t overrideRevision=0;
+        const auto palette=mesh&&node?SkinMatrices(*node,*mesh,_SkinScratch,overrideRevision):std::nullopt;
+        bool ready=palette.has_value();
         auto* component=node?dynamic_cast<MeshComponent*>(node->GetComponent<IMeshComponent>()):nullptr;
         if(ready) {
-            const bool samePose=object.SkinPoseReady&&object.SkinMatrices.size()==_SkinScratch.size()&&
-                std::equal(_SkinScratch.begin(),_SkinScratch.end(),object.SkinMatrices.begin(),[](const Mat4& a,const Mat4& b) {
-                    return !std::memcmp(a.Data,b.Data,sizeof(a.Data));
-                });
+            const bool samePose=object.SkinPoseReady&&object.SkinMatrices.size()==palette->size()&&
+                (overrideRevision?skin.OverrideRevision==overrideRevision:
+                    (palette->empty()||!std::memcmp(palette->data(),object.SkinMatrices.data(),palette->size_bytes())));
             if(!samePose) {
-                ready=SkinPoseBounds(*mesh,_SkinScratch,skin.LocalBounds);
+                ready=SkinPoseBounds(*mesh,*palette,skin.LocalBounds);
                 if(ready) {
-                    object.SkinMatrices.swap(_SkinScratch);
+                    if(overrideRevision)object.SkinMatrices.assign(palette->begin(),palette->end());
+                    else object.SkinMatrices.swap(_SkinScratch);
                     object.SkinUploadDirty=true;
+                    object.CullBoxKnown=false;
                 }
             }
-            if(ready&&component&&component->GetMesh()==object.Mesh)component->_Bounds=skin.LocalBounds;
-        } else if(!mesh&&component&&component->GetMesh()==object.Mesh)component->_Bounds={};
+            if(ready&&component&&component->_Mesh==object.Mesh)component->_Bounds=skin.LocalBounds;
+        } else if(!mesh&&component&&component->_Mesh==object.Mesh)component->_Bounds={};
         if(object.SkinPoseReady!=ready) {
             _PreparedKnown=false;
             _OpaqueDrawOrderKnown=false;
         }
         object.SkinPoseReady=ready;
-        if(!ready) {object.SkinMatrices.clear();continue;}
+        skin.OverrideRevision=overrideRevision;
+        if(!ready) {object.SkinMatrices.clear();object.CullBoxKnown=false;continue;}
         // Bounds are derived from the current skin palette, including vertices
         // that move across the frustum independently of their object transform.
         // The shadow passes still read every caster's palette and pose bounds.
-        const auto& bounds=skin.LocalBounds;
-        const bool outside=!frustum.Intersects(bounds.Center-bounds.Extents,bounds.Center+bounds.Extents,object.Model);
+        if(!object.CullBoxKnown) {
+            const auto& bounds=skin.LocalBounds;
+            object.CullBox=RenderFrustum::Box(bounds.Center-bounds.Extents,bounds.Center+bounds.Extents,object.Model);
+            object.CullBoxKnown=true;
+        }
+        const bool outside=!frustum.Intersects(object.CullBox);
         if(outside!=object.SkinOutsideFrustum)_PreparedKnown=false;
         object.SkinOutsideFrustum=outside;
     }
@@ -86,7 +94,7 @@ void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
         // 更新已加载资源的派生 bounds；不修改节点属性、主相机、Undo 或源场景快照。
         if(!object.Skinned&&!object.BoundsInitialized)if(auto* node=_Runtime.QueryGameObject(object.ObjectID)) {
             if(auto* component=dynamic_cast<MeshComponent*>(node->GetComponent<IMeshComponent>());
-               component && component->GetMesh()==object.Mesh) {
+               component && component->_Mesh==object.Mesh) {
                 component->_Bounds=mesh?mesh->Data.LocalBounds:Bounds{};
                 object.BoundsInitialized=true;
             }
