@@ -5,7 +5,7 @@
 #include <algorithm>
 
 namespace GRHI {
-static constexpr uint32_t VertexElementSizes[]={8,12,16,16,4};
+static constexpr uint32_t VertexElementSizes[]={8,12,16,16,4,4};
 PipelineSDL::PipelineSDL(DeviceSDL* owner, uint64_t id, SDL_GPUGraphicsPipeline* native,const GraphicsPipelineDesc& desc,
                          uint32_t samplers,uint32_t vertexUniforms,uint32_t fragmentUniforms,uint32_t vertexStorageBuffers)
     : IGraphicsPipeline(id),Owner(owner),Native(native),Format(desc.ColorFormat),SamplerCount(samplers),
@@ -70,7 +70,8 @@ IGraphicsPipeline* DeviceSDL::CreateGraphicsPipeline(const GraphicsPipelineDesc&
             SDL_GPU_VERTEXINPUTRATE_INSTANCE:SDL_GPU_VERTEXINPUTRATE_VERTEX,0});
     }
     const SDL_GPUVertexElementFormat formats[]={SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
-        SDL_GPU_VERTEXELEMENTFORMAT_UINT4,SDL_GPU_VERTEXELEMENTFORMAT_UINT};
+        SDL_GPU_VERTEXELEMENTFORMAT_UINT4,SDL_GPU_VERTEXELEMENTFORMAT_UINT,SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4};
+    static_assert(std::size(formats)==std::size(VertexElementSizes));
     for(size_t index=0;index<desc.VertexAttributeCount;++index) {
         const auto& a=desc.VertexAttributes[index];
         const auto f=static_cast<unsigned>(a.Format);

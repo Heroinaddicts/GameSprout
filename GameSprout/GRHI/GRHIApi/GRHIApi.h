@@ -214,7 +214,7 @@ namespace GRHI {
     };
 
     // UInt32x4 保留整数输入语义，可用于任意四分量索引数据。
-    enum class VertexFormat : uint8_t { Float2, Float3, Float4, UInt32x4, UInt32 };
+    enum class VertexFormat : uint8_t { Float2, Float3, Float4, UInt32x4, UInt32, UInt8x4 };
     // Instance advances once per instance, independently of mesh vertex indices.
     // firstInstance selects the first record in an Instance-rate binding.
     enum class VertexInputRate : uint8_t { Vertex, Instance };
