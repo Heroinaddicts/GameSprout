@@ -1,0 +1,25 @@
+{
+  "Version": 1,
+  "Guid": "a5de5c02eee05954adc9ff678c2a41c2",
+  "ImporterType": "Texture",
+  "Path": "Characters/Horse/Textures/BayCoat_Normal.png",
+  "ImportSettings": {
+    "ColorSpace": "Linear",
+    "AlphaSource": "FromSource",
+    "AlphaIsTransparency": false,
+    "MaxSize": 4096,
+    "GenerateMipmaps": true,
+    "KeepCPUCopy": false,
+    "FilterMode": "Bilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat"
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 1,
+      "SourceKey": "main",
+      "Name": "BayCoat_Normal"
+    }
+  ]
+}

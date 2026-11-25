@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Guid": "7a2cb86bc15a07b4ca6dd2cc91e9974f",
+  "Path": "MedievalCastle/Textures/MC_Door/MC_Door_A.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "GenerateMipmaps": true,
+    "FilterMode": "Trilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat",
+    "MaxSize": 2048
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Door_A"
+    }
+  ]
+}

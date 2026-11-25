@@ -1,0 +1,42 @@
+{
+  "Version": 1,
+  "Guid": "5a3e5670727f0b949adb1c47c6e50ef7",
+  "Path": "MedievalCastle/Models/MC_Castle_Tower_A_15m.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Tower_A_15m_Collider#0",
+      "Name": "MC_Castle_Tower_A_15m_Collider.001",
+      "LocalID": 13441056390343897621
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Tower_A_15m_LOD0#0",
+      "Name": "MC_Castle_Tower_A_15m_LOD0.001",
+      "LocalID": 6740324783141921528
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Tower_A_15m_LOD1#0",
+      "Name": "MC_Castle_Tower_A_15m_LOD1.001",
+      "LocalID": 8509410098111938146
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Tower_A_15m_LOD2#0",
+      "Name": "MC_Castle_Tower_A_15m_LOD2.001",
+      "LocalID": 6029991899900373975
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Tower_A_15m",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

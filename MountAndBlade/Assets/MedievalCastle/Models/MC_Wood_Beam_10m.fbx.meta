@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Guid": "960b7bb322c49134291baed10ada1d16",
+  "Path": "MedievalCastle/Models/MC_Wood_Beam_10m.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Wood_Beam_10m#0",
+      "Name": "MC_Wood_Beam_10m.001",
+      "LocalID": 3013484246916069299
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Wood_Beam_10m",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

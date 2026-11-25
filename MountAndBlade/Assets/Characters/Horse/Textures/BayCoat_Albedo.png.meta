@@ -1,0 +1,25 @@
+{
+  "Version": 1,
+  "Guid": "b78a1ae7cc0d54e0b7713bfc9d47e4c9",
+  "ImporterType": "Texture",
+  "Path": "Characters/Horse/Textures/BayCoat_Albedo.png",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "AlphaIsTransparency": false,
+    "MaxSize": 4096,
+    "GenerateMipmaps": true,
+    "KeepCPUCopy": false,
+    "FilterMode": "Bilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat"
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 1,
+      "SourceKey": "main",
+      "Name": "BayCoat_Albedo"
+    }
+  ]
+}

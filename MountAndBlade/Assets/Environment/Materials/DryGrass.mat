@@ -1,0 +1,27 @@
+{
+    "Version": 1,
+    "Name": "DryGrass",
+    "Shader": "GameSprout/Lit",
+    "BaseColor": [
+        1,
+        1,
+        1,
+        1
+    ],
+    "BaseColorTexture": {
+        "Guid": "c3abad7dc1cb5d22b5340db60e32e917",
+        "LocalID": 1
+    },
+    "BaseColorTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "Metallic": 0,
+    "Roughness": 0.9,
+    "DoubleSided": false,
+    "EnableGPUInstancing": true,
+    "SpecularHighlights": true,
+    "Stylization": 0
+}

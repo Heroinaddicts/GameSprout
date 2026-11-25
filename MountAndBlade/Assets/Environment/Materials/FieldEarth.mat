@@ -1,0 +1,38 @@
+{
+    "Version": 1,
+    "Name": "FieldEarth",
+    "Shader": "GameSprout/Lit",
+    "BaseColor": [
+        1,
+        1,
+        1,
+        1
+    ],
+    "BaseColorTexture": {
+        "Guid": "ea1ef533e18f537e8374883ecade070d",
+        "LocalID": 1
+    },
+    "BaseColorTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "Metallic": 0,
+    "Roughness": 0.9,
+    "DoubleSided": false,
+    "EnableGPUInstancing": true,
+    "SpecularHighlights": true,
+    "Stylization": 0,
+    "NormalTexture": {
+        "Guid": "3883210417b751d4a8eac271f3310721",
+        "LocalID": 1
+    },
+    "NormalTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "NormalScale": 0.7
+}

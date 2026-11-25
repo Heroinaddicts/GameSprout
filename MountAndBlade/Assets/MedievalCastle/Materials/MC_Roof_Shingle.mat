@@ -1,0 +1,42 @@
+{
+  "BaseColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "BaseColorTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "NormalTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "Roughness": 0.5,
+  "Metallic": 0.0,
+  "NormalScale": 1.5,
+  "DoubleSided": false,
+  "Emission": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "Version": 1,
+  "Name": "MC_Roof_Shingle",
+  "Shader": "GameSprout/Lit",
+  "EnableGPUInstancing": true,
+  "BaseColorTexture": {
+    "Guid": "33b62da9c3f6fde49ba88805979d9609",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "d2c05ddd712930c40bd3291cd5dee68d",
+    "LocalID": 1
+  }
+}

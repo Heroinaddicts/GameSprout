@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "5f07a7c1f9ff5fe991d284c4ad0d5d69",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/FieldEarth.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "FieldEarth"
+        }
+    ]
+}

@@ -1,0 +1,38 @@
+{
+    "Version": 1,
+    "Name": "Limestone",
+    "Shader": "GameSprout/Lit",
+    "BaseColor": [
+        1,
+        1,
+        1,
+        1
+    ],
+    "BaseColorTexture": {
+        "Guid": "0085302141e95b76a1882fd2fcd47ac9",
+        "LocalID": 1
+    },
+    "BaseColorTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "Metallic": 0,
+    "Roughness": 0.9,
+    "DoubleSided": false,
+    "EnableGPUInstancing": true,
+    "SpecularHighlights": true,
+    "Stylization": 0,
+    "NormalTexture": {
+        "Guid": "1796954c2d3b5470a5b6d5d973a09ce3",
+        "LocalID": 1
+    },
+    "NormalTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "NormalScale": 0.7
+}

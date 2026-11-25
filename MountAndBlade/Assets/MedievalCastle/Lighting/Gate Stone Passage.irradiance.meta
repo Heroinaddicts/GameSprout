@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "053261d0d4ba54b682ca26bc61ee461d",
+  "ImporterType": "Irradiance",
+  "Path": "MedievalCastle/Lighting/Gate Stone Passage.irradiance",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 34,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Gate Stone Passage"
+    }
+  ]
+}

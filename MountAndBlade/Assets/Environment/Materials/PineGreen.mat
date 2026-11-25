@@ -1,0 +1,27 @@
+{
+    "Version": 1,
+    "Name": "PineGreen",
+    "Shader": "GameSprout/Lit",
+    "BaseColor": [
+        1,
+        1,
+        1,
+        1
+    ],
+    "BaseColorTexture": {
+        "Guid": "788c18a47a0e5b67a7c332547bec5ec9",
+        "LocalID": 1
+    },
+    "BaseColorTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "Metallic": 0,
+    "Roughness": 0.9,
+    "DoubleSided": false,
+    "EnableGPUInstancing": true,
+    "SpecularHighlights": true,
+    "Stylization": 0
+}

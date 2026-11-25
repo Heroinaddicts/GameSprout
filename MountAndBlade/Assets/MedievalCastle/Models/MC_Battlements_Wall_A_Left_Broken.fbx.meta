@@ -1,0 +1,30 @@
+{
+  "Version": 1,
+  "Guid": "022183f35a301974499ff7189c892bd5",
+  "Path": "MedievalCastle/Models/MC_Battlements_Wall_A_Left_Broken.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_A_Left_Broken_LOD0#0",
+      "Name": "MC_Battlements_Wall_A_Left_Broken_LOD0.001",
+      "LocalID": 6145612221505656776
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_A_Left_Broken_LOD1#0",
+      "Name": "MC_Battlements_Wall_A_Left_Broken_LOD1.001",
+      "LocalID": 9457403962602950101
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Battlements_Wall_A_Left_Broken",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

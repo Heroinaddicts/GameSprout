@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "62c4f41ae01d5f0b82a615fe26c5b816",
+  "ImporterType": "Irradiance",
+  "Path": "MedievalCastle/Lighting/West Courtyard.irradiance",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 34,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "West Courtyard"
+    }
+  ]
+}

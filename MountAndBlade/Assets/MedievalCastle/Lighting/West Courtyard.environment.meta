@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "af669b88ec235581b88bcf12fc69dcf3",
+  "ImporterType": "Environment",
+  "Path": "MedievalCastle/Lighting/West Courtyard.environment",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 33,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "West Courtyard"
+    }
+  ]
+}

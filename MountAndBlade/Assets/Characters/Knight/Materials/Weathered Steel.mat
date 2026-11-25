@@ -1,0 +1,33 @@
+{
+  "Version": 1,
+  "Name": "Weathered Steel",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "Roughness": 0.47,
+  "Metallic": 0.26,
+  "BaseColorTexture": {
+    "Guid": "fbfc836e4324ec1458fa154bac6ffba1",
+    "LocalID": 1
+  },
+  "BaseColorTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ],
+  "NormalTexture": {
+    "Guid": "1d072288233dd3b4e87cc4c240691d4f",
+    "LocalID": 1
+  },
+  "NormalTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ]
+}

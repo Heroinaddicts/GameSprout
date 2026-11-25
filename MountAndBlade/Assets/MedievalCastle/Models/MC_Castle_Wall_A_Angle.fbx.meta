@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Guid": "6457b7728be3ff549afcebbe666b8eff",
+  "Path": "MedievalCastle/Models/MC_Castle_Wall_A_Angle.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Wall_A_Angle#0",
+      "Name": "MC_Castle_Wall_A_Angle.001",
+      "LocalID": 9220756322154847502
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Wall_A_Angle",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

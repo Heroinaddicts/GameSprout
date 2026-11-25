@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "2388387f43a95b45aa5fe9f56a2e70d7",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/WeatheredOakNormal.png",
+    "ImportSettings": {
+        "ColorSpace": "Linear",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "WeatheredOakNormal"
+        }
+    ]
+}

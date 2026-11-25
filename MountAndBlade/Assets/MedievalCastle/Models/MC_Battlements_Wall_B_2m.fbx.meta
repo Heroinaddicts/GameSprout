@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Guid": "35b48bf9c8e26834db96690e52951f72",
+  "Path": "MedievalCastle/Models/MC_Battlements_Wall_B_2m.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_B_2m#0",
+      "Name": "MC_Battlements_Wall_B_2m.002",
+      "LocalID": 4811915400685471633
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Battlements_Wall_B_2m",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

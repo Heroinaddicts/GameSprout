@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "Guid": "6229cbc3a33967e4d941889b0f033f03",
+  "Path": "MedievalCastle/Models/MC_Castle_Stairs_A_01.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Stairs_A_01_Collider#0",
+      "Name": "MC_Castle_Stairs_A_01_Collider.001",
+      "LocalID": 13005924311424983091
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Stairs_A_01_LOD0#0",
+      "Name": "MC_Castle_Stairs_A_01_LOD0.001",
+      "LocalID": 8106994000498375972
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Stairs_A_01_LOD1#0",
+      "Name": "MC_Castle_Stairs_A_01_LOD1.001",
+      "LocalID": 6621268495560613315
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Stairs_A_01",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

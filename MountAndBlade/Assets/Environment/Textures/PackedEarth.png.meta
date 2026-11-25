@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "8fe4d3c980f75878b1995509c1c2d908",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/PackedEarth.png",
+    "ImportSettings": {
+        "ColorSpace": "SRGB",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "PackedEarth"
+        }
+    ]
+}

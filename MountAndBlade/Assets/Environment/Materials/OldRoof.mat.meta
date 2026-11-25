@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "aec6d2bf10795efc96a0798c38141345",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/OldRoof.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "OldRoof"
+        }
+    ]
+}

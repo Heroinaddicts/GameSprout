@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "c3abad7dc1cb5d22b5340db60e32e917",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/DryGrass.png",
+    "ImportSettings": {
+        "ColorSpace": "SRGB",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "DryGrass"
+        }
+    ]
+}

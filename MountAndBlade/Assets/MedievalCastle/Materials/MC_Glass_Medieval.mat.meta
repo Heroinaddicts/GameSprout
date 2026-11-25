@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "7996a9efdcacda44f9d7ff14a70ab3de",
+  "Path": "MedievalCastle/Materials/MC_Glass_Medieval.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Glass_Medieval"
+    }
+  ]
+}

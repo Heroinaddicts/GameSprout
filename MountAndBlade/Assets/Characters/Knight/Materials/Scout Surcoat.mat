@@ -1,0 +1,13 @@
+{
+  "Version": 1,
+  "Name": "Scout Surcoat",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    0.34,
+    0.055,
+    0.042,
+    1
+  ],
+  "Roughness": 0.88,
+  "Metallic": 0
+}

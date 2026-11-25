@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "3ac264de32fd5eb3ba8d62e2122d6b3a",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/FieldOakDistant_0.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "FieldOakDistant_0"
+        }
+    ]
+}

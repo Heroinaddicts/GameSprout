@@ -1,0 +1,19 @@
+{
+  "Version": 1,
+  "Guid": "75523ce52fd212440b3aa7099798b2f0",
+  "ImporterType": "Texture",
+  "Path": "Characters/Knight/Helmet_Normal.png",
+  "ImportSettings": {
+    "ColorSpace": "Linear",
+    "AlphaSource": "None",
+    "GenerateMipmaps": true
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Helmet_Normal"
+    }
+  ]
+}

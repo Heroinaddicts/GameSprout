@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Guid": "e20018d27c7f15a40982bbc3b78b7825",
+  "Path": "MedievalCastle/Textures/MC_Castle_Wall_C/MC_Castle_Wall_C_A.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "GenerateMipmaps": true,
+    "FilterMode": "Trilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat",
+    "MaxSize": 1024,
+    "Anisotropy": 8
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Castle_Wall_C_A"
+    }
+  ]
+}

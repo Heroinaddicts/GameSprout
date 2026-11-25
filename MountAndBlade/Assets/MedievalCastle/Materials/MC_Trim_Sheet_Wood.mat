@@ -1,0 +1,42 @@
+{
+  "BaseColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "BaseColorTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "NormalTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "Roughness": 0.5,
+  "Metallic": 0.0,
+  "NormalScale": 1.0,
+  "DoubleSided": false,
+  "Emission": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "Version": 1,
+  "Name": "MC_Trim_Sheet_Wood",
+  "Shader": "GameSprout/Lit",
+  "EnableGPUInstancing": true,
+  "BaseColorTexture": {
+    "Guid": "d0cc7aef23d62194db704332dcec5e0c",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "9c6d9a7d7d5e4da489b0ea87eecec011",
+    "LocalID": 1
+  }
+}

@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "333c27dd28675f40aab399b489c0b061",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/LeafGreen.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "LeafGreen"
+        }
+    ]
+}

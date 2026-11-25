@@ -1,0 +1,42 @@
+{
+  "BaseColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "BaseColorTextureST": [
+    1.5,
+    1.5,
+    0.0,
+    0.0
+  ],
+  "NormalTextureST": [
+    1.5,
+    1.5,
+    0.0,
+    0.0
+  ],
+  "Roughness": 0.748,
+  "Metallic": 0.0,
+  "NormalScale": 0.55,
+  "DoubleSided": false,
+  "Emission": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "Version": 1,
+  "Name": "MC_Castle_Wall_C",
+  "Shader": "GameSprout/Lit",
+  "EnableGPUInstancing": true,
+  "BaseColorTexture": {
+    "Guid": "e20018d27c7f15a40982bbc3b78b7825",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "8b3678ea7486a62419ccca2ee664b5ce",
+    "LocalID": 1
+  }
+}

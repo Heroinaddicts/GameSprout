@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "Guid": "71b9eeaf52aa2554d8e6df4d82db1263",
+  "Path": "MedievalCastle/Models/MC_Castle_Balcony.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Balcony_Collider#0",
+      "Name": "MC_Castle_Balcony_Collider",
+      "LocalID": 6728062735107817608
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Balcony_LOD0#0",
+      "Name": "MC_Castle_Balcony_LOD0",
+      "LocalID": 3906692561130913800
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Balcony_LOD1#0",
+      "Name": "MC_Castle_Balcony_LOD1",
+      "LocalID": 18167682114189669439
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Balcony",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

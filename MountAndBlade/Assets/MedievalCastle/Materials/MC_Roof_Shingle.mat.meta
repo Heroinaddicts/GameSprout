@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "4858b4bd9333f244fb5800fa21a38e83",
+  "Path": "MedievalCastle/Materials/MC_Roof_Shingle.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Roof_Shingle"
+    }
+  ]
+}

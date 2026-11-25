@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "2a55ad5bcc3d5a4298649b71f01d5835",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/ValleyCloudDome.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "ValleyCloudDome"
+        }
+    ]
+}

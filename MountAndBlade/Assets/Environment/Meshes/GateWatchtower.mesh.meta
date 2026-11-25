@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "657700e367ab5c90ad3e38ed7afb2a73",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/GateWatchtower.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "GateWatchtower"
+        }
+    ]
+}

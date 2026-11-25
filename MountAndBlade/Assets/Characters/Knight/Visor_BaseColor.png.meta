@@ -1,0 +1,19 @@
+{
+  "Version": 1,
+  "Guid": "066e25036d41fa54f8d6375b1db2f5ad",
+  "ImporterType": "Texture",
+  "Path": "Characters/Knight/Visor_BaseColor.png",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "None",
+    "GenerateMipmaps": true
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Visor_BaseColor"
+    }
+  ]
+}

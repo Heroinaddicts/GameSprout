@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "537dccc46eb55e879f7c64252ad8859d",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/OldRoofNormal.png",
+    "ImportSettings": {
+        "ColorSpace": "Linear",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "OldRoofNormal"
+        }
+    ]
+}

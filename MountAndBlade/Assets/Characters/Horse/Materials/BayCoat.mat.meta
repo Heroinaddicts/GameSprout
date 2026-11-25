@@ -1,0 +1,17 @@
+{
+  "Version": 1,
+  "Guid": "ea97ab49bdb851f2a7cd7c1a5a0f5ccc",
+  "ImporterType": "Material",
+  "Path": "Characters/Horse/Materials/BayCoat.mat",
+  "ImportSettings": {
+    "MainObjectID": 1
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 5,
+      "SourceKey": "main",
+      "Name": "BayCoat"
+    }
+  ]
+}

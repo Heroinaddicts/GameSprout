@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "ae243589de09b9d4fbd0489945ae75b0",
+  "Path": "MedievalCastle/Materials/MC_Rocks_Ground_02.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Rocks_Ground_02"
+    }
+  ]
+}

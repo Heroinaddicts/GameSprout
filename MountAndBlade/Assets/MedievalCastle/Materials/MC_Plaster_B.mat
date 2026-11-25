@@ -1,0 +1,42 @@
+{
+  "BaseColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "BaseColorTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "NormalTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "Roughness": 0.7150000000000001,
+  "Metallic": 0.0,
+  "NormalScale": 0.6,
+  "DoubleSided": false,
+  "Emission": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "Version": 1,
+  "Name": "MC_Plaster_B",
+  "Shader": "GameSprout/Lit",
+  "EnableGPUInstancing": true,
+  "BaseColorTexture": {
+    "Guid": "85eda1e0f43613740b4481f72b21c5d5",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "de435ce97fcd43247b445a9c8f25ed21",
+    "LocalID": 1
+  }
+}

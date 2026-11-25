@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Guid": "fd4c77d1828e2ad4eb038d6b19c1fd1d",
+  "Path": "MedievalCastle/Textures/MC_Trim_Sheet/MC_Trim_Sheet_A.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "GenerateMipmaps": true,
+    "FilterMode": "Trilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat",
+    "MaxSize": 2048
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Trim_Sheet_A"
+    }
+  ]
+}

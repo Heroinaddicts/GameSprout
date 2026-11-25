@@ -1,0 +1,25 @@
+{
+  "Version": 1,
+  "Guid": "da669ac172765d06aa83a8ce343772fc",
+  "ImporterType": "Texture",
+  "Path": "Characters/Horse/Textures/Saddle_Albedo.png",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "AlphaIsTransparency": false,
+    "MaxSize": 2048,
+    "GenerateMipmaps": true,
+    "KeepCPUCopy": false,
+    "FilterMode": "Bilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat"
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 1,
+      "SourceKey": "main",
+      "Name": "Saddle_Albedo"
+    }
+  ]
+}

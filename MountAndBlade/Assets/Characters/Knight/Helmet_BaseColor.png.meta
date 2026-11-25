@@ -1,0 +1,19 @@
+{
+  "Version": 1,
+  "Guid": "d9125a5c836cec14b94bb6bc40f13060",
+  "ImporterType": "Texture",
+  "Path": "Characters/Knight/Helmet_BaseColor.png",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "None",
+    "GenerateMipmaps": true
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Helmet_BaseColor"
+    }
+  ]
+}

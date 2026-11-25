@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "95d01769065551f9835129a05e17eb48",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/LimePlaster.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "LimePlaster"
+        }
+    ]
+}

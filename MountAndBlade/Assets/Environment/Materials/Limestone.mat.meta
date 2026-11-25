@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "cb132864d3ca5d388197c14f0261e5bd",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/Limestone.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "Limestone"
+        }
+    ]
+}

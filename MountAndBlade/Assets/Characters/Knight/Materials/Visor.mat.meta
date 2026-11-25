@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "f8aeae9e0da8503aa131f30af19e6e52",
+  "ImporterType": "Material",
+  "Path": "Characters/Knight/Materials/Visor.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Visor"
+    }
+  ]
+}

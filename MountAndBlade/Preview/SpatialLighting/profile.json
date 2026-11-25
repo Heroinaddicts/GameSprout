@@ -1,0 +1,499 @@
+{
+  "Platform": "macOS SDL3/Metal, Release Runtime + real scene, offscreen",
+  "SceneSHA256": "125568560a8051c6e6defcff767c0a116e7109db563a87284e1794f60cfd252d",
+  "FramesPerCase": 48,
+  "Resolution": [
+    2292,
+    954
+  ],
+  "Timing": "After warm-up, submit simulation/render in four batches of 12 frames and drain GPU/read pixels after each batch.",
+  "TravelMetres": 46.18059539794922,
+  "SourceUnchangedOnPlayStop": true,
+  "CapturedStaticMeshRenderers": 178,
+  "LocalReflectionProbes": 2,
+  "IrradianceGridSizes": [
+    [
+      3,
+      2,
+      3
+    ],
+    [
+      3,
+      2,
+      3
+    ]
+  ],
+  "RouteBaseline": [
+    {
+      "AdvanceMeanMs": 0.48253729166666665,
+      "AdvanceP95Ms": 0.657875,
+      "DrainedBatchMeanMsPerFrame": 3.6858298333333335,
+      "DrawCallsMean": 168.0,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        37.99534606933594,
+        -0.07371324300765991,
+        -0.009950201027095318
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "approach-idle",
+      "PlanarReflectionDrawCallsMean": 0.0,
+      "ReflectionProbeDrawCallsMean": 0.0,
+      "RenderSubmitMeanMs": 2.6083437291666676,
+      "RenderSubmitP95Ms": 3.509041,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 60.0,
+      "Start": [
+        37.99736022949219,
+        -0.07353872060775757,
+        -0.005644361488521099
+      ],
+      "StaticShadowDrawCallsMean": 0.0,
+      "TrianglesMean": 236528.0,
+      "Width": 2292
+    },
+    {
+      "AdvanceMeanMs": 0.5979877708333333,
+      "AdvanceP95Ms": 0.825667,
+      "DrainedBatchMeanMsPerFrame": 4.371548625,
+      "DrawCallsMean": 157.0,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        21.35580825805664,
+        -9.5367431640625e-07,
+        -0.011942033655941486
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "bridge-ride",
+      "PlanarReflectionDrawCallsMean": 0.0,
+      "ReflectionProbeDrawCallsMean": 0.0,
+      "RenderSubmitMeanMs": 3.044951291666667,
+      "RenderSubmitP95Ms": 3.965792,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 62.229166666666664,
+      "Start": [
+        24.233322143554688,
+        -8.940696716308594e-07,
+        -0.012175177223980427
+      ],
+      "StaticShadowDrawCallsMean": 2.2291666666666665,
+      "TrianglesMean": 230828.875,
+      "Width": 2292
+    },
+    {
+      "AdvanceMeanMs": 0.5555728541666667,
+      "AdvanceP95Ms": 0.745625,
+      "DrainedBatchMeanMsPerFrame": 4.4794227499999995,
+      "DrawCallsMean": 130.52083333333334,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        2.796304941177368,
+        -0.003661215305328369,
+        -0.011972161009907722
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "gate-ride-and-orbit",
+      "PlanarReflectionDrawCallsMean": 0.0,
+      "ReflectionProbeDrawCallsMean": 0.0,
+      "RenderSubmitMeanMs": 3.2442022708333322,
+      "RenderSubmitP95Ms": 4.296792,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 83.375,
+      "Start": [
+        5.844573020935059,
+        -0.0036611557006835938,
+        -0.0119471475481987
+      ],
+      "StaticShadowDrawCallsMean": 0.0,
+      "TrianglesMean": 199703.20833333334,
+      "Width": 2292
+    }
+  ],
+  "RouteSpatialLighting": [
+    {
+      "AdvanceMeanMs": 0.45516402083333324,
+      "AdvanceP95Ms": 0.789459,
+      "DrainedBatchMeanMsPerFrame": 5.065263854166666,
+      "DrawCallsMean": 172.0,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        37.99534606933594,
+        -0.07371324300765991,
+        -0.009950201027095318
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "approach-idle",
+      "PlanarReflectionDrawCallsMean": 167.0,
+      "ReflectionProbeDrawCallsMean": 14.0,
+      "RenderSubmitMeanMs": 3.8655799583333335,
+      "RenderSubmitP95Ms": 6.214542,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 60.0,
+      "Start": [
+        37.99736022949219,
+        -0.07353872060775757,
+        -0.005644361488521099
+      ],
+      "StaticShadowDrawCallsMean": 0.0,
+      "TrianglesMean": 236528.0,
+      "Width": 2292
+    },
+    {
+      "AdvanceMeanMs": 0.4520954375,
+      "AdvanceP95Ms": 0.549458,
+      "DrainedBatchMeanMsPerFrame": 4.8744114375,
+      "DrawCallsMean": 161.0,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        21.35580825805664,
+        -9.5367431640625e-07,
+        -0.011942033655941486
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "bridge-ride",
+      "PlanarReflectionDrawCallsMean": 154.125,
+      "ReflectionProbeDrawCallsMean": 14.0,
+      "RenderSubmitMeanMs": 3.5503533750000003,
+      "RenderSubmitP95Ms": 4.2445,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 62.229166666666664,
+      "Start": [
+        24.233322143554688,
+        -8.940696716308594e-07,
+        -0.012175177223980427
+      ],
+      "StaticShadowDrawCallsMean": 2.2291666666666665,
+      "TrianglesMean": 230828.875,
+      "Width": 2292
+    },
+    {
+      "AdvanceMeanMs": 0.5028446250000002,
+      "AdvanceP95Ms": 0.714292,
+      "DrainedBatchMeanMsPerFrame": 5.028842041666667,
+      "DrawCallsMean": 134.52083333333334,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        2.796304941177368,
+        -0.003661215305328369,
+        -0.011972161009907722
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "gate-ride-and-orbit",
+      "PlanarReflectionDrawCallsMean": 119.35416666666667,
+      "ReflectionProbeDrawCallsMean": 28.0,
+      "RenderSubmitMeanMs": 3.7975564583333323,
+      "RenderSubmitP95Ms": 4.561875,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 83.375,
+      "Start": [
+        5.844573020935059,
+        -0.0036611557006835938,
+        -0.0119471475481987
+      ],
+      "StaticShadowDrawCallsMean": 0.0,
+      "TrianglesMean": 199703.20833333334,
+      "Width": 2292
+    }
+  ],
+  "RouteSpatialLightingFirstPass": [
+    {
+      "AdvanceMeanMs": 0.5256788124999998,
+      "AdvanceP95Ms": 0.829167,
+      "DrainedBatchMeanMsPerFrame": 5.222913208333333,
+      "DrawCallsMean": 172.0,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        37.99534606933594,
+        -0.07371324300765991,
+        -0.009950201027095318
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "approach-idle",
+      "PlanarReflectionDrawCallsMean": 167.0,
+      "ReflectionProbeDrawCallsMean": 14.0,
+      "RenderSubmitMeanMs": 3.990711749999999,
+      "RenderSubmitP95Ms": 5.159209,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 60.0,
+      "Start": [
+        37.99736022949219,
+        -0.07353872060775757,
+        -0.005644361488521099
+      ],
+      "StaticShadowDrawCallsMean": 0.0,
+      "TrianglesMean": 236528.0,
+      "Width": 2292
+    },
+    {
+      "AdvanceMeanMs": 0.4882299791666666,
+      "AdvanceP95Ms": 0.647417,
+      "DrainedBatchMeanMsPerFrame": 5.002113708333334,
+      "DrawCallsMean": 161.0,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        21.35580825805664,
+        -9.5367431640625e-07,
+        -0.011942033655941486
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "bridge-ride",
+      "PlanarReflectionDrawCallsMean": 154.125,
+      "ReflectionProbeDrawCallsMean": 14.0,
+      "RenderSubmitMeanMs": 3.7993264166666663,
+      "RenderSubmitP95Ms": 4.733166,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 62.229166666666664,
+      "Start": [
+        24.233322143554688,
+        -8.940696716308594e-07,
+        -0.012175177223980427
+      ],
+      "StaticShadowDrawCallsMean": 2.2291666666666665,
+      "TrianglesMean": 230828.875,
+      "Width": 2292
+    },
+    {
+      "AdvanceMeanMs": 0.5435077291666667,
+      "AdvanceP95Ms": 0.802958,
+      "DrainedBatchMeanMsPerFrame": 5.652858500000001,
+      "DrawCallsMean": 134.52083333333334,
+      "DynamicShadowDrawCallsMean": 60.0,
+      "End": [
+        2.796304941177368,
+        -0.003661215305328369,
+        -0.011972161009907722
+      ],
+      "Frames": 48,
+      "Height": 954,
+      "Name": "gate-ride-and-orbit",
+      "PlanarReflectionDrawCallsMean": 119.35416666666667,
+      "ReflectionProbeDrawCallsMean": 28.0,
+      "RenderSubmitMeanMs": 4.3512890625,
+      "RenderSubmitP95Ms": 6.384458,
+      "SceneSnapshotRebuilds": 0.0,
+      "ShadowDrawCallsMean": 83.375,
+      "Start": [
+        5.844573020935059,
+        -0.0036611557006835938,
+        -0.0119471475481987
+      ],
+      "StaticShadowDrawCallsMean": 0.0,
+      "TrianglesMean": 199703.20833333334,
+      "Width": 2292
+    }
+  ],
+  "CaptureStats": {
+    "castle-overview": {
+      "CameraPosition": [
+        51.0,
+        14.0,
+        -35.0
+      ],
+      "Capture": "castle-overview.png",
+      "DrawCalls": 171,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 166,
+      "PlanarReflectionHeight": 324,
+      "PlanarReflectionWidth": 576,
+      "ReflectionProbeDrawCalls": 14,
+      "ShadowDrawCalls": 462,
+      "SpotShadowDrawCalls": 0,
+      "SpotShadowLights": 0,
+      "Triangles": 228518
+    },
+    "courtyard-indirect-off": {
+      "CameraPosition": [
+        -7.0,
+        2.200000047683716,
+        3.0
+      ],
+      "Capture": "courtyard-indirect-off.png",
+      "DrawCalls": 89,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 73,
+      "PlanarReflectionHeight": 324,
+      "PlanarReflectionWidth": 576,
+      "ReflectionProbeDrawCalls": 9,
+      "ShadowDrawCalls": 0,
+      "SpotShadowDrawCalls": 0,
+      "SpotShadowLights": 1,
+      "Triangles": 150741
+    },
+    "courtyard-indirect-on": {
+      "CameraPosition": [
+        -7.0,
+        2.200000047683716,
+        3.0
+      ],
+      "Capture": "courtyard-indirect-on.png",
+      "DrawCalls": 89,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 73,
+      "PlanarReflectionHeight": 324,
+      "PlanarReflectionWidth": 576,
+      "ReflectionProbeDrawCalls": 9,
+      "ShadowDrawCalls": 563,
+      "SpotShadowDrawCalls": 17,
+      "SpotShadowLights": 1,
+      "Triangles": 150741
+    },
+    "gate-indirect-off": {
+      "CameraPosition": [
+        8.0,
+        2.799999952316284,
+        0.0
+      ],
+      "Capture": "gate-indirect-off.png",
+      "DrawCalls": 116,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 102,
+      "PlanarReflectionHeight": 324,
+      "PlanarReflectionWidth": 576,
+      "ReflectionProbeDrawCalls": 14,
+      "ShadowDrawCalls": 0,
+      "SpotShadowDrawCalls": 0,
+      "SpotShadowLights": 2,
+      "Triangles": 167047
+    },
+    "gate-indirect-on": {
+      "CameraPosition": [
+        8.0,
+        2.799999952316284,
+        0.0
+      ],
+      "Capture": "gate-indirect-on.png",
+      "DrawCalls": 116,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 102,
+      "PlanarReflectionHeight": 324,
+      "PlanarReflectionWidth": 576,
+      "ReflectionProbeDrawCalls": 14,
+      "ShadowDrawCalls": 583,
+      "SpotShadowDrawCalls": 29,
+      "SpotShadowLights": 2,
+      "Triangles": 167047
+    },
+    "gate-probe-off": {
+      "CameraPosition": [
+        7.0,
+        1.5499999523162842,
+        0.6499999761581421
+      ],
+      "Capture": "gate-probe-off.png",
+      "DrawCalls": 102,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 88,
+      "PlanarReflectionHeight": 324,
+      "PlanarReflectionWidth": 576,
+      "ReflectionProbeDrawCalls": 0,
+      "ShadowDrawCalls": 0,
+      "SpotShadowDrawCalls": 0,
+      "SpotShadowLights": 2,
+      "Triangles": 172260
+    },
+    "gate-probe-on": {
+      "CameraPosition": [
+        7.0,
+        1.5499999523162842,
+        0.6499999761581421
+      ],
+      "Capture": "gate-probe-on.png",
+      "DrawCalls": 106,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 92,
+      "PlanarReflectionHeight": 324,
+      "PlanarReflectionWidth": 576,
+      "ReflectionProbeDrawCalls": 13,
+      "ShadowDrawCalls": 555,
+      "SpotShadowDrawCalls": 0,
+      "SpotShadowLights": 2,
+      "Triangles": 172260
+    },
+    "moat-planar-off": {
+      "CameraPosition": [
+        23.0,
+        -0.949999988079071,
+        -7.0
+      ],
+      "Capture": "moat-planar-off.png",
+      "DrawCalls": 158,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 0,
+      "PlanarReflectionHeight": 0,
+      "PlanarReflectionWidth": 0,
+      "ReflectionProbeDrawCalls": 14,
+      "ShadowDrawCalls": 0,
+      "SpotShadowDrawCalls": 0,
+      "SpotShadowLights": 2,
+      "Triangles": 190486
+    },
+    "moat-planar-on": {
+      "CameraPosition": [
+        23.0,
+        -0.949999988079071,
+        -7.0
+      ],
+      "Capture": "moat-planar-on.png",
+      "DrawCalls": 158,
+      "HorsePosition": [
+        38.0,
+        0.03309100866317749,
+        0.0
+      ],
+      "PlanarReflectionDrawCalls": 156,
+      "PlanarReflectionHeight": 324,
+      "PlanarReflectionWidth": 576,
+      "ReflectionProbeDrawCalls": 14,
+      "ShadowDrawCalls": 510,
+      "SpotShadowDrawCalls": 0,
+      "SpotShadowLights": 2,
+      "Triangles": 190486
+    }
+  },
+  "ComparisonAbsoluteRGBAbove7Pixels": {
+    "MoatPlanar": 157332,
+    "GateProbe": 271717,
+    "GateIndirect": 588721,
+    "CourtyardIndirect": 4765
+  }
+}

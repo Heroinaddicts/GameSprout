@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "a291371fe0d65970b84d790616e9f2df",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/DryGrass.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "DryGrass"
+        }
+    ]
+}

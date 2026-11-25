@@ -1,0 +1,19 @@
+{
+  "Version": 1,
+  "Guid": "fbfc836e4324ec1458fa154bac6ffba1",
+  "ImporterType": "Texture",
+  "Path": "Characters/Knight/Body_BaseColor.png",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "None",
+    "GenerateMipmaps": true
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Body_BaseColor"
+    }
+  ]
+}

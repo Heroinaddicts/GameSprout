@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Guid": "ebe08d26bb21df24094eba000dd31848",
+  "Path": "MedievalCastle/Models/MC_Castle_Wall_B_4m.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Wall_B_4m#0",
+      "Name": "MC_Castle_Wall_B_4m.001",
+      "LocalID": 8485417643878973922
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Wall_B_4m",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

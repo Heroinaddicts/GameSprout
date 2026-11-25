@@ -1,0 +1,27 @@
+{
+    "Version": 1,
+    "Name": "LimePlaster",
+    "Shader": "GameSprout/Lit",
+    "BaseColor": [
+        1,
+        1,
+        1,
+        1
+    ],
+    "BaseColorTexture": {
+        "Guid": "b6f4f4ff855056d2aea9ee3f2d849021",
+        "LocalID": 1
+    },
+    "BaseColorTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "Metallic": 0,
+    "Roughness": 0.9,
+    "DoubleSided": false,
+    "EnableGPUInstancing": true,
+    "SpecularHighlights": true,
+    "Stylization": 0
+}

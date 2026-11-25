@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "63ff572966645a06aee474948f08845f",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/ScotsPine_1.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "ScotsPine_1"
+        }
+    ]
+}

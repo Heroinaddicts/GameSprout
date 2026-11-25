@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "ca32321542d1e184fbfdfca3a4cd13d5",
+  "Path": "MedievalCastle/Materials/MC_Plaster_B.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Plaster_B"
+    }
+  ]
+}

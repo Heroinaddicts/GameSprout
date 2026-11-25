@@ -1,0 +1,14 @@
+{
+    "Version": 1,
+    "Name": "Valley Clouds",
+    "Shader": {
+        "Guid": "7593328ca5f85ca1bbee2c0d1f28453c",
+        "LocalID": 1
+    },
+    "CloudTexture": {
+        "Guid": "094dd13d0bd457668bea62941c551a89",
+        "LocalID": 1
+    },
+    "SortingPriority": -50,
+    "EnableGPUInstancing": false
+}

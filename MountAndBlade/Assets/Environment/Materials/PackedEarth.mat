@@ -1,0 +1,38 @@
+{
+    "Version": 1,
+    "Name": "PackedEarth",
+    "Shader": "GameSprout/Lit",
+    "BaseColor": [
+        1,
+        1,
+        1,
+        1
+    ],
+    "BaseColorTexture": {
+        "Guid": "8fe4d3c980f75878b1995509c1c2d908",
+        "LocalID": 1
+    },
+    "BaseColorTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "Metallic": 0,
+    "Roughness": 0.9,
+    "DoubleSided": false,
+    "EnableGPUInstancing": true,
+    "SpecularHighlights": true,
+    "Stylization": 0,
+    "NormalTexture": {
+        "Guid": "29d1c13f733d594fa62dc25f524b4737",
+        "LocalID": 1
+    },
+    "NormalTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "NormalScale": 0.7
+}

@@ -1,0 +1,63 @@
+{
+  "PlanarReflection": {
+    "Enabled": true,
+    "Height": -2.75,
+    "ResolutionScale": 0.45,
+    "MaxResolution": 832,
+    "Strength": 1,
+    "MaxDistance": 100,
+    "LayerMask": 4294967039
+  },
+  "ReflectionProbes": [
+    {
+      "File": "Gate Stone Passage.environment",
+      "CapturePosition": [4.2, 1.75, 0],
+      "CaptureEdge": 128,
+      "CaptureFar": 130,
+      "Center": [4.3, 2.2, 0],
+      "Size": [8.5, 5.5, 5.8],
+      "BlendDistance": 0.75,
+      "Intensity": 1,
+      "Priority": 2,
+      "BoxProjection": true
+    },
+    {
+      "File": "West Courtyard.environment",
+      "CapturePosition": [-10.4, 2.25, 0.2],
+      "CaptureEdge": 128,
+      "CaptureFar": 130,
+      "Center": [-10.4, 2.6, 0],
+      "Size": [13, 6, 16],
+      "BlendDistance": 2,
+      "Intensity": 1,
+      "Priority": 1,
+      "BoxProjection": true
+    }
+  ],
+  "IndirectLightVolumes": [
+    {
+      "File": "Gate Stone Passage.irradiance",
+      "Center": [4.2, 2.3, 0],
+      "Size": [8, 5, 5.1],
+      "Grid": [3, 2, 3],
+      "CaptureEdge": 48,
+      "CaptureFar": 100,
+      "MinimumCaptureY": 0.4,
+      "BlendDistance": 0.6,
+      "Intensity": 0.82,
+      "Priority": 2
+    },
+    {
+      "File": "West Courtyard.irradiance",
+      "Center": [-10.4, 2.3, 0],
+      "Size": [11.6, 5, 14],
+      "Grid": [3, 2, 3],
+      "CaptureEdge": 48,
+      "CaptureFar": 100,
+      "MinimumCaptureY": 0.4,
+      "BlendDistance": 1.5,
+      "Intensity": 0.8,
+      "Priority": 1
+    }
+  ]
+}

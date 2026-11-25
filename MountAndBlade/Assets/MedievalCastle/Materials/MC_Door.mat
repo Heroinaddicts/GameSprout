@@ -1,0 +1,42 @@
+{
+  "BaseColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "BaseColorTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "NormalTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "Roughness": 0.5,
+  "Metallic": 0.0,
+  "NormalScale": 1.0,
+  "DoubleSided": false,
+  "Emission": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "Version": 1,
+  "Name": "MC_Door",
+  "Shader": "GameSprout/Lit",
+  "EnableGPUInstancing": true,
+  "BaseColorTexture": {
+    "Guid": "7a2cb86bc15a07b4ca6dd2cc91e9974f",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "b077a31e8cc31ef49aacd236606db104",
+    "LocalID": 1
+  }
+}

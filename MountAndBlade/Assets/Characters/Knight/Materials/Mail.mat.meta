@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "a9bc5ae116fb5c65a5195bf1b106d1ce",
+  "ImporterType": "Material",
+  "Path": "Characters/Knight/Materials/Mail.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Mail"
+    }
+  ]
+}

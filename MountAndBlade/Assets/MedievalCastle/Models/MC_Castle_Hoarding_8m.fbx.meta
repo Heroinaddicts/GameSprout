@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "Guid": "846486b5118bdca489a33205e73efe69",
+  "Path": "MedievalCastle/Models/MC_Castle_Hoarding_8m.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Hoarding_8m_Collider#0",
+      "Name": "MC_Castle_Hoarding_8m_Collider",
+      "LocalID": 3282224705126549211
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Hoarding_8m_LOD0#0",
+      "Name": "MC_Castle_Hoarding_8m_LOD0.007",
+      "LocalID": 212876370783178665
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Hoarding_8m_LOD1#0",
+      "Name": "MC_Castle_Hoarding_8m_LOD1.001",
+      "LocalID": 13074978259821994499
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Hoarding_8m",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

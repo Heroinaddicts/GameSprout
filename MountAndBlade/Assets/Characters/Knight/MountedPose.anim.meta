@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "bb464b19930f5d958b768cfbbb843c03",
+  "ImporterType": "AnimationClip",
+  "Path": "Characters/Knight/MountedPose.anim",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 14,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MountedPose"
+    }
+  ]
+}

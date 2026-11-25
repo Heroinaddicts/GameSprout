@@ -1,0 +1,19 @@
+{
+  "Version": 1,
+  "Guid": "1d072288233dd3b4e87cc4c240691d4f",
+  "ImporterType": "Texture",
+  "Path": "Characters/Knight/Body_Normal.png",
+  "ImportSettings": {
+    "ColorSpace": "Linear",
+    "AlphaSource": "None",
+    "GenerateMipmaps": true
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Body_Normal"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "db7f31f121825138889a2390c7e6462c",
+    "ImporterType": "Mesh",
+    "Path": "MedievalCastle/Ground/CastleTerrain_0_0.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "CastleTerrain_0_0"
+        }
+    ]
+}

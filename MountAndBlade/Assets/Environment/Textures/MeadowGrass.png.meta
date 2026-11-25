@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "6ebe85f5a33a51e6bcec8ad4909e8c6b",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/MeadowGrass.png",
+    "ImportSettings": {
+        "ColorSpace": "SRGB",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "MeadowGrass"
+        }
+    ]
+}

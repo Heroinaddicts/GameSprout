@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Guid": "8a8ce938ecf08464f82721b5716a0e4c",
+  "Path": "MedievalCastle/Models/MC_Buttresses_Wall_A.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Buttresses_Wall_A#0",
+      "Name": "MC_Buttresses_Wall_A.009",
+      "LocalID": 8626444956561751584
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Buttresses_Wall_A",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

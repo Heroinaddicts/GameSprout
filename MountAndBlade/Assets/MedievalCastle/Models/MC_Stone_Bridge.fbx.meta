@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "Guid": "a043db20d57ed824fa4268c1af65fbeb",
+  "Path": "MedievalCastle/Models/MC_Stone_Bridge.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Stone_Bridge_Collider#0",
+      "Name": "MC_Stone_Bridge_Collider",
+      "LocalID": 1271546647986927959
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Stone_Bridge_LOD0#0",
+      "Name": "MC_Stone_Bridge_LOD0.031",
+      "LocalID": 10055519839055583543
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Stone_Bridge_LOD1#0",
+      "Name": "MC_Stone_Bridge_LOD1.003",
+      "LocalID": 11476801002385717968
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Stone_Bridge",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

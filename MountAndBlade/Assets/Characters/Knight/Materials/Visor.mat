@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Name": "Visor",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "Roughness": 0.43,
+  "Metallic": 0.28,
+  "BaseColorTexture": {
+    "Guid": "066e25036d41fa54f8d6375b1db2f5ad",
+    "LocalID": 1
+  },
+  "BaseColorTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ]
+}

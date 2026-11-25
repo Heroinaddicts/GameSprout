@@ -1,0 +1,147 @@
+{
+    "Guid" : "fb0b74129b7054a9b725ef35c3890d6b",
+    "ImportSettings" : 
+    {
+        "AnimationClips" : [],
+        "AnimationType" : "Generic",
+        "GenerateLightmapUVs" : false,
+        "HumanBones" : [],
+        "HumanReferencePose" : [],
+        "HumanScale" : 0.0,
+        "ImportAnimation" : true,
+        "ImportBlendShapes" : true,
+        "ImportCameras" : false,
+        "ImportLights" : false,
+        "ImportMaterials" : false,
+        "KeepCPUCopy" : false,
+        "MaterialRemaps" : {},
+        "MeshCompression" : "Off",
+        "NormalSmoothingAngle" : 60.0,
+        "NormalsMode" : "Import",
+        "OptimizeMesh" : true,
+        "ScaleFactor" : 1.0,
+        "TangentsMode" : "Calculate",
+        "UseFileScale" : true,
+        "WeldVertices" : true
+    },
+    "ImporterType" : "Model",
+    "Path" : "Characters/Horse/Horse.fbx",
+    "SubAssets" : 
+    [
+        {
+            "LocalID" : 8419080638980295745,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Eyes#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 10787638889532842232,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Mane1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 18271199623508611925,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Tail#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 17278733829095115030,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Body#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 7086984977031925607,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Saddle#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 6547520556964621330,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Reins Head#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 10738339267326865396,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Reins#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 5553654483487323484,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Saddle Low#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 6964467865960709011,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Body Low#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 3739000710161653336,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Tail Low#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 10356822484991362741,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Mane2 Low#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 3927985330808100598,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Mane2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 8026722375987019075,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Horse Mane1 Low#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 8770140032191375522,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Reins Carriage#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 16865807560551751202,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Armour#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 980698805863986881,
+            "Name" : "Skeleton",
+            "SourceKey" : "skeleton",
+            "Type" : 30
+        },
+        {
+            "LocalID" : 14400376046457777655,
+            "Name" : "Avatar",
+            "SourceKey" : "avatar",
+            "Type" : 31
+        },
+        {
+            "LocalID" : 4078335087224966688,
+            "Name" : "Take 001",
+            "SourceKey" : "animation/Take 001#0",
+            "Type" : 14
+        },
+        {
+            "LocalID" : 12129063053868126227,
+            "Name" : "Horse",
+            "SourceKey" : "main",
+            "Type" : 4
+        }
+    ],
+    "Version" : 1
+}

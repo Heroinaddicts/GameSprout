@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "fe106861d61951e1a3fb5634f34d4a42",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/RoadsideFlint_4.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "RoadsideFlint_4"
+        }
+    ]
+}

@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "ac0b1e32f608f0e47acf4fdbecf07fe9",
+  "Path": "MedievalCastle/Materials/MC_Door.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Door"
+    }
+  ]
+}

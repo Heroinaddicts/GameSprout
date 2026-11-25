@@ -1,0 +1,30 @@
+{
+  "Version": 1,
+  "Guid": "bf5cb419d2f40f44f85bc4a10fd9ebdd",
+  "Path": "MedievalCastle/Models/MC_Battlements_Wall_F_Angle.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_F_Angle_LOD0#0",
+      "Name": "MC_Battlements_Wall_F_Angle_LOD0.001",
+      "LocalID": 9826238186253179960
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_F_Angle_LOD1#0",
+      "Name": "MC_Battlements_Wall_F_Angle_LOD1.001",
+      "LocalID": 10058873938328373855
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Battlements_Wall_F_Angle",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "BaseColor": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "BaseColorTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "NormalTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "Roughness": 0.5,
+  "Metallic": 0.0,
+  "NormalScale": 0.55,
+  "DoubleSided": false,
+  "Emission": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "Version": 1,
+  "Name": "MC_Castle_Stone_Floor",
+  "Shader": "GameSprout/Lit",
+  "EnableGPUInstancing": true,
+  "BaseColorTexture": {
+    "Guid": "25793ed19bd5d614f959a5c9eb0f66fc",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "be716b97b8c53404c98802e187751050",
+    "LocalID": 1
+  }
+}

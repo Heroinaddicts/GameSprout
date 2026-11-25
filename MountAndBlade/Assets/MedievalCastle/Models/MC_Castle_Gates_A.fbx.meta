@@ -1,0 +1,48 @@
+{
+  "Version": 1,
+  "Guid": "f487af68e730020428db51d207521fa3",
+  "Path": "MedievalCastle/Models/MC_Castle_Gates_A.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Gates_01#0",
+      "Name": "MC_Castle_Gates_01",
+      "LocalID": 17471997735501823546
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Gates_A_Collider#0",
+      "Name": "MC_Castle_Gates_A_Collider.001",
+      "LocalID": 4922825154456498687
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Gates_A_LOD0#0",
+      "Name": "MC_Castle_Gates_A_LOD0.001",
+      "LocalID": 10501856169040537731
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Gates_A_LOD1#0",
+      "Name": "MC_Castle_Gates_A_LOD1.001",
+      "LocalID": 16296348514216149590
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Gates_A_LOD2#0",
+      "Name": "MC_Castle_Gates_A_LOD2.001",
+      "LocalID": 13359934997412125269
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Gates_A",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

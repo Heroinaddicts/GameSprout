@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "dc4a39f2a360593595d095b4e064fa15",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/HamletLane.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "HamletLane"
+        }
+    ]
+}

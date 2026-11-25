@@ -1,0 +1,25 @@
+{
+  "Version": 1,
+  "Guid": "09b7e4ca9ea05ec2b0d46a107235188a",
+  "ImporterType": "Texture",
+  "Path": "Characters/Horse/Textures/Eye_Albedo.png",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "AlphaIsTransparency": false,
+    "MaxSize": 1024,
+    "GenerateMipmaps": true,
+    "KeepCPUCopy": false,
+    "FilterMode": "Bilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat"
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 1,
+      "SourceKey": "main",
+      "Name": "Eye_Albedo"
+    }
+  ]
+}

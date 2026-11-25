@@ -1,0 +1,25 @@
+{
+  "Version": 1,
+  "Guid": "b046bda5452f527bbde6f305f2864526",
+  "ImporterType": "Texture",
+  "Path": "Characters/Horse/Textures/Eye_Normal.png",
+  "ImportSettings": {
+    "ColorSpace": "Linear",
+    "AlphaSource": "FromSource",
+    "AlphaIsTransparency": false,
+    "MaxSize": 1024,
+    "GenerateMipmaps": true,
+    "KeepCPUCopy": false,
+    "FilterMode": "Bilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat"
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 1,
+      "SourceKey": "main",
+      "Name": "Eye_Normal"
+    }
+  ]
+}

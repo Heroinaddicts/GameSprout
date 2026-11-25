@@ -1,0 +1,14 @@
+{
+  "Version": 1,
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    0.034,
+    0.019,
+    0.012,
+    1
+  ],
+  "Metallic": 0,
+  "Roughness": 0.82,
+  "DoubleSided": true,
+  "SpecularHighlights": true
+}

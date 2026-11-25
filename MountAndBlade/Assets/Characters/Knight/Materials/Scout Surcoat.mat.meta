@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "5cedc46c06ea5bf7a4bcc7b13468b570",
+  "ImporterType": "Material",
+  "Path": "Characters/Knight/Materials/Scout Surcoat.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Scout Surcoat"
+    }
+  ]
+}

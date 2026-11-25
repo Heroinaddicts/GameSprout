@@ -1,0 +1,25 @@
+{
+  "Version": 1,
+  "Guid": "5b2b165fecd054fda57eced296454f20",
+  "ImporterType": "Texture",
+  "Path": "Characters/Horse/Textures/Saddle_Normal.png",
+  "ImportSettings": {
+    "ColorSpace": "Linear",
+    "AlphaSource": "FromSource",
+    "AlphaIsTransparency": false,
+    "MaxSize": 2048,
+    "GenerateMipmaps": true,
+    "KeepCPUCopy": false,
+    "FilterMode": "Bilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat"
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 1,
+      "SourceKey": "main",
+      "Name": "Saddle_Normal"
+    }
+  ]
+}

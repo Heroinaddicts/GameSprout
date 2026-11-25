@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "ca20c6dadc225b81b9efa5d9cc5818a5",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/LeafGreen.png",
+    "ImportSettings": {
+        "ColorSpace": "SRGB",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "LeafGreen"
+        }
+    ]
+}

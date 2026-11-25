@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "d9fa9def7ca957e7aa2ffc3bffe76005",
+    "ImporterType": "Mesh",
+    "Path": "MedievalCastle/Ground/CastleMoat.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "CastleMoat"
+        }
+    ]
+}

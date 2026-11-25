@@ -1,0 +1,75 @@
+{
+    "Guid" : "f083b09104914cb41a552bb2f88858a1",
+    "ImportSettings" : 
+    {
+        "AnimationClips" : [],
+        "AnimationType" : "Generic",
+        "GenerateLightmapUVs" : false,
+        "HumanBones" : [],
+        "HumanReferencePose" : [],
+        "HumanScale" : 0.0,
+        "ImportAnimation" : false,
+        "ImportBlendShapes" : false,
+        "ImportCameras" : false,
+        "ImportLights" : false,
+        "ImportMaterials" : false,
+        "KeepCPUCopy" : false,
+        "MaterialRemaps" : {},
+        "MeshCompression" : "Off",
+        "NormalSmoothingAngle" : 60.0,
+        "NormalsMode" : "Import",
+        "OptimizeMesh" : true,
+        "ScaleFactor" : 1.0,
+        "TangentsMode" : "Calculate",
+        "UseFileScale" : true,
+        "WeldVertices" : true
+    },
+    "ImporterType" : "Model",
+    "Path" : "Characters/Knight/Visor.fbx",
+    "SubAssets" : 
+    [
+        {
+            "LocalID" : 9599866760667087655,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/VisorPivot_LOD0#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 11338875775190515721,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/VisorPivot_LOD0#0/Visiere_LOD0#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 7298333806418385127,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/VisorPivot_LOD0#0/Visiere_LOD2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 11325798017726151706,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/VisorPivot_LOD0#0/Visiere_LOD1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 6193715848606768784,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/VisorPivot_LOD0#0/VisorPivot_LOD2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 7953552864595106715,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/VisorPivot_LOD0#0/VisorPivot_LOD1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 12129063053868126227,
+            "Name" : "Visor",
+            "SourceKey" : "main",
+            "Type" : 4
+        }
+    ],
+    "Version" : 1
+}

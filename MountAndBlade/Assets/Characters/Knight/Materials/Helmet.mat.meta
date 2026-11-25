@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "f0fe890768d0544b8b0ac1435a008c2c",
+  "ImporterType": "Material",
+  "Path": "Characters/Knight/Materials/Helmet.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Helmet"
+    }
+  ]
+}

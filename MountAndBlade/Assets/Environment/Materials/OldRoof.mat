@@ -1,0 +1,38 @@
+{
+    "Version": 1,
+    "Name": "OldRoof",
+    "Shader": "GameSprout/Lit",
+    "BaseColor": [
+        1,
+        1,
+        1,
+        1
+    ],
+    "BaseColorTexture": {
+        "Guid": "e550bfab9d555dd5a65b10a8c471fe96",
+        "LocalID": 1
+    },
+    "BaseColorTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "Metallic": 0,
+    "Roughness": 0.9,
+    "DoubleSided": false,
+    "EnableGPUInstancing": true,
+    "SpecularHighlights": true,
+    "Stylization": 0,
+    "NormalTexture": {
+        "Guid": "537dccc46eb55e879f7c64252ad8859d",
+        "LocalID": 1
+    },
+    "NormalTextureST": [
+        1,
+        1,
+        0,
+        0
+    ],
+    "NormalScale": 0.7
+}

@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "c442a03661b35c3c8fb8a9b2e04e91da",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/CroftHouse_1.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "CroftHouse_1"
+        }
+    ]
+}

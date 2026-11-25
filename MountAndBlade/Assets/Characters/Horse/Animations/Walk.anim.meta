@@ -1,0 +1,17 @@
+{
+  "Version": 1,
+  "Guid": "efc32b2b83595ac8b1652e0e76118960",
+  "ImporterType": "AnimationClip",
+  "Path": "Characters/Horse/Animations/Walk.anim",
+  "ImportSettings": {
+    "MainObjectID": 1
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 14,
+      "SourceKey": "main",
+      "Name": "Walk"
+    }
+  ]
+}

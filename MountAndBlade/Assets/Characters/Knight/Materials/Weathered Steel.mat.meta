@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "c3b59a7cb1915d8d8120039b1b8333ca",
+  "ImporterType": "Material",
+  "Path": "Characters/Knight/Materials/Weathered Steel.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Weathered Steel"
+    }
+  ]
+}

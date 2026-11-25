@@ -1,0 +1,35 @@
+{
+  "Version": 1,
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "Metallic": 0,
+  "Roughness": 0.68,
+  "DoubleSided": true,
+  "SpecularHighlights": true,
+  "BaseColorTexture": {
+    "Guid": "da669ac172765d06aa83a8ce343772fc",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "5b2b165fecd054fda57eced296454f20",
+    "LocalID": 1
+  },
+  "NormalScale": 0.88,
+  "BaseColorTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ],
+  "NormalTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ]
+}

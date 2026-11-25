@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "7dff22b28ae1a7f448a1d99bb7e3fcee",
+  "Path": "MedievalCastle/Materials/MC_Castle_Stone_Floor.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Castle_Stone_Floor"
+    }
+  ]
+}

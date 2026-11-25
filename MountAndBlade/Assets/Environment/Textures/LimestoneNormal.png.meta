@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "1796954c2d3b5470a5b6d5d973a09ce3",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/LimestoneNormal.png",
+    "ImportSettings": {
+        "ColorSpace": "Linear",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "LimestoneNormal"
+        }
+    ]
+}

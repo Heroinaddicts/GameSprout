@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "Guid": "31a4b2713a6498440ba0d0c8bcb479ae",
+  "Path": "MedievalCastle/Models/MC_Castle_Wall_A_8m_Broken_01.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Wall_A_8m_Broken_LOD0#0",
+      "Name": "MC_Castle_Wall_A_8m_Broken_LOD0.001",
+      "LocalID": 9610489772730096638
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Wall_A_8m_Broken_LOD1#0",
+      "Name": "MC_Castle_Wall_A_8m_Broken_LOD1.001",
+      "LocalID": 13513259915934534127
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Wall_A_8m_Broken_LOD2#0",
+      "Name": "MC_Castle_Wall_A_8m_Broken_LOD2.001",
+      "LocalID": 3045245793676894654
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Wall_A_8m_Broken_01",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

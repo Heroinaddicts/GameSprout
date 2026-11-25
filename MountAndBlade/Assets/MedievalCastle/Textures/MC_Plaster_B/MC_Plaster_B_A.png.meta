@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Guid": "85eda1e0f43613740b4481f72b21c5d5",
+  "Path": "MedievalCastle/Textures/MC_Plaster_B/MC_Plaster_B_A.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "GenerateMipmaps": true,
+    "FilterMode": "Trilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat",
+    "MaxSize": 1024
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Plaster_B_A"
+    }
+  ]
+}

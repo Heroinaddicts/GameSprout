@@ -1,0 +1,33 @@
+{
+  "Version": 1,
+  "Name": "Helmet",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "Roughness": 0.39,
+  "Metallic": 0.35,
+  "BaseColorTexture": {
+    "Guid": "d9125a5c836cec14b94bb6bc40f13060",
+    "LocalID": 1
+  },
+  "BaseColorTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ],
+  "NormalTexture": {
+    "Guid": "75523ce52fd212440b3aa7099798b2f0",
+    "LocalID": 1
+  },
+  "NormalTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "Guid": "8f8af2e13e2acb046be2e16c9554b3f1",
+  "Path": "MedievalCastle/Models/MC_Battlements_Wall_C_8m_Broken.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_C_8m_Broken_LOD0#0",
+      "Name": "MC_Battlements_Wall_C_8m_Broken_LOD0.017",
+      "LocalID": 13474193388562174714
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_C_8m_Broken_LOD1#0",
+      "Name": "MC_Battlements_Wall_C_8m_Broken_LOD1.003",
+      "LocalID": 902994775378220588
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_C_8m_Broken_LOD2#0",
+      "Name": "MC_Battlements_Wall_C_8m_Broken_LOD2.003",
+      "LocalID": 14055139071031123536
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Battlements_Wall_C_8m_Broken",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

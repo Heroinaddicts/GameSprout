@@ -1,0 +1,24 @@
+{
+  "Version": 1,
+  "Guid": "25793ed19bd5d614f959a5c9eb0f66fc",
+  "Path": "MedievalCastle/Textures/MC_Castle_Stone_Floor/MC_Castle_Stone_Floor_A.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "GenerateMipmaps": true,
+    "FilterMode": "Trilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat",
+    "MaxSize": 1024,
+    "Anisotropy": 8
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Castle_Stone_Floor_A"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "0805094a2b3b5524b2e7bdb091acc9e6",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/Valley_01_01.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "Valley_01_01"
+        }
+    ]
+}

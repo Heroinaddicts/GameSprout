@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "57162c1b83aa5c8d8781e6e2b0943428",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/RoadsideHerbage_12_L.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "RoadsideHerbage_12_L"
+        }
+    ]
+}

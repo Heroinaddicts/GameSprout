@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "7388c3ed4e195249a32264c68a4a8b06",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/WeatheredBoulder_2.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "WeatheredBoulder_2"
+        }
+    ]
+}

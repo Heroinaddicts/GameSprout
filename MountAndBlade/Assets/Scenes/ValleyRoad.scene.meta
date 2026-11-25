@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "38b23dd2f4ae5fd6a08840878861a6a3",
+  "ImporterType": "Scene",
+  "Path": "Scenes/ValleyRoad.scene",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 13,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "ValleyRoad"
+    }
+  ]
+}

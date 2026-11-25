@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "079ed079a1f388540be750e556595e4f",
+  "Path": "MedievalCastle/Materials/MC_Trim_Sheet.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Trim_Sheet"
+    }
+  ]
+}

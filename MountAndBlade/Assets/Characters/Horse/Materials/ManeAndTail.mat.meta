@@ -1,0 +1,17 @@
+{
+  "Version": 1,
+  "Guid": "ab2ab035ccb25193b70f3c32f2c78eea",
+  "ImporterType": "Material",
+  "Path": "Characters/Horse/Materials/ManeAndTail.mat",
+  "ImportSettings": {
+    "MainObjectID": 1
+  },
+  "SubAssets": [
+    {
+      "LocalID": 1,
+      "Type": 5,
+      "SourceKey": "main",
+      "Name": "ManeAndTail"
+    }
+  ]
+}

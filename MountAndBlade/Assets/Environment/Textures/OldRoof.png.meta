@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "e550bfab9d555dd5a65b10a8c471fe96",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/OldRoof.png",
+    "ImportSettings": {
+        "ColorSpace": "SRGB",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "OldRoof"
+        }
+    ]
+}

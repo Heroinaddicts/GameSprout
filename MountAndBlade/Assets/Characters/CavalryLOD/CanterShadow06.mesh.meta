@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "352ff41da37b5ea2b695571043b8960c",
+    "ImporterType": "Mesh",
+    "Path": "Characters/CavalryLOD/CanterShadow06.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "CanterShadow06"
+        }
+    ]
+}

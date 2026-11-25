@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "b6f4f4ff855056d2aea9ee3f2d849021",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/LimePlaster.png",
+    "ImportSettings": {
+        "ColorSpace": "SRGB",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "LimePlaster"
+        }
+    ]
+}

@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Name": "Moat Water",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    0.067,
+    0.126,
+    0.114,
+    1
+  ],
+  "Metallic": 0.12,
+  "Roughness": 0.13,
+  "EnableGPUInstancing": true,
+  "PlanarReflection": true
+}

@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Guid": "9f969c638173fef418d5eab961e9865d",
+  "Path": "MedievalCastle/Textures/MC_Roof_Wooden/MC_Roof_Wooden_A.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "GenerateMipmaps": true,
+    "FilterMode": "Trilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat",
+    "MaxSize": 1024
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Roof_Wooden_A"
+    }
+  ]
+}

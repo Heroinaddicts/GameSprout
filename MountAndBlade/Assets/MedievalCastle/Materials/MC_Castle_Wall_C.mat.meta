@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "10f23018367a942488721e5e7d02d672",
+  "Path": "MedievalCastle/Materials/MC_Castle_Wall_C.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Castle_Wall_C"
+    }
+  ]
+}

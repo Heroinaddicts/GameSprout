@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "d3e9da953eaf559eb6085343e60a692e",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/PackedEarth.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "PackedEarth"
+        }
+    ]
+}

@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "3883210417b751d4a8eac271f3310721",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/FieldEarthNormal.png",
+    "ImportSettings": {
+        "ColorSpace": "Linear",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "FieldEarthNormal"
+        }
+    ]
+}

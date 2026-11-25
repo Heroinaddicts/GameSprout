@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "ce83a5a0d77d5292ab53df06f26d7883",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/ValleyRoad.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "ValleyRoad"
+        }
+    ]
+}

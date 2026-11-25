@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "7593328ca5f85ca1bbee2c0d1f28453c",
+    "ImporterType": "Shader",
+    "Path": "Environment/Shaders/ValleyClouds.shader",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 6,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "ValleyClouds"
+        }
+    ]
+}

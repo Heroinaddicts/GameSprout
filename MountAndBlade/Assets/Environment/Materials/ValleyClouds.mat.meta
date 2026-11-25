@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "1408cfb158a351ee820e1030bc5f7906",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/ValleyClouds.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "ValleyClouds"
+        }
+    ]
+}

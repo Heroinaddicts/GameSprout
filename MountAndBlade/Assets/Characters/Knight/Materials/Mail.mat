@@ -1,0 +1,13 @@
+{
+  "Version": 1,
+  "Name": "Mail",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    0.2,
+    0.19,
+    0.17,
+    1
+  ],
+  "Roughness": 0.74,
+  "Metallic": 0.23
+}

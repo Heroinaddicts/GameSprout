@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "4c80d374d1cd5b9b8fdf3fed43b16844",
+  "ImporterType": "Material",
+  "Path": "MedievalCastle/Materials/Moat Water.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Moat Water"
+    }
+  ]
+}

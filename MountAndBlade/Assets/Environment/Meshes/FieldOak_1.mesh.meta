@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "1c1ef85ba89e559a8184e80061eeb150",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/FieldOak_1.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "FieldOak_1"
+        }
+    ]
+}

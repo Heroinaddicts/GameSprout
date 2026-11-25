@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "41cf43b6740e5e12bddfc5d5e66ccef3",
+  "ImporterType": "PhysicsMaterial",
+  "Path": "Characters/Mount.physicmaterial",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 19,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Mount"
+    }
+  ]
+}

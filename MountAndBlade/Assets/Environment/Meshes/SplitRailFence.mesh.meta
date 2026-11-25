@@ -1,0 +1,20 @@
+{
+    "Version": 1,
+    "Guid": "2308dc9ad76f5ec9984c58dd0dc65b42",
+    "ImporterType": "Mesh",
+    "Path": "Environment/Meshes/SplitRailFence.mesh",
+    "ImportSettings": {
+        "NormalsMode": "Import",
+        "ScaleFactor": 1,
+        "MeshCompression": "Off",
+        "GenerateLightmapUVs": false
+    },
+    "SubAssets": [
+        {
+            "Type": 3,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "SplitRailFence"
+        }
+    ]
+}

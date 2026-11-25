@@ -1,0 +1,15 @@
+{
+    "Version": 1,
+    "Guid": "ae17fceec2ee5fbc8fa38a72cc0769bd",
+    "ImporterType": "Material",
+    "Path": "Environment/Materials/PineGreen.mat",
+    "ImportSettings": {},
+    "SubAssets": [
+        {
+            "Type": 5,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "PineGreen"
+        }
+    ]
+}

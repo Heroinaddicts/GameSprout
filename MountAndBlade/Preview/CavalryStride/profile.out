@@ -1,0 +1,14 @@
+-- The CXX compiler identification is AppleClang 21.0.0.21000334
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /var/folders/52/z64fs26s1ps183l20v3n_ch00000gp/T/CrowdChecks-tVRktn/GameLogicRelease
+[1/5] Building CXX object CMakeFiles/GameLogic.dir/GameLogic.buildstamp.cpp.o
+[2/5] Building CXX object CMakeFiles/GameLogic.dir/Scripts/HorseRider.cpp.o
+[3/5] Building CXX object CMakeFiles/GameLogic.dir/Scripts/CavalryStress.cpp.o
+[4/5] Building CXX object CMakeFiles/GameLogic.dir/GameLogic.generated.cpp.o
+[5/5] Linking CXX shared library libGameLogic.dylib

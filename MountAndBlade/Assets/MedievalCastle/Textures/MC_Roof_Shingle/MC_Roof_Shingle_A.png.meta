@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Guid": "33b62da9c3f6fde49ba88805979d9609",
+  "Path": "MedievalCastle/Textures/MC_Roof_Shingle/MC_Roof_Shingle_A.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "GenerateMipmaps": true,
+    "FilterMode": "Trilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat",
+    "MaxSize": 1024
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Roof_Shingle_A"
+    }
+  ]
+}

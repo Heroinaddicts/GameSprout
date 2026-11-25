@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "d3f0ee8ff05c5684a00a7c09a67666d4",
+  "ImporterType": "Scene",
+  "Path": "Scenes/MedievalCastle.scene",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 13,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MedievalCastle"
+    }
+  ]
+}

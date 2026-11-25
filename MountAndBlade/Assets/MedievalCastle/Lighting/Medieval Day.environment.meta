@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "d5b8c5963f725c23a76c3d974881d42b",
+  "Path": "MedievalCastle/Lighting/Medieval Day.environment",
+  "ImporterType": "Environment",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 33,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Medieval Day"
+    }
+  ]
+}

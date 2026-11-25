@@ -1,0 +1,42 @@
+{
+  "BaseColor": [
+    0.8214343605870293,
+    0.8111626880708318,
+    0.7833607016399302,
+    1.0
+  ],
+  "BaseColorTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "NormalTextureST": [
+    1.0,
+    1.0,
+    0.0,
+    0.0
+  ],
+  "Roughness": 1.0,
+  "Metallic": 0.0,
+  "NormalScale": 2.0,
+  "DoubleSided": false,
+  "Emission": [
+    0,
+    0,
+    0,
+    1
+  ],
+  "Version": 1,
+  "Name": "MC_Rocks_Ground_02",
+  "Shader": "GameSprout/Lit",
+  "EnableGPUInstancing": true,
+  "BaseColorTexture": {
+    "Guid": "73612d63349884d40b6f5e4da7596d4e",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "eafa49ece893a7e439e45a675ddb8a79",
+    "LocalID": 1
+  }
+}

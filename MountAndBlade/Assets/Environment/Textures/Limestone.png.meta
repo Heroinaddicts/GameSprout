@@ -1,0 +1,23 @@
+{
+    "Version": 1,
+    "Guid": "0085302141e95b76a1882fd2fcd47ac9",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/Limestone.png",
+    "ImportSettings": {
+        "ColorSpace": "SRGB",
+        "AlphaSource": "None",
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "Repeat",
+        "MaxSize": 256
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "Limestone"
+        }
+    ]
+}

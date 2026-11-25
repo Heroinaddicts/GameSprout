@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Guid": "9c6d9a7d7d5e4da489b0ea87eecec011",
+  "Path": "MedievalCastle/Textures/MC_Trim_Sheet_Wood/MC_Trim_Sheet_Wood_N.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "Linear",
+    "AlphaSource": "None",
+    "GenerateMipmaps": true,
+    "FilterMode": "Trilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat",
+    "MaxSize": 2048
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MC_Trim_Sheet_Wood_N"
+    }
+  ]
+}

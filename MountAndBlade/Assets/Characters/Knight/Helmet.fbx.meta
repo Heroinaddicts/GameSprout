@@ -1,0 +1,57 @@
+{
+    "Guid" : "c8fca8f664db29a46b3c2f9b4477bb64",
+    "ImportSettings" : 
+    {
+        "AnimationClips" : [],
+        "AnimationType" : "Generic",
+        "GenerateLightmapUVs" : false,
+        "HumanBones" : [],
+        "HumanReferencePose" : [],
+        "HumanScale" : 0.0,
+        "ImportAnimation" : false,
+        "ImportBlendShapes" : false,
+        "ImportCameras" : false,
+        "ImportLights" : false,
+        "ImportMaterials" : false,
+        "KeepCPUCopy" : false,
+        "MaterialRemaps" : {},
+        "MeshCompression" : "Off",
+        "NormalSmoothingAngle" : 60.0,
+        "NormalsMode" : "Import",
+        "OptimizeMesh" : true,
+        "ScaleFactor" : 1.0,
+        "TangentsMode" : "Calculate",
+        "UseFileScale" : true,
+        "WeldVertices" : true
+    },
+    "ImporterType" : "Model",
+    "Path" : "Characters/Knight/Helmet.fbx",
+    "SubAssets" : 
+    [
+        {
+            "LocalID" : 4581066227989615752,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Helmet_LOD0#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 8562190451161085807,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Helmet_LOD2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 15436411699899328801,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Helmet_LOD1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 12129063053868126227,
+            "Name" : "Helmet",
+            "SourceKey" : "main",
+            "Type" : 4
+        }
+    ],
+    "Version" : 1
+}

@@ -1,0 +1,24 @@
+{
+    "Version": 1,
+    "Guid": "094dd13d0bd457668bea62941c551a89",
+    "ImporterType": "Texture",
+    "Path": "Environment/Textures/ValleyClouds.png",
+    "ImportSettings": {
+        "ColorSpace": "SRGB",
+        "AlphaSource": "FromSource",
+        "AlphaIsTransparency": true,
+        "GenerateMipmaps": true,
+        "FilterMode": "Trilinear",
+        "WrapU": "Repeat",
+        "WrapV": "ClampToEdge",
+        "MaxSize": 2048
+    },
+    "SubAssets": [
+        {
+            "Type": 1,
+            "SourceKey": "main",
+            "LocalID": 1,
+            "Name": "ValleyClouds"
+        }
+    ]
+}

@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "Guid": "a1e9e8dc3cd8f95499d3d44365229110",
+  "Path": "MedievalCastle/Models/MC_Battlements_Wall_F_8m.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_F_8m_LOD0#0",
+      "Name": "MC_Battlements_Wall_F_8m_LOD0.001",
+      "LocalID": 16832194401974984137
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_F_8m_LOD1#0",
+      "Name": "MC_Battlements_Wall_F_8m_LOD1.001",
+      "LocalID": 1673179589148940702
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Battlements_Wall_F_8m_LOD2#0",
+      "Name": "MC_Battlements_Wall_F_8m_LOD2.001",
+      "LocalID": 6107822643114225845
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Battlements_Wall_F_8m",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

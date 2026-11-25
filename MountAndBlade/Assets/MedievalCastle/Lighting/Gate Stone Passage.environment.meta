@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "e2b0d3dd370e57718e10cff182f7ae96",
+  "ImporterType": "Environment",
+  "Path": "MedievalCastle/Lighting/Gate Stone Passage.environment",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 33,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Gate Stone Passage"
+    }
+  ]
+}

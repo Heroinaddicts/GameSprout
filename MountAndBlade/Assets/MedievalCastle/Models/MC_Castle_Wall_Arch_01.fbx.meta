@@ -1,0 +1,30 @@
+{
+  "Version": 1,
+  "Guid": "afa97613ad0ca71478d0906c2bbcd32c",
+  "Path": "MedievalCastle/Models/MC_Castle_Wall_Arch_01.fbx",
+  "ImporterType": "Model",
+  "ImportSettings": {
+    "ImportMaterials": false,
+    "ImportAnimation": false
+  },
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Wall_Arch_01_LOD0#0",
+      "Name": "MC_Castle_Wall_Arch_01_LOD0.001",
+      "LocalID": 6146673956180909776
+    },
+    {
+      "Type": 3,
+      "SourceKey": "mesh//#0/MC_Castle_Wall_Arch_01_LOD1#0",
+      "Name": "MC_Castle_Wall_Arch_01_LOD1.001",
+      "LocalID": 11321281537752253033
+    },
+    {
+      "Type": 4,
+      "SourceKey": "main",
+      "Name": "MC_Castle_Wall_Arch_01",
+      "LocalID": 12129063053868126227
+    }
+  ]
+}

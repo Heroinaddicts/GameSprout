@@ -1,0 +1,219 @@
+{
+    "Guid" : "4e4333228ae3e3f46b0a511989fef2b6",
+    "ImportSettings" : 
+    {
+        "AnimationClips" : [],
+        "AnimationType" : "Generic",
+        "GenerateLightmapUVs" : false,
+        "HumanBones" : [],
+        "HumanReferencePose" : [],
+        "HumanScale" : 0.0,
+        "ImportAnimation" : false,
+        "ImportBlendShapes" : false,
+        "ImportCameras" : false,
+        "ImportLights" : false,
+        "ImportMaterials" : false,
+        "KeepCPUCopy" : false,
+        "MaterialRemaps" : {},
+        "MeshCompression" : "Off",
+        "NormalSmoothingAngle" : 60.0,
+        "NormalsMode" : "Import",
+        "OptimizeMesh" : true,
+        "ScaleFactor" : 1.0,
+        "TangentsMode" : "Calculate",
+        "UseFileScale" : true,
+        "WeldVertices" : true
+    },
+    "ImporterType" : "Model",
+    "Path" : "Characters/Knight/KnightBody.fbx",
+    "SubAssets" : 
+    [
+        {
+            "LocalID" : 10070185569443861282,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Eye_Left#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 12835682164883292098,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Knight_base_LOD0#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 3769760031766631605,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Shoulders_LOD0#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 15835013400382602192,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Chainmail_LOD0#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 16287312201908395537,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/CoatOfArms_LOD0#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 2084052520299665949,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Chainmail_LOD1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 1302313972530121582,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Chainmail_LOD2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 797332887330534431,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/CoatOfArms_LOD1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 13940847691046122987,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/CoatOfArms_LOD2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 13754096842183059447,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/CoatOfArms_LOD3#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 14743766077644056025,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/CoatOfArms_LOD4#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 171209145782165129,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Shoulders_LOD1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 2453087560417585548,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Shoulders_LOD2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 10820139324907860593,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Eye_Right#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 13985335668840822454,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/NoblemanBelt#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 6991257309567104281,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Sheath#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 6111608568209560216,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Necklace02#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 12958652633174703692,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Necklace01#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 14552951620203492651,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Belt&Purse#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 16180424600712955634,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Knight_base_LOD1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 190465522942581941,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Knight_base_LOD2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 12433235131828386333,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Knight_base_LOD3#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 16867135990593605816,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/Knight_base_LOD4#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 3552607257282609755,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/KnightFace_LOD0#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 17740769433877096351,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/KnightFace_LOD1#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 8957156357574723019,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/KnightFace_LOD2#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 5219715650023744162,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/KnightFace_LOD3#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 1837101691219332715,
+            "Name" : "",
+            "SourceKey" : "mesh//#0/KnightFace_LOD4#0",
+            "Type" : 3
+        },
+        {
+            "LocalID" : 980698805863986881,
+            "Name" : "Skeleton",
+            "SourceKey" : "skeleton",
+            "Type" : 30
+        },
+        {
+            "LocalID" : 14400376046457777655,
+            "Name" : "Avatar",
+            "SourceKey" : "avatar",
+            "Type" : 31
+        },
+        {
+            "LocalID" : 12129063053868126227,
+            "Name" : "KnightBody",
+            "SourceKey" : "main",
+            "Type" : 4
+        }
+    ],
+    "Version" : 1
+}
