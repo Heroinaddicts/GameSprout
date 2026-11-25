@@ -132,8 +132,13 @@ float3x4 LoadInstanceBoneMatrix(uint index)
 float3x4 BlendInstanceSkin(uint slot, uint4 bones, float4 weights)
 {
     uint4 indices = bones + InstanceSkinOffsets[slot];
-    return LoadInstanceBoneMatrix(indices.x) * weights.x + LoadInstanceBoneMatrix(indices.y) * weights.y
-         + LoadInstanceBoneMatrix(indices.z) * weights.z + LoadInstanceBoneMatrix(indices.w) * weights.w;
+    float3x4 skin = LoadInstanceBoneMatrix(indices.x) * weights.x;
+    // Keep the same positive influences and summation order. A zero weight
+    // does not need a storage fetch even when its validated index is nonzero.
+    [branch] if (weights.y != 0.0) skin += LoadInstanceBoneMatrix(indices.y) * weights.y;
+    [branch] if (weights.z != 0.0) skin += LoadInstanceBoneMatrix(indices.z) * weights.z;
+    [branch] if (weights.w != 0.0) skin += LoadInstanceBoneMatrix(indices.w) * weights.w;
+    return skin;
 }
 
 float3 TransformSkinNormal(float3x4 skin, float3 normal)

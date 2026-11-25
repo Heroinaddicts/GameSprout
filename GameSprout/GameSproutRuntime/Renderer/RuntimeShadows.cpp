@@ -63,12 +63,12 @@ bool Renderer::DrawShadow(GRHI::IRenderPass& pass,const ShadowBatch& batch,const
     const auto& data=draw.Mesh->Data;
     PipelineKey key;key.Shadow=true;key.Stride=data.VertexStride;key.Position=data.PositionOffset;
     key.DoubleSided=draw.DoubleSided;key.Negative=draw.Object->Negative;key.Instanced=instanced;
-    if(draw.Object->Skinned){key.BoneIndices=data.BoneIndicesOffset;key.BoneWeights=data.BoneWeightsOffset;}
+    auto* vertices=draw.Object->Skinned?SkinVertexInput(key,*draw.Mesh):draw.Mesh->Buffer;
     auto* pipeline=Pipeline(key);if(!pipeline)return false;
     struct ShadowDrawUniform { Mat4 Model,ViewProjection; };
     static_assert(sizeof(ShadowDrawUniform)==128,"Shadow draw matrices must match HLSL layout");
     const ShadowDrawUniform uniform{instanced?Mat4{}:draw.Object->Model,lightViewProjection};
-    pass.SetPipeline(pipeline);pass.SetVertexBuffer(0,draw.Mesh->Buffer,0);
+    pass.SetPipeline(pipeline);pass.SetVertexBuffer(0,vertices,0);
     if(instanced) {
         pass.SetVertexBuffer(1,instances.Buffer,batch.IndexOffset*sizeof(std::uint32_t));
         pass.SetVertexStorageBuffer(0,_InstanceTransformsBuffer);

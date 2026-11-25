@@ -9,17 +9,18 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
     std::size_t firstInstance,std::uint32_t instanceCount) {
     const auto& data=draw.Mesh->Data;
     PipelineKey key;key.Format=format;key.Stride=data.VertexStride;key.Position=data.PositionOffset;key.Normal=data.NormalOffset;
-    key.Color=data.ColorOffset;key.UV=data.UVOffset;key.DoubleSided=draw.Material->DoubleSided;key.Negative=draw.Object->Negative;
+    key.Color=draw.Object->Skinned&&!draw.Mesh->SkinHasNonWhiteVertexColor?-1:data.ColorOffset;
+    key.UV=data.UVOffset;key.DoubleSided=draw.Material->DoubleSided;key.Negative=draw.Object->Negative;
     key.Lit=draw.Material->ShadingModel==MaterialShadingModel::Lit;key.Instanced=instanceCount>1;
     const bool skyReflection=key.Lit&&draw.Material->EnvironmentReflections&&reflections;
     key.SpatialLighting=key.Lit&&(draw.ReflectionProbeIndex||UsesPlanarReflection(draw)||UsesIndirectLighting(draw));
     key.EnvironmentReflections=skyReflection&&!key.SpatialLighting;
-    if(draw.Object->Skinned){key.BoneIndices=data.BoneIndicesOffset;key.BoneWeights=data.BoneWeightsOffset;}
+    auto* vertices=draw.Object->Skinned?SkinVertexInput(key,*draw.Mesh):draw.Mesh->Buffer;
     auto* pipeline=Pipeline(key);if(!pipeline)return false;
     DrawUniform uniform;uniform.ViewProjection=viewProjection;
     if(!key.Instanced){uniform.Model=draw.Object->Model;uniform.Normal=draw.Object->Normal;}
     uniform.BaseColor=draw.Material->BaseColor;uniform.TextureST=draw.Material->BaseColorTextureST;
-    pass.SetPipeline(pipeline);pass.SetVertexBuffer(0,draw.Mesh->Buffer,0);
+    pass.SetPipeline(pipeline);pass.SetVertexBuffer(0,vertices,0);
     if(key.Instanced) {
         pass.SetVertexBuffer(1,_ColorInstances.Buffer,firstInstance*sizeof(std::uint32_t));
         pass.SetVertexStorageBuffer(0,_InstanceTransformsBuffer);
@@ -29,6 +30,8 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
         }
     }
     auto* skinIndices=draw.Object->Skinned?draw.Mesh->SkinColorIndices.get():nullptr;
+    if(draw.Object->Skinned&&!draw.Transparent&&draw.Mesh->SkinOrderedColorIndices)
+        skinIndices=draw.Mesh->SkinOrderedColorIndices.get();
     pass.SetIndexBuffer(skinIndices?skinIndices:draw.Mesh->Buffer,GRHI::IndexFormat::UInt32,
         skinIndices?0:static_cast<std::size_t>(data.IndexOffset));
     pass.SetVertexUniform(0,&uniform,sizeof(uniform));

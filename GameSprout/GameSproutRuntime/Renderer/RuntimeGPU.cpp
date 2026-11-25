@@ -3,6 +3,26 @@
 #include <vector>
 
 namespace GameSproutRuntime {
+GRHI::IBuffer* Renderer::SkinVertexInput(PipelineKey& key,const MeshGPU& mesh) const {
+    const auto& stream=mesh.PackedSkinVertices;
+    if(!stream.Buffer) {
+        key.BoneIndices=mesh.Data.BoneIndicesOffset;
+        key.BoneWeights=mesh.Data.BoneWeightsOffset;
+        return mesh.Buffer;
+    }
+    key.Stride=stream.Stride;
+    key.Position=0;
+    if(!key.Shadow) {
+        key.Normal=12;
+        key.Color=stream.Color;
+        key.UV=stream.UV;
+    }
+    key.BoneIndices=stream.BoneIndices;
+    key.BoneWeights=stream.BoneWeights;
+    key.BoneIndexFormat=GRHI::VertexFormat::UInt8x4;
+    return stream.Buffer.get();
+}
+
 bool Renderer::InitializeSamples() {
     if(!_White) {
         const std::uint8_t pixels[]={255,255,255,255};
@@ -65,7 +85,7 @@ GRHI::IGraphicsPipeline* Renderer::Pipeline(const PipelineKey& key) {
             if(key.UV>=0) attributes[count++]={3,0,GRHI::VertexFormat::Float2,static_cast<std::uint32_t>(key.UV)};
         }
         if(key.BoneIndices>=0) {
-            attributes[count++]={4,0,GRHI::VertexFormat::UInt32x4,static_cast<std::uint32_t>(key.BoneIndices)};
+            attributes[count++]={4,0,key.BoneIndexFormat,static_cast<std::uint32_t>(key.BoneIndices)};
             attributes[count++]={5,0,GRHI::VertexFormat::Float4,static_cast<std::uint32_t>(key.BoneWeights)};
         }
     }

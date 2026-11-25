@@ -53,6 +53,11 @@ private:
             std::size_t Joint=0;
             double Center[3]{},Extent[3]{},Magnitude[3]{};
         };
+        struct SkinVertexStream {
+            std::unique_ptr<GRHI::IBuffer> Buffer;
+            std::uint32_t Stride=0;
+            std::int32_t Color=-1,UV=-1,BoneIndices=-1,BoneWeights=-1;
+        };
         MeshRenderData Data;
         std::vector<Vector3> Positions;
         std::vector<SkinVertex> Skin;
@@ -61,7 +66,9 @@ private:
         std::vector<std::uint32_t> Indices;
         GRHI::IBuffer* Buffer=nullptr;
         GRHI::IBuffer* ShaderVertexBuffer=nullptr; // Canonical P/N/C/UV, only allocated for user shaders.
-        std::unique_ptr<GRHI::IBuffer> SkinColorIndices,SkinDepthIndices;
+        std::unique_ptr<GRHI::IBuffer> SkinColorIndices,SkinOrderedColorIndices,SkinDepthIndices;
+        SkinVertexStream PackedSkinVertices;
+        bool SkinHasNonWhiteVertexColor=false;
         // A private render-only bound derived from validated vertex positions.
         // Does not replace the provider's authored/queried LocalBounds contract.
         Vector3 CullMinimum,CullMaximum;
@@ -131,12 +138,13 @@ private:
         GRHI::TextureFormat Format=GRHI::TextureFormat::Unknown;
         std::uint32_t Stride=0,Position=0,Normal=0;
         std::int32_t Color=-1,UV=-1,BoneIndices=-1,BoneWeights=-1;
+        GRHI::VertexFormat BoneIndexFormat=GRHI::VertexFormat::UInt32x4;
         bool Grid=false,DoubleSided=false,Negative=false,DebugTriangles=false,DepthTest=true,Lit=false,Instanced=false,Shadow=false;
         bool EnvironmentReflections=false;
         bool SpatialLighting=false;
         bool operator<(const PipelineKey& other) const {
-            return std::tie(Format,Stride,Position,Normal,Color,UV,BoneIndices,BoneWeights,Grid,DoubleSided,Negative,DebugTriangles,DepthTest,Lit,Instanced,Shadow,EnvironmentReflections,SpatialLighting)<
-                std::tie(other.Format,other.Stride,other.Position,other.Normal,other.Color,other.UV,other.BoneIndices,other.BoneWeights,other.Grid,other.DoubleSided,other.Negative,other.DebugTriangles,other.DepthTest,other.Lit,other.Instanced,other.Shadow,other.EnvironmentReflections,other.SpatialLighting);
+            return std::tie(Format,Stride,Position,Normal,Color,UV,BoneIndices,BoneWeights,BoneIndexFormat,Grid,DoubleSided,Negative,DebugTriangles,DepthTest,Lit,Instanced,Shadow,EnvironmentReflections,SpatialLighting)<
+                std::tie(other.Format,other.Stride,other.Position,other.Normal,other.Color,other.UV,other.BoneIndices,other.BoneWeights,other.BoneIndexFormat,other.Grid,other.DoubleSided,other.Negative,other.DebugTriangles,other.DepthTest,other.Lit,other.Instanced,other.Shadow,other.EnvironmentReflections,other.SpatialLighting);
         }
     };
     struct Depth {GRHI::ITexture* Texture=nullptr;std::uint64_t LastUsed=0;};
@@ -398,6 +406,8 @@ private:
     bool DrawShaderMaterial(GRHI::IRenderPass&,Material&,ShaderGPU&,MeshGPU&,const ResourceReference&,
         const MeshSection&,const DrawObject&,const Mat4&,GRHI::TextureFormat);
     GRHI::IGraphicsPipeline* Pipeline(const PipelineKey& key);
+    GRHI::IBuffer* SkinVertexInput(PipelineKey&,const MeshGPU&) const;
+    void PreparePackedSkinVertexStream(MeshGPU&);
     GRHI::ITexture* DepthTarget(std::uint32_t width,std::uint32_t height);
     GRHI::ITexture* HDRTarget(std::uint32_t width,std::uint32_t height);
     GRHI::IGraphicsPipeline* FullscreenPipeline(PreviewShader vertex,PreviewShader fragment,

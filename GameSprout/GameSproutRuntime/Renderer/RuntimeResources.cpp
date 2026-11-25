@@ -9,6 +9,7 @@
 #include <bit>
 #include <cstring>
 #include <limits>
+#include <numeric>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_set>
@@ -80,8 +81,113 @@ bool ValidateMesh(GameSproutRuntime::MeshRenderData& data,std::string& error) {
 }
 namespace GameSproutRuntime {
 namespace {
+constexpr std::uint32_t VertexCacheSize = 24;
+
+std::uint32_t CountVertexCacheMisses(std::span<const std::uint32_t> indices,
+        std::vector<std::uint32_t>& cache) {
+    std::fill(cache.begin(),cache.end(),0);
+    std::uint32_t next=VertexCacheSize+1;
+    for(const auto index:indices)
+        if(next-cache[index]>VertexCacheSize)cache[index]=next++;
+    return next-(VertexCacheSize+1);
+}
+
+bool OrderSkinSection(std::span<std::uint32_t> section, std::uint32_t vertexCount) {
+    if(section.size()<6)return false;
+
+    // Build the triangle fan of each remapped vertex. Emit neighboring
+    // triangles while the shared vertices are still in the post-transform cache.
+    std::vector<std::uint32_t> offsets(std::size_t(vertexCount)+1);
+    for(const auto index:section)++offsets[index+1];
+    std::partial_sum(offsets.begin(),offsets.end(),offsets.begin());
+    std::vector<std::uint32_t> live(offsets.begin(),offsets.end()-1);
+    std::vector<std::uint32_t> adjacent(section.size());
+    for(std::uint32_t index=0;index<section.size();++index)
+        adjacent[live[section[index]]++]=index/3;
+    for(std::uint32_t vertex=0;vertex<vertexCount;++vertex)
+        live[vertex]-=offsets[vertex];
+
+    std::vector<unsigned char> placed(section.size()/3);
+    std::vector<std::uint32_t> cache(vertexCount);
+    std::vector<std::uint32_t> ordered,pending;
+    ordered.reserve(section.size());
+    pending.reserve(section.size());
+    constexpr auto missing=std::numeric_limits<std::uint32_t>::max();
+    auto vertex=section.front();
+    std::size_t scan=0;
+    std::uint32_t next=VertexCacheSize+1;
+    while(ordered.size()<section.size()) {
+        const auto first=pending.size();
+        for(auto index=offsets[vertex];index<offsets[vertex+1];++index) {
+            const auto triangle=adjacent[index];
+            if(placed[triangle])continue;
+            placed[triangle]=1;
+            for(const auto corner:section.subspan(std::size_t(triangle)*3,3)) {
+                ordered.push_back(corner);
+                pending.push_back(corner);
+                --live[corner];
+                if(next-cache[corner]>VertexCacheSize)cache[corner]=next++;
+            }
+        }
+        if(ordered.size()==section.size())break;
+
+        vertex=missing;
+        std::uint32_t best=0;
+        for(std::size_t offset=first;offset<pending.size();++offset) {
+            const auto candidate=pending[offset];
+            if(!live[candidate])continue;
+            const auto age=next-cache[candidate];
+            // Prefer a live fan that can reuse a vertex before its eviction.
+            const auto rank=age+2*live[candidate]<=VertexCacheSize?age:0;
+            if(vertex==missing||rank>best){vertex=candidate;best=rank;}
+        }
+        while(vertex==missing&&!pending.empty()) {
+            const auto candidate=pending.back();
+            pending.pop_back();
+            if(live[candidate])vertex=candidate;
+        }
+        if(vertex==missing) {
+            while(!live[section[scan]])++scan;
+            vertex=section[scan];
+        }
+    }
+    const auto reorderedMisses=next-(VertexCacheSize+1);
+    if(reorderedMisses>=CountVertexCacheMisses(section,cache))return false;
+    std::copy(ordered.begin(),ordered.end(),section.begin());
+    return true;
+}
+
+std::vector<std::uint32_t> OrderSkinIndices(const MeshRenderData& mesh,
+        const std::vector<std::uint32_t>& indices) {
+    auto sections=mesh.Sections;
+    std::sort(sections.begin(),sections.end(),[](const auto& a,const auto& b){return a.FirstIndex<b.FirstIndex;});
+    std::uint32_t end=0;
+    for(const auto& section:sections) {
+        // Two overlapping ranges represent different draws over the same
+        // indices. Preserve their shared source order.
+        if(section.FirstIndex<end)return {};
+        end=section.FirstIndex+section.IndexCount;
+    }
+    auto ordered=indices;
+    bool changed=false;
+    for(const auto& section:sections)
+        changed|=OrderSkinSection(std::span(ordered).subspan(section.FirstIndex,section.IndexCount),mesh.VertexCount);
+    if(!changed)ordered.clear();
+    return ordered;
+}
+
+std::unique_ptr<GRHI::IBuffer> UploadSkinIndices(GRHI::IDevice& device,
+        const std::vector<std::uint32_t>& indices) {
+    GRHI::BufferDesc description;
+    description.Size=indices.size()*sizeof(std::uint32_t);
+    description.Usage=GRHI::BufferUsage::Index;
+    const GRHI::BufferInitialData initial{indices.data(),description.Size};
+    return std::unique_ptr<GRHI::IBuffer>(device.CreateBuffer(description,&initial));
+}
+
 std::unique_ptr<GRHI::IBuffer> CreateSkinIndexBuffer(GRHI::IDevice& device,
-    const MeshRenderData& mesh,const std::vector<std::uint32_t>& indices,bool depthOnly) {
+    const MeshRenderData& mesh,const std::vector<std::uint32_t>& indices,bool depthOnly,
+    std::unique_ptr<GRHI::IBuffer>* orderedColor=nullptr) {
     // Imported skins can have separate vertices for triangles that read the
     // same attributes. Keep their original CPU/custom-shader topology, but
     // let the built-in vertex stages reuse an index when all inputs match.
@@ -116,15 +222,18 @@ std::unique_ptr<GRHI::IBuffer> CreateSkinIndexBuffer(GRHI::IDevice& device,
         if(representative==unresolved)representative=*unique.insert(index).first;
         changed|=representative!=index;
     }
-    if(!changed)return {};
     std::vector<std::uint32_t> remapped;
-    remapped.reserve(indices.size());
-    for(const auto index:indices)remapped.push_back(representatives[index]);
-    GRHI::BufferDesc description;
-    description.Size=remapped.size()*sizeof(std::uint32_t);
-    description.Usage=GRHI::BufferUsage::Index;
-    const GRHI::BufferInitialData initial{remapped.data(),description.Size};
-    return std::unique_ptr<GRHI::IBuffer>(device.CreateBuffer(description,&initial));
+    if(changed) {
+        remapped.reserve(indices.size());
+        for(const auto index:indices)remapped.push_back(representatives[index]);
+    }
+    auto ordered=OrderSkinIndices(mesh,changed?remapped:indices);
+    if(!ordered.empty()) {
+        auto buffer=UploadSkinIndices(device,ordered);
+        if(depthOnly&&buffer)return buffer;
+        if(orderedColor)*orderedColor=std::move(buffer);
+    }
+    return changed?UploadSkinIndices(device,remapped):nullptr;
 }
 
 GRHI::SamplerDesc ToGRHISampler(const SamplerSettings& settings) {
@@ -192,6 +301,49 @@ void Renderer::Diagnostic(const std::string& error) {
     if(error.empty() || _Error.size()>4096) return;
     if(!_Error.empty()) _Error+='\n';_Error+=error;
 }
+void Renderer::PreparePackedSkinVertexStream(MeshGPU& mesh) {
+    const auto& source=mesh.Data;
+    static_assert(MaxSkinBones<=256);
+    // Only the built-in stages use this stream. Their vertex indices stay
+    // identical to the original mesh, picking data and imported topology.
+    MeshGPU::SkinVertexStream stream;
+    stream.Stride=24;
+    if(mesh.SkinHasNonWhiteVertexColor) {
+        stream.Color=stream.Stride;
+        stream.Stride+=16;
+    }
+    if(source.UVOffset>=0) {
+        stream.UV=stream.Stride;
+        stream.Stride+=8;
+    }
+    stream.BoneIndices=stream.Stride;
+    stream.Stride+=4;
+    stream.BoneWeights=stream.Stride;
+    stream.Stride+=16;
+    if(stream.Stride>=source.VertexStride)return;
+
+    // Finiteness, field ranges and joint indices have all been validated
+    // before this point. Keep float fields byte-exact and narrow only IDs.
+    std::vector<std::uint8_t> bytes(std::size_t(source.VertexCount)*stream.Stride);
+    for(std::size_t vertex=0;vertex<source.VertexCount;++vertex) {
+        const auto* input=source.Bytes.data()+vertex*source.VertexStride;
+        auto* packed=bytes.data()+vertex*stream.Stride;
+        std::memcpy(packed,input+source.PositionOffset,12);
+        std::memcpy(packed+12,input+source.NormalOffset,12);
+        if(stream.Color>=0)std::memcpy(packed+stream.Color,input+source.ColorOffset,16);
+        if(stream.UV>=0)std::memcpy(packed+stream.UV,input+source.UVOffset,8);
+        for(std::size_t joint=0;joint<4;++joint)
+            packed[stream.BoneIndices+joint]=static_cast<std::uint8_t>(mesh.Skin[vertex].Bones[joint]);
+        std::memcpy(packed+stream.BoneWeights,input+source.BoneWeightsOffset,16);
+    }
+    GRHI::BufferDesc description;
+    description.Size=bytes.size();
+    description.Usage=GRHI::BufferUsage::Vertex;
+    const GRHI::BufferInitialData initial{bytes.data(),description.Size};
+    stream.Buffer.reset(_Device.CreateBuffer(description,&initial));
+    if(stream.Buffer)mesh.PackedSkinVertices=std::move(stream);
+}
+
 Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
     if(reference.Guid.empty() || !reference.LocalID) {Diagnostic("Mesh reference is unbound or invalid");return nullptr;}
     auto [position,inserted]=_Meshes.try_emplace(ResourceKey(reference));auto& entry=position->second;
@@ -219,6 +371,12 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
                     if(!entry.Data.Bones.empty()) {
                         MeshGPU::SkinVertex skin;
                         const auto* source=entry.Data.Bytes.data()+std::uint64_t(vertex)*entry.Data.VertexStride;
+                        if(!entry.SkinHasNonWhiteVertexColor&&entry.Data.ColorOffset>=0) {
+                            const auto* color=source+entry.Data.ColorOffset;
+                            constexpr auto white=std::bit_cast<std::uint32_t>(1.0f);
+                            entry.SkinHasNonWhiteVertexColor=Read32(color)!=white||Read32(color+4)!=white||
+                                Read32(color+8)!=white||Read32(color+12)!=white;
+                        }
                         double weightSum=0;
                         for(std::size_t influence=0;influence<4;++influence) {
                             const auto joint=Read32(source+entry.Data.BoneIndicesOffset+influence*4);
@@ -264,8 +422,10 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
                 entry.Buffer=_Device.CreateBuffer(description,&initial);
                 if(!entry.Buffer) entry.Error=DeviceError("Create prepared mesh buffer");
                 else if(!entry.JointBounds.empty()) {
-                    entry.SkinColorIndices=CreateSkinIndexBuffer(_Device,entry.Data,entry.Indices,false);
+                    entry.SkinColorIndices=CreateSkinIndexBuffer(_Device,entry.Data,entry.Indices,false,
+                        &entry.SkinOrderedColorIndices);
                     entry.SkinDepthIndices=CreateSkinIndexBuffer(_Device,entry.Data,entry.Indices,true);
+                    PreparePackedSkinVertexStream(entry);
                 }
             }
         } catch(const std::exception& exception) {entry.Error=exception.what();}
