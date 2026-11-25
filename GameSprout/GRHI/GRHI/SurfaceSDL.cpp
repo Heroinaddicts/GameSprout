@@ -32,6 +32,16 @@ SurfaceSDL* SurfaceSDL::CreateSurfaceSDL(DeviceSDL* device, GRHIWindowHandle han
     SDL_Window* window = SDL_CreateWindowWithProperties(props);
     SDL_DestroyProperties(props);
     if (!window) { device->FailSDL(); return nullptr; }
+#if defined(SDL_PLATFORM_MACOS)
+    // SDL can prefetch drawables for an embedded view when its host has a
+    // frame-ready callback. Borrowed Player windows keep their own pacing.
+    if (!SDL_SetBooleanProperty(SDL_GetWindowProperties(window),
+            SDL_PROP_WINDOW_GPU_METAL_ASYNC_DRAWABLE_BOOLEAN, true)) {
+        device->FailSDL();
+        SDL_DestroyWindow(window);
+        return nullptr;
+    }
+#endif
     return ClaimWindow(device, window, handle, true);
 }
 
@@ -98,10 +108,14 @@ AcquireFrameResult SurfaceSDL::AcquireFrame(ICommandBuffer* value, SurfaceFrame&
         bool drawableAvailable = false;
         std::string syncError;
         if (!SyncCocoaSurfaceDrawable(_HostHandle, _Window, drawableAvailable, syncError)) {
+            SDL_ResetGPUMetalDrawable(_Window);
             command->Fail(syncError);
             return AcquireFrameResult::Failed;
         }
-        if (!drawableAvailable) return AcquireFrameResult::Unavailable;
+        if (!drawableAvailable) {
+            SDL_ResetGPUMetalDrawable(_Window);
+            return AcquireFrameResult::Unavailable;
+        }
     }
 #endif
     // Reserve bookkeeping before acquiring; allocation must not strand an acquired frame.

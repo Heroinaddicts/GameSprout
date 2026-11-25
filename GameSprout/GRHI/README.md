@@ -94,6 +94,12 @@ SDL 源码改动位于相邻的 `../../../SDL` 仓库，需与 GRHI 一起保留
   版本 2，GRHI 配置和初始化时都会校验，需同步重建 SDL 与 GRHI。
 - `SDL_PROP_GPU_DEVICE_CREATE_ADAPTER_STRING`：创建设备时传入枚举得到的标识。
 - `SDL_PROP_GPU_DEVICE_ADAPTER_STRING`：查询成功创建的设备实际使用的物理标识。
+- macOS 还需要 Metal drawable 扩展。GRHI 给嵌入的 Cocoa 视口设置
+  `SDL_PROP_WINDOW_GPU_METAL_ASYNC_DRAWABLE_BOOLEAN`。宿主通过
+  `SDL_SetGPUMetalDrawableReadyCallback` 注册唤醒后，SDL 才在后台预取 drawable，
+  窗口线程的 Try 路径只取就绪结果。窗口线程继续负责尺寸同步、命令提交和呈现。
+  `SDL_ResetGPUMetalDrawable` 清理已不可用的视口缓冲，SDL 负责对尺寸变化和销毁作废旧请求。
+  Player 自有 SDL 窗口继续使用原有取帧策略。
 
 Metal 路径已在本机 Apple M4 验证。DX12 和 Vulkan 后端已交叉编译为 Windows x64
 对象文件，尚需 Windows 链接、实际 GPU 运行及双显卡切换验收。GRHI 的 macOS

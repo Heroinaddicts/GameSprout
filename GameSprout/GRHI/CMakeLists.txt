@@ -37,6 +37,21 @@ cmake_pop_check_state()
 if(NOT GRHI_SDL_ADAPTER_EXTENSION)
     message(FATAL_ERROR "Build the local SDL with the GRHI GPU adapter extension first, then set SDL3_DIR to that build.")
 endif()
+if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    cmake_push_check_state(RESET)
+    set(CMAKE_REQUIRED_LIBRARIES "${GAMESPROUT_GRHI_SDL_TARGET}")
+    unset(GRHI_SDL_METAL_DRAWABLE_EXTENSION CACHE)
+    check_cxx_source_compiles("#include <SDL3/SDL.h>
+int main() {
+    SDL_SetGPUMetalDrawableReadyCallback(nullptr, nullptr);
+    SDL_ResetGPUMetalDrawable(nullptr);
+    return SDL_PROP_WINDOW_GPU_METAL_ASYNC_DRAWABLE_BOOLEAN[0] == 0;
+}" GRHI_SDL_METAL_DRAWABLE_EXTENSION)
+    cmake_pop_check_state()
+    if(NOT GRHI_SDL_METAL_DRAWABLE_EXTENSION)
+        message(FATAL_ERROR "Build the local SDL with the macOS GPU drawable extension first, then set SDL3_DIR to that build.")
+    endif()
+endif()
 endif()
 
 file(GLOB_RECURSE grhi_api_files CONFIGURE_DEPENDS

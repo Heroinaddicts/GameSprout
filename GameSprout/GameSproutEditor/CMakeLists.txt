@@ -35,6 +35,10 @@ set(PROJECT_SOURCES
         Api/GameSproutEditorApi.h
 )
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    list(APPEND PROJECT_SOURCES CocoaEditorFramePump.cpp CocoaEditorFramePump.h)
+endif()
+
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(GameSproutEditor
         MANUAL_FINALIZATION
@@ -129,6 +133,14 @@ add_dependencies(GameSproutEditor GameSproutDeployFoundation)
 GameSproutRuntimeDeploy(GameSproutEditor)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    if(NOT TARGET SDL3::SDL3-shared)
+        find_package(SDL3 3.2 CONFIG REQUIRED COMPONENTS SDL3-shared
+            HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../SDL/build")
+    endif()
+    target_link_libraries(GameSproutEditor PRIVATE SDL3::SDL3-shared)
+    # Use the same bundled SDL instance as GRHI and RuntimeHost.
+    set_property(TARGET GameSproutEditor APPEND PROPERTY BUILD_RPATH "@executable_path")
+    set_property(TARGET GameSproutEditor APPEND PROPERTY INSTALL_RPATH "@executable_path")
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../GameSproutPlayer" "${CMAKE_CURRENT_BINARY_DIR}/Player")
     add_custom_target(GameSproutDeployPlayerTemplate
         COMMAND "${CMAKE_COMMAND}" -E copy_directory
