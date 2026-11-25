@@ -129,7 +129,8 @@ void Renderer::AppendShadowBatch(const ShadowCandidate& caster,bool instancing,
 bool Renderer::DrawShadowAtlas(GRHI::ICommandBuffer& command,GRHI::ITexture& atlas,
     const RenderView& view,const RuntimeShadowMath::CascadeSet& cascades,
     std::uint32_t tile,std::uint32_t columns,const std::vector<ShadowCandidate>& candidates,
-    InstanceStream& stream,std::uint32_t cascadeMask,const std::vector<ShadowRegion>* repair) {
+    InstanceStream& stream,std::uint32_t cascadeMask,const std::vector<ShadowRegion>* repair,
+    const RuntimeShadowMath::ReceiverFootprint* receivers) {
     struct TileDraws {
         GRHI::Viewport Viewport;
         Mat4 Projection;
@@ -149,15 +150,18 @@ bool Renderer::DrawShadowAtlas(GRHI::ICommandBuffer& command,GRHI::ITexture& atl
         if(!repair) {
             auto& work=tiles.emplace_back(TileDraws{{float(x),float(y),float(tile),float(tile),0,1},projection,{},{}});
             const RenderFrustum::Frustum frustum(projection);
+            const auto* footprint=receivers?&receivers[cascade]:nullptr;
             for(const auto& candidate:candidates) {
                 const auto& object=*candidate.Object;
-                if(object.CullBoxKnown&&!object.Skinned) {
+                if(!footprint&&object.CullBoxKnown&&!object.Skinned) {
                     // Reuse the transformed local mesh bounds. A world AABB
                     // expands again when projected onto the light's tilted axes.
                     if(frustum.Intersects(object.CullBox))AppendShadowBatch(candidate,instancing,work.Batches,stream.Indices);
                     continue;
                 }
                 const auto bounds=ProjectShadowBounds(candidate.World,projection);
+                if(footprint&&(bounds.Maximum[0]<footprint->Minimum[0]||bounds.Minimum[0]>footprint->Maximum[0]||
+                    bounds.Maximum[1]<footprint->Minimum[1]||bounds.Minimum[1]>footprint->Maximum[1]))continue;
                 if(bounds.Maximum[0]>=-1&&bounds.Minimum[0]<=1&&bounds.Maximum[1]>=-1&&bounds.Minimum[1]<=1&&
                    bounds.Maximum[2]>=0&&bounds.Minimum[2]<=1)
                     AppendShadowBatch(candidate,instancing,work.Batches,stream.Indices);
@@ -259,6 +263,14 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
     const bool sameAspect=_ShadowAspect==aspect;
     const bool samePreview=_ShadowPreviewObjectID==previewID;
     const bool navigationReuse=!refreshRequested&&(!sameView||!sameAspect)&&view.ReuseShadowsWhileNavigating;
+    // A planar capture borrows these shadow maps from a second view. Navigation
+    // can also use the last cascade-selection view instead of the current one.
+    const auto& planar=scene.GetEnvironmentLighting().PlanarReflection;
+    const bool useReceiverFootprints=settings.CacheStaticCasters&&!view.ReuseShadowsWhileNavigating&&
+        !(view.EnablePlanarReflections&&planar.Enabled&&planar.Strength>0&&planar.LayerMask!=0&&
+          std::any_of(_PreparedDraws.begin(),_PreparedDraws.end(),[&](const PreparedDraw& draw) {
+              return IsPlanarReceiver(draw,planar,view.Camera.Position);
+          }));
     const bool sameFitSettings=_ShadowValid&&sameLight&&!refreshRequested&&_ShadowSceneID==sceneID&&(sameAspect||navigationReuse)&&
         _ShadowSettings==settings&&_ShadowLightMask==light.CullingMask&&
         SameVector(_ShadowDirection,light.TowardsLight)&&
@@ -276,7 +288,8 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
     const bool reuseFit=sameFitSettings&&(sameView||navigationReuse||coveredCascades==allCascades);
     const auto& samplingCamera=navigationReuse&&reuseFit?_ShadowCamera:view.Camera;
     const bool sameSampling=std::memcmp(_ShadowUniform.CameraView.Data,samplingCamera.View.Data,sizeof(samplingCamera.View.Data))==0;
-    if(reuseFit&&sameSampling&&_ShadowSceneRevision==sceneRevision&&_ShadowSkinPoseRevision==skinPoseRevision&&
+    if(reuseFit&&sameSampling&&(!_DynamicShadowReceiverCulled||useReceiverFootprints)&&
+        _ShadowSceneRevision==sceneRevision&&_ShadowSkinPoseRevision==skinPoseRevision&&
         (samePreview||!previewID)) {
         // The submitted split still represents the exact committed pose.
         // Rebuild with the authored policy at the next actual invalidation.
@@ -525,6 +538,7 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
 
     // If the last dynamic caster disappears, ignore its old atlas contents.
     uniform.Bias[0].W=0;
+    _DynamicShadowReceiverCulled=false;
     if(!dynamicCasters.empty()) {
         if(!_DynamicShadowAtlas) {
             _DynamicShadowAtlas=_Device.CreateTexture(description);
@@ -545,7 +559,12 @@ bool Renderer::RenderShadows(GRHI::ICommandBuffer& command,const RenderView& vie
         uniform.DynamicDepthBias={depthBias[0],depthBias[1],depthBias[2],depthBias[3]};
         uniform.Bias[0].W=1;
         SortShadowCandidates(dynamicCasters);
-        if(!DrawShadowAtlas(command,*_DynamicShadowAtlas,view,cascades,tile,columns,dynamicCasters,_DynamicShadowInstances))return false;
+        std::array<RuntimeShadowMath::ReceiverFootprint,4> receivers;
+        const bool cullReceivers=useReceiverFootprints&&RuntimeShadowMath::BuildReceiverFootprints(
+            fitCamera,fitAspect,cascades,tile,uniform.Bias,filterRadius,receivers);
+        if(!DrawShadowAtlas(command,*_DynamicShadowAtlas,view,cascades,tile,columns,dynamicCasters,
+            _DynamicShadowInstances,allCascades,nullptr,cullReceivers?receivers.data():nullptr))return false;
+        _DynamicShadowReceiverCulled=cullReceivers;
         ++_Statistics.DynamicShadowMapUpdates;
         _Statistics.DynamicShadowDrawCalls=_Statistics.ShadowDrawCalls-_Statistics.StaticShadowDrawCalls;
     }

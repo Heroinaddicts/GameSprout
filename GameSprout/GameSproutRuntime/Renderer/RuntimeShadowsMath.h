@@ -26,6 +26,10 @@ struct CascadeSet {
     std::array<Cascade,4> Entries{};
 };
 
+struct ReceiverFootprint {
+    std::array<double,2> Minimum{},Maximum{};
+};
+
 namespace Detail {
 struct Point {double X=0,Y=0,Z=0;};
 inline Point operator+(Point a,Point b){return {a.X+b.X,a.Y+b.Y,a.Z+b.Z};}
@@ -54,6 +58,45 @@ inline Point SliceCorner(const Mat4& inverseView,float aspect,bool perspective,d
     const double halfHeight=perspective?depth*tangent:orthoHeight*.5;
     return World(inverseView,(index&1?1.0:-1.0)*halfHeight*aspect,(index&2?1.0:-1.0)*halfHeight,-depth);
 }
+}
+
+// Bounds of the pixels that may sample a cascade in this view. This only
+// narrows caster submission. The projection and the atlas sampling stay fixed.
+inline bool BuildReceiverFootprints(const RenderCamera& camera,float aspect,const CascadeSet& cascades,
+    std::uint32_t tile,const Vector4* bias,float filterRadius,std::array<ReceiverFootprint,4>& output) {
+    const bool perspective=camera.Projection.Projection==CameraProjection::Perspective;
+    const double tangent=perspective?std::tan(double(camera.Projection.VerticalFovRadians)*.5):0;
+    const double orthoHeight=camera.Projection.OrthographicHeight;
+    Mat4 inverseView;
+    if(!RuntimeMath::TryInverseAffine(camera.View,inverseView))return false;
+    const double samplePadding=2*(double(filterRadius)+1)/tile;
+    for(std::uint32_t index=0;index<cascades.Count;++index) {
+        const auto& cascade=cascades.Entries[index];
+        const auto& matrix=cascade.ViewProjection;
+        // Cascade zero also covers depths before its fitted near split.
+        // The current camera clips those fragments before shading.
+        const double nearDepth=index?cascades.Entries[index-1].FarDepth:camera.Projection.NearPlane;
+        const double farDepth=cascade.FarDepth;
+        if(!(std::isfinite(nearDepth)&&std::isfinite(farDepth)&&farDepth>=nearDepth))return false;
+        auto& bounds=output[index];
+        for(std::size_t row=0;row<2;++row) {
+            bounds.Minimum[row]= std::numeric_limits<double>::infinity();
+            bounds.Maximum[row]=-std::numeric_limits<double>::infinity();
+            const double padding=samplePadding+std::abs(double(bias[index].Y))*Detail::RowLength(matrix,row);
+            for(std::size_t corner=0;corner<8;++corner) {
+                const auto point=Detail::SliceCorner(inverseView,aspect,perspective,tangent,orthoHeight,
+                    nearDepth,farDepth,corner);
+                const double x=matrix(row,0)*point.X,y=matrix(row,1)*point.Y,z=matrix(row,2)*point.Z;
+                const double clip=x+y+z+matrix(row,3);
+                const double guard=64*std::numeric_limits<float>::epsilon()*
+                    (std::abs(x)+std::abs(y)+std::abs(z)+std::abs(double(matrix(row,3)))+1);
+                if(!std::isfinite(clip)||!std::isfinite(padding+guard))return false;
+                bounds.Minimum[row]=std::min(bounds.Minimum[row],clip-padding-guard);
+                bounds.Maximum[row]=std::max(bounds.Maximum[row],clip+padding+guard);
+            }
+        }
+    }
+    return true;
 }
 
 inline int WrapShadowTexel(int pixel,int tile) {

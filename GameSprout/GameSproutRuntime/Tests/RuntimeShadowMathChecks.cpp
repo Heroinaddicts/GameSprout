@@ -25,6 +25,44 @@ void CheckReceiverCorners(const RenderCamera& camera,float aspect,const RuntimeS
         Contained(cascade,{world.X,world.Y,world.Z});
     }
 }
+void CheckReceiverFootprints(const RenderCamera& camera,float aspect,const RuntimeShadowMath::CascadeSet& cascades){
+    constexpr unsigned tile=1024;
+    constexpr float pcfRadius=2;
+    Vector4 bias[4]{};
+    for(unsigned index=0;index<cascades.Count;++index)bias[index].Y=10*cascades.Entries[index].WorldUnitsPerTexel;
+    std::array<RuntimeShadowMath::ReceiverFootprint,4> footprints;
+    Check(RuntimeShadowMath::BuildReceiverFootprints(camera,aspect,cascades,tile,bias,pcfRadius,footprints),
+        "The current camera could not bound receivers in retained shadow tiles");
+    Mat4 inverse;
+    Check(RuntimeMath::TryInverseAffine(camera.View,inverse),"Invalid receiver test view");
+    bool clipsUnusedTexels=false;
+    for(unsigned index=0;index<cascades.Count;++index){
+        const auto& cascade=cascades.Entries[index];
+        const auto& footprint=footprints[index];
+        for(unsigned row=0;row<2;++row)
+            clipsUnusedTexels|=footprint.Maximum[row]-footprint.Minimum[row]<1.9;
+        for(unsigned corner=0;corner<8;++corner){
+            const float depth=corner<4?cascade.NearDepth:cascade.FarDepth;
+            const float height=camera.Projection.Projection==CameraProjection::Perspective?
+                std::tan(camera.Projection.VerticalFovRadians*.5f)*depth:camera.Projection.OrthographicHeight*.5f;
+            const auto point=inverse*Vector4{(corner&1?height:-height)*aspect,corner&2?height:-height,-depth,1};
+            for(unsigned row=0;row<2;++row){
+                const auto& matrix=cascade.ViewProjection;
+                Vector3 axis{matrix(row,0),matrix(row,1),matrix(row,2)};
+                Check(axis.TryNormalize(axis),"Invalid shadow footprint axis");
+                // Exercise the largest admissible displacement on this axis.
+                const auto shift=Vector4{axis.X*bias[index].Y,axis.Y*bias[index].Y,axis.Z*bias[index].Y,0};
+                const auto positive=matrix*(point+shift);
+                const auto negative=matrix*(point+Vector4{-shift.X,-shift.Y,-shift.Z,0});
+                const auto clipPadding=2*(pcfRadius+.5f)/tile;
+                const float upper=row==0?positive.X:positive.Y,lower=row==0?negative.X:negative.Y;
+                Check(upper+clipPadding<=footprint.Maximum[row]&&lower-clipPadding>=footprint.Minimum[row],
+                    "Visible receiver bias or a PCF tap escaped the dynamic shadow footprint");
+            }
+        }
+    }
+    Check(clipsUnusedTexels,"Dynamic shadow footprints retained the entire tile after fitting a guarded view");
+}
 }
 
 int main(){
@@ -186,6 +224,9 @@ int main(){
             Check(TryMakeLookAt(eye+offset,eye+offset+direction,{0,1,0},camera.View),"Rotated orbit view failed");
             const auto mask=RuntimeShadowMath::CoveredCascades(camera,wideAspect,staticProjection,splits,4,1024,2,1.0f);
             Check((mask&farCascades)==farCascades,"Turn or small orbit escaped a rotation-stable far cascade");
+            Check(RuntimeShadowMath::Build(camera,wideAspect,{.3f,.8f,.6f},120,4,1024,nullptr,0,cascades,1,staticProjection),
+                "Dynamic refit failed during receiver-footprint test");
+            CheckReceiverFootprints(camera,wideAspect,cascades);
         }
         const Vector3 distantEye{500,7,-19};
         Check(TryMakeLookAt(distantEye,distantEye+Vector3{0,0,1},{0,1,0},camera.View),"Teleported orbit view failed");

@@ -16,7 +16,7 @@ namespace GameSproutRuntime {
 class Runtime;
 class RenderResourceCache;
 struct RenderObjectChange;
-namespace RuntimeShadowMath { struct CascadeSet; }
+namespace RuntimeShadowMath { struct CascadeSet; struct ReceiverFootprint; }
 namespace RenderEnvironment { struct Uniform; }
 class Renderer final : public IRuntimeViewport {
 public:
@@ -292,7 +292,8 @@ private:
     bool DrawShadowAtlas(GRHI::ICommandBuffer&,GRHI::ITexture&,const RenderView&,
         const RuntimeShadowMath::CascadeSet&,std::uint32_t tile,std::uint32_t columns,
         const std::vector<ShadowCandidate>&,InstanceStream&,std::uint32_t cascadeMask=0xF,
-        const std::vector<ShadowRegion>* repair=nullptr);
+        const std::vector<ShadowRegion>* repair=nullptr,
+        const RuntimeShadowMath::ReceiverFootprint* receivers=nullptr);
     static bool BuildShadowRepairRegions(const Mat4*,const std::vector<Bounds>& removedBounds,
         const std::vector<Bounds>& addedBounds,const Vector4* scroll,std::uint32_t tile,std::uint32_t columns,
         std::uint32_t count,std::vector<ShadowRegion>&);
@@ -499,7 +500,7 @@ private:
     float _ShadowAspect=0;
     std::uint64_t _ShadowSceneID=0,_ShadowSceneRevision=0,_ShadowSkinPoseRevision=0;
     std::uint64_t _ShadowLightObjectID=0,_ShadowLightComponentID=0,_ShadowRefreshRevision=0;
-    bool _ShadowValid=false,_ShadowRecorded=false,_ShadowNavigationApproximate=false;
+    bool _ShadowValid=false,_ShadowRecorded=false,_ShadowNavigationApproximate=false,_DynamicShadowReceiverCulled=false;
     GRHI::ITexture* _SpotShadowAtlas=nullptr;
     SpotShadowUniform _SpotShadowUniform;
     struct SpotShadowCacheKey {
