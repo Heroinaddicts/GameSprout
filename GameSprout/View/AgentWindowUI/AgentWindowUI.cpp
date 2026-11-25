@@ -17,13 +17,6 @@ bool AgentWindowUI::Launch(GameSproutEditor::GameSproutViewApi * const editor) {
 }
 
 void AgentWindowUI::LaunchFinished(GameSproutEditor::GameSproutViewApi * const editor) {
-//     _AgentWinDocker = g_IIDEWindow->CreateDocker("Agent");
-//     _Dispatch = new QObject();
-//     _Window = new QWidget();
-//     _Ui = new Ui::AgentWindow();
-//     _Ui->setupUi(_Window);
-
-//     _AgentWinDocker->AttachWidget(_Window);
 }
 
 void AgentWindowUI::Show() {
