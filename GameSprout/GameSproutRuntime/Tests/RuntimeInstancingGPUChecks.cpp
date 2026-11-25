@@ -236,6 +236,18 @@ int main(int argc,char** argv){
         Check(viewport->GetStatistics().InstanceTransformUploadBytes==128&&viewport->GetStatistics().InstanceVisibilityUploadBytes==0,
             "Moving one visible instance rewrote other transforms or visible slots");
         CompareSingleDraws(*viewport,view,moved,"Moved instance transform was stale");
+        Pixels(*viewport,view);
+        for(std::size_t index=1;index<=60;++index) {
+            auto* transform=nodes[index]->GetTransform();
+            auto position=transform->GetLocalPosition();
+            position.Y+=.05f;
+            transform->SetLocalPosition(position);
+        }
+        const auto crowdMove=Pixels(*viewport,view);
+        Check(viewport->GetStatistics().InstanceTransformUploadBytes==nodes.size()*128,
+            "Moving most instances did not replace the resident transform data");
+        CompareSingleDraws(*viewport,view,crowdMove,"Replacing busy transforms lost unchanged instances");
+        Pixels(*viewport,view);
         Check(scene->DestroyGameObject(nodes.back()),"Cannot delete cached instance");nodes.pop_back();
         pixels=Pixels(*viewport,view);Check(viewport->GetStatistics().InstancedInstances==99&&viewport->GetStatistics().InstanceBufferUploads==2,
             "Deleted instance remained in GPU data");CompareSingleDraws(*viewport,view,pixels,"Deleted instance still rendered");

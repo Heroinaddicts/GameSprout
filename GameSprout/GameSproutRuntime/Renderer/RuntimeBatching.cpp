@@ -135,7 +135,14 @@ void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,boo
 bool Renderer::UploadResidentInstances(GRHI::ICommandBuffer& command) {
     if(_SceneObjects.empty())return true;
     const auto requiredBytes=_SceneObjects.size()*sizeof(InstanceVertex);
-    if(_InstanceTransformsDirty) {
+    auto& changes=_ChangedInstanceTransforms;
+    if(!_InstanceTransformsDirty&&!changes.empty()) {
+        std::sort(changes.begin(),changes.end());
+        changes.erase(std::unique(changes.begin(),changes.end()),changes.end());
+    }
+    // When most instances move, replace the backing allocation as a whole.
+    // Patching the same GPU buffer would wait for the previous frame's reads.
+    if(_InstanceTransformsDirty||changes.size()>_SceneObjects.size()/2) {
         _InstanceTransforms.resize(_SceneObjects.size());
         for(const auto& object:_SceneObjects)
             _InstanceTransforms[object.InstanceIndex]={object.Model,object.Normal};
@@ -145,10 +152,7 @@ bool Renderer::UploadResidentInstances(GRHI::ICommandBuffer& command) {
         if(!command.UploadBuffers(&upload,1))return Fail(DeviceError("Upload resident instance transforms"));
         ++_Statistics.InstanceBufferUploads;
         _Statistics.InstanceTransformUploadBytes=requiredBytes;
-    }else if(!_ChangedInstanceTransforms.empty()) {
-        auto& changes=_ChangedInstanceTransforms;
-        std::sort(changes.begin(),changes.end());
-        changes.erase(std::unique(changes.begin(),changes.end()),changes.end());
+    }else if(!changes.empty()) {
         std::vector<GRHI::BufferUpload> uploads;
         for(std::size_t start=0;start<changes.size();) {
             const auto first=changes[start];
