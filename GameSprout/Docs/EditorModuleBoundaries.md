@@ -63,6 +63,8 @@ Runtime 内部为同一实例共享图形 Device，不同 Scene/Game 视口拥�
 
 `GameSproutRuntimeDeploy` 负责将 Runtime 和其私有图形依赖放入应用包。应用包中存在 GRHI 动态库属于部署依赖，不要求 Editor 源码包含 GRHI 头文件或操作 GPU 对象。
 
+macOS Editor 的 Cocoa 帧泵通过 SDL 接收嵌入式视口的 drawable 就绪通知，将唤醒合并到 Qt 主线程。SDL 每个视口在后台预取一个 drawable，GRHI 同步窗口尺寸并通过窗口线程取图、提交与呈现。RuntimeHost 继续负责游戏时钟。停用视口或暂未收到就绪通知时，Editor 由定时器驱动。构建和部署使用配套的本地 SDL，其中 Metal drawable 扩展记录于相邻 SDL 仓库提交 `fbaef2b1a`，还需配合已有的 GPU 适配器与 Cocoa 外部视图扩展。详见 [GRHI 的 SDL 扩展说明](../GRHI/README.md#本地-sdl-扩展)。
+
 ### 实时蒙皮实例化
 
 Runtime 为使用兼容网格分段、材质和管线的骨骼网格合并内置不透明绘制，并在方向光和聚光灯的阴影通道中合批。每个实例独立读取自己的骨骼矩阵。GPU 常驻缓冲保存实例变换、姿态寻址和骨骼矩阵，Runtime 批量上传变化的范围。网格加载时生成供内置着色器使用的索引和骨骼包围盒数据，颜色和阴影分别按各自的顶点输入复用等价顶点。场景裁剪使用当前姿态的保守包围盒。
@@ -70,6 +72,12 @@ Runtime 为使用兼容网格分段、材质和管线的骨骼网格合并内置
 普通角色使用 Animator 播放 Clip 或 Controller。同一骨架的装备可以通过 `SetAnimatorObjectID` 绑定到同一个 Animator，并使用 `IMeshComponent::SetMesh` 和 `IMeshRendererComponent::SetMaterials` 换装。自定义动画求值器可以调用 `ISkinnedMeshRendererComponent::SetSkinPose`，传入网格局部空间、按网格骨骼顺序排列的矩阵，矩阵须已乘以各自的逆绑定矩阵，最多 128 根骨骼。Runtime 拷贝数据，覆盖仅在运行期间生效，传空 span 恢复 Animator 绑定。随 GameLogic ABI 升至 12，宿主和项目动态库须使用匹配的 SDK 重新构建。[Runtime API](../GameSproutRuntime/RuntimeApi.txt)
 
 内置不透明材质可通过 `EnableGPUInstancing` 控制颜色实例化，`RenderView::EnableGPUInstancing` 控制视口实例化。`RenderStatistics` 中，`SkinnedInstancedDrawCalls` 和 `SkinnedInstancedInstances` 统计颜色通道中使用实例化的绘制和实例数，`InstanceSkinPaletteUploadBytes` 统计这一帧上传的骨骼矩阵和寻址数据。Editor 通过公开接口读这些数据，GRHI 负责执行已录制的上传和绘制。
+
+千骑压测使用通用渲染路径。Runtime 按网格布局、材质、实例变化比例和阴影覆盖选择实现。多数实例移动时整批替换 GPU 变换缓冲，少量变化时只上传变更区间。内置蒙皮可创建紧凑顶点流，以 `UInt8x4` 表达已有 128 骨骼上限内的骨骼索引，浮点位置、法线、纹理坐标和权重保持原精度。紧凑缓冲分配失败时回退到原始流。原始网格数据仍供自定义着色器使用。每种网格新增的紧凑流和索引流会增加加载工作与驻留缓冲，骑兵示例中典型顶点步长 100 → 52 字节指绘制读取的步长。
+
+内置不透明蒙皮在材质分段内调整三角形顺序以改善顶点缓存复用，透明保留原有顺序。一个材质段内完全重叠且深度相同的不透明三角形，在 `LessEqual` 深度测试下可能因提交顺序变化而改变覆盖结果。启用静态缓存的方向光可按当前视口缩小动态阴影提交范围，边界计入法线偏移和 PCF 滤波。平面反射借用阴影图或视口启用导航近似时，回到完整覆盖。
+
+GRHI 追加 `UInt8x4` 并保留旧格式编号。新版 Runtime 和 GRHI 需配套部署，应用包中的 SDL 也要与 GRHI 匹配。紧凑缓冲分配失败可用原始流，紧凑格式的管线创建失败目前会报告渲染错误。Metal、DX12、Vulkan 均有对应格式映射，本轮运行回归在 macOS Metal 完成。Windows、Linux 和移动设备上的同场景兼容还需实机验证。详见 [原生 Game 压测记录](NinjaBuild.md#2026-11-25--mountandblade-骑兵压测)。
 
 ## 更新与退出
 
