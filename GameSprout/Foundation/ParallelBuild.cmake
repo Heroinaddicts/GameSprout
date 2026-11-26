@@ -1,6 +1,18 @@
 # Shared by standalone projects and their subdirectories.
 include_guard(DIRECTORY)
 
+# JOM can misread localized MSVC /showIncludes prefixes in generated rules.
+if(CMAKE_HOST_WIN32 AND CMAKE_GENERATOR STREQUAL "NMake Makefiles JOM")
+    set(CMAKE_DEPENDS_USE_COMPILER OFF CACHE BOOL "Use compiler-generated dependencies")
+    if(NOT CMAKE_DEPENDS_USE_COMPILER)
+        # Keep generated rules and try_compile projects in the same mode, even
+        # when this helper is first included after a language was enabled.
+        set(CMAKE_C_DEPENDS_USE_COMPILER OFF)
+        set(CMAKE_CXX_DEPENDS_USE_COMPILER OFF)
+        list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_DEPENDS_USE_COMPILER)
+    endif()
+endif()
+
 cmake_host_system_information(RESULT FOUNDATION_BUILD_CORES QUERY NUMBER_OF_LOGICAL_CORES)
 if(NOT FOUNDATION_BUILD_CORES MATCHES "^[1-9][0-9]*$")
     message(FATAL_ERROR "Cannot determine the host CPU core count.")
