@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <string>
+#include <system_error>
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -61,7 +62,13 @@ namespace Foundation {
             reinterpret_cast<const char8_t*>(libraryPath.data()),
             libraryPath.size()
         ));
-        HMODULE const library = ::LoadLibraryW(nativeLibraryPath.c_str());
+        std::error_code pathError;
+        const auto absoluteLibraryPath = std::filesystem::absolute(nativeLibraryPath, pathError);
+        if (pathError) {
+            return nullptr;
+        }
+        HMODULE const library = ::LoadLibraryExW(absoluteLibraryPath.c_str(), nullptr,
+            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
         if (!library) {
             return nullptr;
         }

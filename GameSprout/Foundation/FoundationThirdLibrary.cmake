@@ -25,6 +25,9 @@ function(FoundationResolveMsvcSystemRuntime)
         return()
     endif()
 
+    if(NOT MSVC_REDIST_DIR AND IS_DIRECTORY "$ENV{VCToolsRedistDir}")
+        file(TO_CMAKE_PATH "$ENV{VCToolsRedistDir}" MSVC_REDIST_DIR)
+    endif()
     set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
     set(CMAKE_INSTALL_OPENMP_LIBRARIES TRUE)
     include(InstallRequiredSystemLibraries)
@@ -1070,9 +1073,10 @@ function(FoundationInstallThirdParty)
     FoundationEnsureVcpkg(vcpkgExecutable)
     file(MAKE_DIRECTORY "${FOUNDATION_VCPKG_BINARY_CACHE}")
 
-    set(vcpkgOverlayArguments
-        --overlay-ports "${FOUNDATION_ROOT}/VcpkgOverlayPorts"
-    )
+    set(vcpkgOverlayArguments)
+    if(IS_DIRECTORY "${FOUNDATION_ROOT}/VcpkgOverlayPorts")
+        list(APPEND vcpkgOverlayArguments --overlay-ports "${FOUNDATION_ROOT}/VcpkgOverlayPorts")
+    endif()
     if(NOT "${FOUNDATION_VCPKG_OVERLAY_TRIPLETS}" STREQUAL "")
         list(APPEND vcpkgOverlayArguments
             --overlay-triplets "${FOUNDATION_VCPKG_OVERLAY_TRIPLETS}"
@@ -1736,11 +1740,11 @@ function(FoundationDeployRuntimeDependencies targetName)
             get_filename_component(runtimeName "${runtimeLibrary}" NAME)
             list(APPEND msvcSystemRuntimeNames "${runtimeName}")
         endforeach()
-        list(JOIN msvcSystemRuntimeNames "|" msvcSystemRuntimeNamesArgument)
 
+        # Pass lists as single arguments so cmd can chain the post-build commands.
         add_custom_command(TARGET ${targetName} POST_BUILD
             COMMAND "${CMAKE_COMMAND}"
-                "-DFOUNDATION_RUNTIME_FILES=$<JOIN:$<TARGET_RUNTIME_DLLS:${targetName}>,|>"
+                "-DFOUNDATION_RUNTIME_FILES=$<TARGET_RUNTIME_DLLS:${targetName}>"
                 "-DFOUNDATION_RUNTIME_DIRECTORY=$<TARGET_FILE_DIR:${targetName}>"
                 -P
                 "${FOUNDATION_ROOT}/CMake/FoundationCopyRuntimeDependencies.cmake"
@@ -1771,11 +1775,26 @@ function(FoundationDeployRuntimeDependencies targetName)
 
         get_target_property(runtimeTargetType ${targetName} TYPE)
         if("${runtimeTargetType}" STREQUAL "EXECUTABLE")
+            set(runtimeDependencyToolArguments)
+            if(MSVC)
+                get_filename_component(compilerDirectory "${CMAKE_CXX_COMPILER}" DIRECTORY)
+                find_program(foundationDumpbin NAMES dumpbin HINTS "${compilerDirectory}" NO_CACHE)
+                if(foundationDumpbin)
+                    list(APPEND runtimeDependencyToolArguments
+                        "-DCMAKE_GET_RUNTIME_DEPENDENCIES_TOOL=dumpbin"
+                        "-DCMAKE_GET_RUNTIME_DEPENDENCIES_COMMAND=${foundationDumpbin}")
+                endif()
+            elseif(CMAKE_OBJDUMP)
+                list(APPEND runtimeDependencyToolArguments
+                    "-DCMAKE_GET_RUNTIME_DEPENDENCIES_TOOL=objdump"
+                    "-DCMAKE_GET_RUNTIME_DEPENDENCIES_COMMAND=${CMAKE_OBJDUMP}")
+            endif()
             add_custom_command(TARGET ${targetName} POST_BUILD
                 COMMAND "${CMAKE_COMMAND}"
                     "-DFOUNDATION_RUNTIME_BINARY=$<TARGET_FILE:${targetName}>"
                     "-DFOUNDATION_RUNTIME_DIRECTORY=$<TARGET_FILE_DIR:${targetName}>"
-                    "-DFOUNDATION_REQUIRED_APP_LOCAL_RUNTIME_FILES=${msvcSystemRuntimeNamesArgument}"
+                    "-DFOUNDATION_REQUIRED_APP_LOCAL_RUNTIME_FILES=${msvcSystemRuntimeNames}"
+                    ${runtimeDependencyToolArguments}
                     -P
                     "${FOUNDATION_ROOT}/CMake/FoundationValidateRuntimeDependencies.cmake"
                 COMMENT
