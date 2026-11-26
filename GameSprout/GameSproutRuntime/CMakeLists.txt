@@ -32,6 +32,12 @@ list(FILTER gamesprout_runtime_files EXCLUDE REGEX
     "/(build|Build|cmake-build-[^/]+|CMakeFiles|[^/]+_autogen|Tests|ThirdParty)/")
 list(SORT gamesprout_runtime_files)
 
+# The generator assembles shader sources separately. Keep Visual Studio from
+# treating shader fragments as standalone FXCompile inputs.
+set(runtime_shader_sources ${gamesprout_runtime_files})
+list(FILTER runtime_shader_sources INCLUDE REGEX "[.]hlsl$")
+set_source_files_properties(${runtime_shader_sources} PROPERTIES HEADER_FILE_ONLY TRUE)
+
 option(GAMESPROUT_RUNTIME_STATIC "Link Runtime into the target Player" OFF)
 if(GAMESPROUT_RUNTIME_STATIC)
     add_library(GameSproutRuntime STATIC ${gamesprout_runtime_files})

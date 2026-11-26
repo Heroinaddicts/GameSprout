@@ -135,7 +135,16 @@ Windows 的 MSVC Kit 使用同一套 ABI 构建 Editor、Runtime 和 GameLogic�
 
 ### Windows x64 构建
 
-使用启用了 MSVC 和 Windows SDK 的 x64 开发者 PowerShell，准备 Qt 6 MSVC x64、Ninja、Git 和 SDL3。先构建 Foundation、GRHI、Runtime，再构建 Editor。各 SDK 默认放入同一个 `Bin`，请使用同一架构和 Debug/Release 配置。
+使用启用了 MSVC 和 Windows SDK 的 x64 开发者 PowerShell，准备 Qt 6 MSVC x64、Git 和 SDL3。以 `GameSprout` 为 CMake 源目录可统一构建 Foundation、GRHI、Runtime、Editor、Hub、Agent 和 Player。若 SDL3 SDK 已解压到 `Bin/Deps/SDL3Windows` 下的版本目录，聚合入口会自动查找其 CMake 包，也可以通过 `SDL3_DIR` 指定其他 SDK。以下 Visual Studio 2026 命令需要 CMake 4.2 或更新版本。
+
+```powershell
+cmake -S GameSprout -B GameSprout/build/VS2026 -G 'Visual Studio 18 2026' -A x64 '-DCMAKE_PREFIX_PATH=C:/Qt/6.12.1/msvc2022_64'
+cmake --build GameSprout/build/VS2026 --config Debug
+```
+
+各 SDK 默认写入同一个 `Bin`。在同一输出目录中使用一致的架构和构建配置。自定义 Shader 导入所需的 ShaderTools 使用下方的独立构建和安装命令。
+
+也可以使用 Ninja 逐个构建工程，先构建 Foundation、GRHI 和 Runtime，再构建 Editor。
 
 ```powershell
 $qt = 'C:/Qt/6.12.1/msvc2022_64'

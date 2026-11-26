@@ -43,14 +43,19 @@ endif()
 function(GameSproutRuntimeDeploy target)
     include("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../GRHI/GRHI.cmake")
     get_target_property(backend_dependencies GRHI::GRHI GRHI_RUNTIME_DEPENDENCIES)
+    set(deploy_dependencies "$<TARGET_FILE:GameSproutRuntime::GameSproutRuntime>" "$<TARGET_FILE:GRHI::GRHI>")
+    get_target_property(grhi_is_imported GRHI::GRHI IMPORTED)
+    if(grhi_is_imported)
+        list(APPEND deploy_dependencies ${backend_dependencies})
+    endif()
+    # The in-tree GRHI stages SDL when its own target finishes building.
     add_custom_target(${target}DeployRuntime
         COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:${target}>"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "$<TARGET_FILE:GameSproutRuntime::GameSproutRuntime>" "$<TARGET_FILE_DIR:${target}>"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "$<TARGET_FILE:GRHI::GRHI>" ${backend_dependencies} "$<TARGET_FILE_DIR:${target}>"
-        DEPENDS "$<TARGET_FILE:GameSproutRuntime::GameSproutRuntime>"
-            "$<TARGET_FILE:GRHI::GRHI>" ${backend_dependencies}
+        DEPENDS ${deploy_dependencies}
         COMMENT "Deploying Runtime SDK and its private graphics dependencies"
         VERBATIM)
     add_dependencies(${target} ${target}DeployRuntime)

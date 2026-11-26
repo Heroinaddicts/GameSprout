@@ -105,7 +105,7 @@ set_target_properties(GameSproutAgent PROPERTIES
 )
 
 # Copy Foundation and the independently built Runtime SDK beside the shell.
-add_custom_target(GameSproutDeployFoundation
+add_custom_target(GameSproutAgentDeployFoundation
     COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:GameSproutAgent>"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -115,7 +115,7 @@ add_custom_target(GameSproutDeployFoundation
     COMMENT "Copying Foundation runtime into GameSproutAgent"
     VERBATIM
 )
-add_dependencies(GameSproutAgent GameSproutDeployFoundation)
+add_dependencies(GameSproutAgent GameSproutAgentDeployFoundation)
 
 GameSproutRuntimeDeploy(GameSproutAgent)
 

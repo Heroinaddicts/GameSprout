@@ -18,7 +18,10 @@ endif()
 
 option(GAMESPROUT_GRHI_STATIC "Link GRHI into the target Player" OFF)
 set(GAMESPROUT_GRHI_SDL_TARGET "SDL3::SDL3-shared" CACHE STRING "SDL library target shared with the Player")
-if(NOT TARGET "${GAMESPROUT_GRHI_SDL_TARGET}")
+if(WIN32)
+    include("${CMAKE_CURRENT_LIST_DIR}/../Tools/FindGameSproutSDL3.cmake")
+    GameSproutFindSDL3("${GAMESPROUT_GRHI_SDL_TARGET}")
+elseif(NOT TARGET "${GAMESPROUT_GRHI_SDL_TARGET}")
     string(REPLACE "SDL3::" "" grhi_sdl_component "${GAMESPROUT_GRHI_SDL_TARGET}")
     find_package(SDL3 3.2 CONFIG REQUIRED COMPONENTS "${grhi_sdl_component}"
         HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../SDL/build")
