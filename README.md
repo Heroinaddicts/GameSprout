@@ -131,7 +131,7 @@ flowchart TD
 
 macOS 仍使用仓库外的 SDL3 扩展 SDK。Windows 可用官方 SDL3 SDK 启动默认 D3D12 设备。指定物理显卡时使用带扩展的 SDK。通过 `SDL3_DIR` 指定 CMake 包目录。具体契约见 [GRHI 构建说明](GameSprout/GRHI/README.md)。
 
-Windows 的 MSVC Kit 使用同一套 ABI 构建 Editor、Runtime 和 GameLogic。可通过 `GAMESPROUT_SCRIPT_REFLECTION_COMPILER` 显式指定 `clang-cl.exe` 或 LLVM 的 `clang.exe` 进行 AST 反射。macOS 的构建和反射继续使用所选 Clang Kit。见 [脚本生成器](GameSprout/Module/ScriptCompiler/ScriptBindingsGenerator.cpp)。
+Windows 的 MSVC Kit 使用同一套 ABI 构建 Editor、Runtime 和 GameLogic。Windows Editor 和 `GameSproutScriptBuild` 共用随应用部署的固定版 Clang 22.1.7 做 AST 反射，GameLogic 由 MSVC 编译。构建时缓存并校验 LLVM 发布包，也可以通过 `GAMESPROUT_SCRIPT_CLANG_ROOT` 提供已准备的同版本目录，包含 `bin/clang.exe`、配套 DLL、Clang 内建头和许可证。macOS 的构建和反射继续使用所选 Clang Kit。见 [脚本生成器](GameSprout/Module/ScriptCompiler/ScriptBindingsGenerator.cpp)。
 
 ### Windows x64 构建
 
@@ -149,7 +149,6 @@ cmake --build GameSprout/build/VS2026 --config Debug
 ```powershell
 $qt = 'C:/Qt/6.12.1/msvc2022_64'
 $sdl = 'C:/SDKs/SDL3/cmake'
-$clang = 'C:/Program Files/LLVM/bin/clang-cl.exe'
 $env:VSLANG = '1033'
 cmake -S GameSprout/Foundation -B GameSprout/Foundation/build/Ninja_Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build GameSprout/Foundation/build/Ninja_Debug
@@ -160,7 +159,7 @@ cmake --build GameSprout/GameSproutRuntime/build/Ninja_Debug
 cmake -S GameSprout/Tools/ShaderTools -B GameSprout/Tools/ShaderTools/build/Ninja_Release -G Ninja -DCMAKE_BUILD_TYPE=Release "-DSDL3_DIR=$sdl"
 cmake --build GameSprout/Tools/ShaderTools/build/Ninja_Release
 cmake --install GameSprout/Tools/ShaderTools/build/Ninja_Release
-cmake -S GameSprout/GameSproutEditor -B GameSprout/GameSproutEditor/build/Ninja_Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_PREFIX_PATH=$qt" "-DSDL3_DIR=$sdl" "-DGAMESPROUT_SCRIPT_REFLECTION_COMPILER=$clang"
+cmake -S GameSprout/GameSproutEditor -B GameSprout/GameSproutEditor/build/Ninja_Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_PREFIX_PATH=$qt" "-DSDL3_DIR=$sdl"
 cmake --build GameSprout/GameSproutEditor/build/Ninja_Debug
 .\Bin\GameSproutEditor.exe "--ProjectRoot=$((Resolve-Path MountAndBlade).Path)"
 ```

@@ -72,6 +72,15 @@ bool ScriptCompiler::Compile(const ScriptCompileRequest& request,ScriptCompileRe
         QThread::msleep(25);
     }
     if(cancelled && cancelled()) {result.Diagnostics="Script compilation cancelled";return false;}
+#if defined(Q_OS_WIN)
+    if (*GAMESPROUT_SCRIPT_REFLECTION_TARGET && !request.Sources.empty()) {
+        QString compilerError;
+        if (ScriptBuildProcess::ReflectionCompiler(compilerError).isEmpty()) {
+            result.Diagnostics = compilerError.toStdString();
+            return false;
+        }
+    }
+#endif
     const QString sourceRoot=QDir(directory).filePath("Sources");
     const QString build=QDir(directory).filePath("Build");
     const QString output=QDir(build).filePath("Output");

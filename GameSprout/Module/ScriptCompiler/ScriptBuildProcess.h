@@ -12,6 +12,7 @@ public:
         QString Error;
         bool Cancelled = false;
     };
+    static QString ReflectionCompiler(QString& error);
     // Every invocation owns a separate process tree. Cancellation completes only
     // after its descendants have exited, before the caller releases Build's lock.
     static bool Run(const QString& program,const QStringList& arguments,const QString& directory,

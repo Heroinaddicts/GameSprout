@@ -76,10 +76,16 @@ QStringList CompilerArguments(const QString& sourceRoot) {
 }
 bool Ast(const QString& path,const QString& filter,const QString& sourceRoot,
          std::vector<QJsonObject>& documents,std::string& error,const std::function<bool()>& cancelled) {
+    QString compilerError;
+    const QString compiler = ScriptBuildProcess::ReflectionCompiler(compilerError);
+    if (compiler.isEmpty()) {
+        error = compilerError.toStdString();
+        return false;
+    }
     QStringList arguments=CompilerArguments(sourceRoot);
     arguments<<"-Xclang"<<"-ast-dump=json"<<"-Xclang"<<"-ast-dump-filter="+filter<<path;
     ScriptBuildProcess::Result process;
-    if(!ScriptBuildProcess::Run(QString::fromUtf8(GAMESPROUT_SCRIPT_REFLECTION_COMPILER),arguments,sourceRoot,false,64*1024*1024,process,cancelled)) {
+    if(!ScriptBuildProcess::Run(compiler,arguments,sourceRoot,false,64*1024*1024,process,cancelled)) {
         error="Clang reflection failed:\n"+process.Error.toStdString()+"\n"+process.ErrorOutput.toStdString();return false;
     }
     return Documents(process.Output,documents,error);
@@ -96,10 +102,16 @@ bool SemanticOverrides(const QString& path,const QString& filter,const QString& 
         if(!explicitOverride && member.value("storageClass").toString()!="static") needed=true;
     }
     if(!needed) return true;
+    QString compilerError;
+    const QString compiler = ScriptBuildProcess::ReflectionCompiler(compilerError);
+    if (compiler.isEmpty()) {
+        error = compilerError.toStdString();
+        return false;
+    }
     QStringList arguments=CompilerArguments(sourceRoot);
     arguments<<"-Xclang"<<"-ast-dump"<<"-Xclang"<<"-ast-dump-filter="+filter<<path;
     ScriptBuildProcess::Result process;
-    if(!ScriptBuildProcess::Run(QString::fromUtf8(GAMESPROUT_SCRIPT_REFLECTION_COMPILER),arguments,sourceRoot,false,
+    if(!ScriptBuildProcess::Run(compiler,arguments,sourceRoot,false,
         64*1024*1024,process,cancelled)) {
         error="Clang declaration analysis failed:\n"+process.Error.toStdString()+"\n"+process.ErrorOutput.toStdString();return false;
     }
@@ -481,8 +493,8 @@ bool ScriptBindingsGenerator::Generate(const ScriptCompileRequest& request,const
     const QString compiler=QString::fromUtf8(GAMESPROUT_SCRIPT_COMPILER_ID);
     const QString frontend=QString::fromUtf8(GAMESPROUT_SCRIPT_FRONTEND);
     if(compiler=="MSVC"||frontend=="MSVC") {
-        if(!*GAMESPROUT_SCRIPT_REFLECTION_COMPILER||!*GAMESPROUT_SCRIPT_REFLECTION_TARGET) {
-            diagnostics="Native script reflection requires Clang for the selected MSVC target. Set GAMESPROUT_SCRIPT_REFLECTION_COMPILER to clang-cl or an LLVM Clang executable when configuring GameSprout.";
+        if(!*GAMESPROUT_SCRIPT_REFLECTION_TARGET) {
+            diagnostics="Native script reflection does not support the configured MSVC target architecture.";
             return false;
         }
     } else if(compiler!="Clang"&&compiler!="AppleClang") {

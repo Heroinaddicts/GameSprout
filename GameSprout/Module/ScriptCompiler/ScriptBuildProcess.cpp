@@ -1,9 +1,11 @@
 #include "ScriptBuildProcess.h"
 #include "ScriptToolchain.h"
 #include <QDir>
+#include <QFileInfo>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QThread>
+#include <string>
 #include <utility>
 #if defined(Q_OS_UNIX)
 #include <cerrno>
@@ -151,6 +153,44 @@ private:
     HANDLE _Handles[3]{};
 #endif
 };
+}
+
+QString ScriptBuildProcess::ReflectionCompiler(QString& error) {
+    const QString configured = QString::fromUtf8(GAMESPROUT_SCRIPT_REFLECTION_COMPILER);
+#if defined(Q_OS_WIN)
+    if (*GAMESPROUT_SCRIPT_REFLECTION_TARGET) {
+        const QString version = QString::fromUtf8(GAMESPROUT_SCRIPT_REFLECTION_VERSION);
+        if (configured.isEmpty() || !QDir::isRelativePath(configured)) {
+            error = QStringLiteral("Cannot resolve bundled Clang %1 for script reflection. "
+                                   "Expected an Editor-relative path, but got '%2'.").arg(version, configured);
+            return {};
+        }
+        std::wstring application(32768, L'\0');
+        const DWORD length = GetModuleFileNameW(nullptr, application.data(), static_cast<DWORD>(application.size()));
+        if (!length || length == application.size()) {
+            error = QStringLiteral("Cannot locate the host executable for bundled Clang %1 (%2).")
+                .arg(version, QDir::toNativeSeparators(configured));
+            return {};
+        }
+        application.resize(length);
+        const QFileInfo executable(QString::fromStdWString(application));
+        QDir root = executable.absoluteDir();
+        // The standalone script entry point is installed in the Editor's Tools directory.
+        if (executable.fileName().compare(QStringLiteral("GameSproutScriptBuild.exe"), Qt::CaseInsensitive) == 0)
+            root.cdUp();
+        const QString program = root.absoluteFilePath(configured);
+        if (!QFileInfo(program).isFile()) {
+            error = QStringLiteral("Bundled Clang %1 for script reflection is missing: %2. "
+                                   "Rebuild or reinstall the GameSprout Editor tools.")
+                .arg(version, QDir::toNativeSeparators(program));
+            return {};
+        }
+        return program;
+    }
+#endif
+    if (configured.isEmpty())
+        error = QStringLiteral("Clang for script reflection is not configured.");
+    return configured;
 }
 
 bool ScriptBuildProcess::Run(const QString& program,const QStringList& arguments,const QString& directory,

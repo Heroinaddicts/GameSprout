@@ -107,21 +107,9 @@ set(script_crt "${CMAKE_MSVC_RUNTIME_LIBRARY}")
 if(WIN32 AND MSVC)
     include("${CMAKE_CURRENT_LIST_DIR}/../../Tools/MsvcDebugOptimization.cmake")
     string(APPEND script_base_flags " /utf-8 /Zc:__cplusplus /Zc:preprocessor")
-    if(NOT GAMESPROUT_SCRIPT_REFLECTION_COMPILER)
-        if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-            set(GAMESPROUT_SCRIPT_REFLECTION_COMPILER "${CMAKE_CXX_COMPILER}")
-        else()
-            find_program(GAMESPROUT_SCRIPT_REFLECTION_COMPILER NAMES clang-cl
-                HINTS "$ENV{LLVM_ROOT}/bin" "$ENV{VCINSTALLDIR}/Tools/Llvm/x64/bin"
-                    "$ENV{VCINSTALLDIR}/Tools/Llvm/bin" "$ENV{ProgramFiles}/LLVM/bin")
-        endif()
-    endif()
-    if(GAMESPROUT_SCRIPT_REFLECTION_COMPILER)
-        set(script_reflection_program "${GAMESPROUT_SCRIPT_REFLECTION_COMPILER}")
-        execute_process(COMMAND "${script_reflection_program}" --version
-            OUTPUT_VARIABLE script_reflection_version OUTPUT_STRIP_TRAILING_WHITESPACE
-            ERROR_QUIET TIMEOUT 10)
-    endif()
+    set(script_reflection_version "22.1.7")
+    set(script_reflection_bundle "local_tools/clang/${script_reflection_version}")
+    set(script_reflection_program "${script_reflection_bundle}/bin/clang.exe")
     string(TOLOWER "${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" script_windows_architecture)
     if(script_windows_architecture STREQUAL "x64")
         set(script_reflection_target x86_64-pc-windows-msvc)
@@ -233,11 +221,28 @@ set_target_properties(GameSproutScriptBuild PROPERTIES
 if(APPLE)
     set_property(TARGET GameSproutScriptBuild APPEND PROPERTY BUILD_RPATH "@loader_path/../Logic/Module")
 elseif(WIN32)
-    add_custom_command(TARGET GameSproutScriptBuild POST_BUILD
+    if(MSVC)
+        set(GAMESPROUT_SCRIPT_CLANG_ROOT "" CACHE PATH "Prepared package for the bundled Windows Clang version")
+        add_custom_target(ScriptCompilerDeployClang
+            COMMAND "${CMAKE_COMMAND}"
+                "-DCLANG_VERSION=${script_reflection_version}"
+                "-DCLANG_TARGET_ARCH=${script_windows_architecture}"
+                "-DCLANG_HOST_ARCH=${CMAKE_HOST_SYSTEM_PROCESSOR}"
+                "-DCLANG_PACKAGE_ROOT=${GAMESPROUT_SCRIPT_CLANG_ROOT}"
+                "-DCLANG_CACHE_DIR=${gamesprout_bin_directory}/Deps/ScriptLLVM"
+                "-DCLANG_DESTINATION=$<TARGET_FILE_DIR:GameSproutScriptBuild>/../${script_reflection_bundle}"
+                -P "${CMAKE_CURRENT_LIST_DIR}/../../Tools/DeployWindowsScriptClang.cmake"
+            COMMENT "Deploying Clang ${script_reflection_version} for script reflection" VERBATIM)
+        add_dependencies(ScriptCompiler ScriptCompilerDeployClang)
+    endif()
+    add_custom_target(GameSproutScriptBuildDeployRuntime
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:GameSproutScriptBuild>"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             $<TARGET_RUNTIME_DLLS:GameSproutScriptBuild> "$<TARGET_FILE_DIR:GameSproutScriptBuild>"
+        DEPENDS ScriptCompiler
         COMMAND_EXPAND_LISTS
         VERBATIM)
+    add_dependencies(GameSproutScriptBuild GameSproutScriptBuildDeployRuntime)
 elseif(UNIX)
     set_property(TARGET GameSproutScriptBuild APPEND PROPERTY BUILD_RPATH "$ORIGIN/../Logic/Module")
 endif()
