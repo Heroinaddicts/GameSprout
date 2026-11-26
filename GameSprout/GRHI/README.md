@@ -8,8 +8,9 @@ Metal，Windows 使用 Direct3D 12，Android/Linux 使用 Vulkan。实际绘制�
 
 ## 构建与验证
 
-先独立构建带 GRHI 显卡扩展的本地 SDL3，再配置 GRHI。当前目录会自动查找相邻的 `../../../SDL/build`，
-也可以通过 `SDL3_DIR` 指定已构建或安装的 SDL CMake 包：
+macOS、Linux 和移动端使用带 GRHI 显卡扩展的本地 SDL3。Windows 也可使用官方 SDL3 SDK，
+由 SDL 创建默认 Direct3D 12 设备。当前目录会自动查找相邻的 `../../../SDL/build`，也可以通过
+`SDL3_DIR` 指定已构建或安装的 SDL CMake 包：
 
 ```sh
 cmake -S . -B Build -DCMAKE_BUILD_TYPE=Debug -DGRHI_BUILD_TESTS=ON \
@@ -62,6 +63,8 @@ API 为主线程使用的单例。重复获取共享同一个实例，由一个�
 - `DefaultDeviceAdapterID` 保留 SDL 默认选卡策略；显式 ID 无效、显卡被移除或后端
   不可用时返回失败，不静默改用其他显卡。字符串 ID 可以保存到设置文件，但每次
   启动必须重新匹配，不保证跨重启、驱动更新或硬件变化永久有效。
+- Windows 使用官方 SDL 时，`GetAdapterList()` 返回空列表，`CreateDevice()` 仍能创建
+  默认设备。非空 ID 返回显式选卡需要扩展的错误。切换至带扩展的 SDL 后可枚举及显式选卡。
 - 设备层接受 Metal 的 MSL/metallib、DX12 的 DXBC/DXIL、Vulkan 的 SPIR-V 格式；
   Shader 资源必须提供匹配的目标产物。已支持纹理/采样器、图形 Shader/Pipeline、
   过程顶点 Draw、顶点/索引缓冲区、Uniform 和带深度测试的 DrawIndexed。
@@ -141,6 +144,8 @@ Windows 的 DX12/Vulkan 均在 SDL 内按物理标识选卡，GRHI 统一使用 
 非索引绘制、矩阵/片元 uniform、深度遮挡、旧图片纹理采样流程及颜色读回；也验证错设备、
 失效资源、越界范围、缺少绑定和非法命令状态被拒绝且不会修改目标。测试 Shader 当前提供
 Metal 源码，非 Apple 平台将明确跳过 GPU fixture，不能视为已经完成 Vulkan/DX 的真机验收。
+Windows 的 `GRHI.PlatformBackendPolicy` 另外覆盖默认 Direct3D 12 设备、原生 HWND 交换链、
+DXIL 图片绘制和离屏 RGBA 读回。显式物理显卡枚举与选择仍需带扩展的 SDL SDK。
 另覆盖真实 indexed/nonindexed 双实例、非零 firstInstance、实例 byte offset、实例越界拒绝，
 以及 Uniform 快照在 Pipeline 切换时的正确绘制；`GRHI.ReplayStateReuse` 检查 1000 次相同
 Draw 的绑定去重及 Pipeline/Pass 边界失效。

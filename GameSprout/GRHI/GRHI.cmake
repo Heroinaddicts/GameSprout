@@ -6,6 +6,7 @@ if(NOT TARGET GRHI::GRHIApi)
     add_library(GRHIApi INTERFACE)
     add_library(GRHI::GRHIApi ALIAS GRHIApi)
     target_compile_features(GRHIApi INTERFACE cxx_std_20)
+    target_compile_options(GRHIApi INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
     target_include_directories(GRHIApi INTERFACE
         "${CMAKE_CURRENT_LIST_DIR}/GRHIApi"
     )

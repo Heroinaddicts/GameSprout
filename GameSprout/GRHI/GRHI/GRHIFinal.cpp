@@ -43,6 +43,7 @@ namespace GRHI {
             return false;
         }
 
+#if !defined(SDL_PLATFORM_WINDOWS) || defined(SDL_GRHI_GPU_ADAPTERS_VERSION)
         if (SDL_GetGPUAdapterExtensionVersion() != SDL_GRHI_GPU_ADAPTERS_VERSION) {
             SDL_LogError(SDL_LOG_CATEGORY_GPU, "GRHI initialization failed: incompatible SDL adapter extension.");
             return false;
@@ -77,6 +78,7 @@ namespace GRHI {
             SDL_LogError(SDL_LOG_CATEGORY_GPU, "GRHI initialization failed: no identifiable physical GPU adapters found.");
             return false;
         }
+#endif
         return true;
     }
 
@@ -87,6 +89,10 @@ namespace GRHI {
     IDevice * GRHIFinal::CreateDevice(const std::string & adapterId) {
         _Error.clear();
         if (!adapterId.empty()) {
+#if defined(SDL_PLATFORM_WINDOWS) && !defined(SDL_GRHI_GPU_ADAPTERS_VERSION)
+            _Error = "Explicit GPU selection requires the GRHI SDL adapter extension.";
+            return nullptr;
+#else
             const AdapterInfo * selected = nullptr;
             for (const auto & adapter : _Adapters) {
                 if (adapter.Id == adapterId) {
@@ -98,6 +104,7 @@ namespace GRHI {
                 _Error = "Invalid GRHI adapter ID.";
                 return nullptr;
             }
+#endif
         }
 
         return DeviceSDL::CreateDeviceSDL(adapterId, _Error);

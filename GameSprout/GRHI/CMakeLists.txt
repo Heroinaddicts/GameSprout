@@ -35,7 +35,21 @@ int main() { int count = 0; SDL_free(SDL_GetGPUAdapters(&count)); return SDL_Get
 )
 cmake_pop_check_state()
 if(NOT GRHI_SDL_ADAPTER_EXTENSION)
-    message(FATAL_ERROR "Build the local SDL with the GRHI GPU adapter extension first, then set SDL3_DIR to that build.")
+    if(WIN32)
+        cmake_push_check_state(RESET)
+        set(CMAKE_REQUIRED_LIBRARIES "${GAMESPROUT_GRHI_SDL_TARGET}")
+        unset(GRHI_STOCK_WINDOWS_SDL CACHE)
+        check_cxx_source_compiles("#include <SDL3/SDL.h>
+#if defined(SDL_GRHI_GPU_ADAPTERS_VERSION)
+#error The selected SDL adapter extension is incompatible or incomplete
+#endif
+int main() { return SDL_GetNumGPUDrivers(); }" GRHI_STOCK_WINDOWS_SDL)
+        cmake_pop_check_state()
+    endif()
+    if(NOT WIN32 OR NOT GRHI_STOCK_WINDOWS_SDL)
+        message(FATAL_ERROR "Build the local SDL with the GRHI GPU adapter extension first, then set SDL3_DIR to that build.")
+    endif()
+    message(STATUS "GRHI will use stock SDL's default Direct3D 12 adapter")
 endif()
 if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     cmake_push_check_state(RESET)
@@ -60,6 +74,8 @@ file(GLOB_RECURSE grhi_api_files CONFIGURE_DEPENDS
 file(GLOB_RECURSE grhi_implementation_files CONFIGURE_DEPENDS
     LIST_DIRECTORIES false "${CMAKE_CURRENT_SOURCE_DIR}/GRHI/*"
 )
+set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/GRHI/Renderer/TextureBlit.hlsl"
+    PROPERTIES HEADER_FILE_ONLY TRUE)
 if(NOT APPLE OR NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     list(FILTER grhi_implementation_files EXCLUDE REGEX "[.]mm$")
 endif()

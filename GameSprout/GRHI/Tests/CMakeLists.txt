@@ -17,4 +17,10 @@ add_test(NAME GRHI.ReplayStateReuse COMMAND GRHIReplayStateChecks)
 add_executable(GRHIBackendChecks GRHIBackendChecks.cpp)
 target_link_libraries(GRHIBackendChecks PRIVATE GRHI::GRHIApi SDL3::SDL3-shared)
 add_dependencies(GRHIBackendChecks GRHI)
+if(WIN32)
+    add_custom_command(TARGET GRHIBackendChecks POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:SDL3::SDL3-shared>" "$<TARGET_FILE_DIR:GRHIBackendChecks>"
+        VERBATIM)
+endif()
 add_test(NAME GRHI.PlatformBackendPolicy COMMAND GRHIBackendChecks "$<TARGET_FILE_DIR:GRHI>")

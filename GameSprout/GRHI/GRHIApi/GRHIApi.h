@@ -619,6 +619,7 @@ namespace GRHI {
 
         // 返回初始化时缓存的 GPU 信息，不创建运行设备。
         // 使用本地 SDL 扩展统一枚举物理显卡，不选择图形后端。
+        // Windows 使用标准 SDL 时返回空列表，仅支持创建默认显卡设备。
         // 后端与显卡的兼容性在 CreateDevice 时检查，不按名称匹配显卡。
         // 列表在 GRHIApi 存活期间保持不变，引用有效至其销毁。
         virtual const std::vector<AdapterInfo> & GetAdapterList() const = 0;

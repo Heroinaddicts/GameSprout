@@ -243,11 +243,7 @@ bool GameViewport::EnsureRendering() {
 #else
     window.System=GameSproutRuntime::NativeWindowSystem::X11;
 #endif
-#if defined(_WIN32)
-    window.Handle=reinterpret_cast<std::uintptr_t>(id);
-#else
     window.Handle=static_cast<std::uintptr_t>(id);
-#endif
     std::string error;_Renderer=_Runtime->CreateViewport(window,_Resources,error);
     if(!_Renderer){DestroyGPU();_Attempted=true;Status(error);return false;}
     return true;

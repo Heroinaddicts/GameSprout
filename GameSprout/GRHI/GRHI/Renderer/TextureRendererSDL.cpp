@@ -3,8 +3,12 @@
 #include "Resource/TextureSDL.h"
 #include <algorithm>
 #include <cmath>
+#if defined(SDL_PLATFORM_WINDOWS)
+#include "TextureBlitDXIL.h"
+#endif
 
 namespace GRHI {
+#if !defined(SDL_PLATFORM_WINDOWS)
 namespace {
 constexpr char kImageShader[] = R"(
 #include <metal_stdlib>
@@ -24,6 +28,7 @@ fragment float4 imageFragment(ImageVertex input [[stage_in]],
 }
 )";
 }
+#endif
 TextureRendererSDL::~TextureRendererSDL() {
     delete _Pipeline;
     delete _FragmentShader;
@@ -36,9 +41,15 @@ bool TextureRendererSDL::Initialize() {
         if (!_Sampler) return false;
     }
     ShaderCode code;
+#if defined(SDL_PLATFORM_WINDOWS)
+    code.Format = ShaderCodeFormat::DXIL;
+    code.Data = EmbeddedShaders::TextureBlitVertex;
+    code.DataSize = sizeof(EmbeddedShaders::TextureBlitVertex);
+#else
     code.Format = ShaderCodeFormat::MSL;
     code.Data = kImageShader;
     code.DataSize = sizeof(kImageShader);
+#endif
     code.EntryPoint = "imageVertex";
     ShaderDesc desc;
     desc.Codes = &code;
@@ -49,6 +60,10 @@ bool TextureRendererSDL::Initialize() {
     }
     if (!_FragmentShader) {
         desc.Stage = ShaderStage::Fragment;
+#if defined(SDL_PLATFORM_WINDOWS)
+        code.Data = EmbeddedShaders::TextureBlitFragment;
+        code.DataSize = sizeof(EmbeddedShaders::TextureBlitFragment);
+#endif
         code.EntryPoint = "imageFragment";
         code.SamplerCount = 1;
         _FragmentShader = _Device->CreateShader(desc);

@@ -14,7 +14,12 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+// Keep the loader from introducing Win16 keywords into SDK consumers.
+#pragma push_macro("near")
+#pragma push_macro("far")
 #include <Windows.h>
+#pragma pop_macro("far")
+#pragma pop_macro("near")
 #define GAMESPROUT_RUNTIME_CALL __cdecl
 #if defined(GAMESPROUT_RUNTIME_EXPORTS)
 #define GAMESPROUT_RUNTIME_API __declspec(dllexport)

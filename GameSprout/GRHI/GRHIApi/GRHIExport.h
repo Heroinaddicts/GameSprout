@@ -16,7 +16,12 @@ namespace GRHI {
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+// Keep the loader from introducing Win16 keywords into SDK consumers.
+#pragma push_macro("near")
+#pragma push_macro("far")
 #include <Windows.h>
+#pragma pop_macro("far")
+#pragma pop_macro("near")
 #elif defined(__APPLE__) || defined(__linux__)
 #include <dlfcn.h>
 #else

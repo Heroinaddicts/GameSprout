@@ -6,6 +6,7 @@ if(NOT TARGET GameSproutRuntime::GameSproutRuntimeApi)
     add_library(GameSproutRuntimeApi INTERFACE)
     add_library(GameSproutRuntime::GameSproutRuntimeApi ALIAS GameSproutRuntimeApi)
     target_compile_features(GameSproutRuntimeApi INTERFACE cxx_std_20)
+    target_compile_options(GameSproutRuntimeApi INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
     target_include_directories(GameSproutRuntimeApi INTERFACE
         "${CMAKE_CURRENT_LIST_DIR}/Api"
     )

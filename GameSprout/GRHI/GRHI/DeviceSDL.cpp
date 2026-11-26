@@ -40,15 +40,20 @@ namespace GRHI {
 
         try {
             // SDL implements rendering; the host platform fixes the allowed backend.
-            const bool configured =
+            bool configured =
                 SDL_SetStringProperty(props, SDL_PROP_GPU_DEVICE_CREATE_NAME_STRING, requiredDriver) &&
                 SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, debugMode) &&
                 SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_MSL_BOOLEAN, (formats & SDL_GPU_SHADERFORMAT_MSL) != 0) &&
                 SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_METALLIB_BOOLEAN, (formats & SDL_GPU_SHADERFORMAT_METALLIB) != 0) &&
                 SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_DXBC_BOOLEAN, (formats & SDL_GPU_SHADERFORMAT_DXBC) != 0) &&
                 SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_DXIL_BOOLEAN, (formats & SDL_GPU_SHADERFORMAT_DXIL) != 0) &&
-                SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, (formats & SDL_GPU_SHADERFORMAT_SPIRV) != 0) &&
-                (adapterIdentifier.empty() || SDL_SetStringProperty(props, SDL_PROP_GPU_DEVICE_CREATE_ADAPTER_STRING, adapterIdentifier.c_str()));
+                SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, (formats & SDL_GPU_SHADERFORMAT_SPIRV) != 0);
+#if !defined(SDL_PLATFORM_WINDOWS) || defined(SDL_GRHI_GPU_ADAPTERS_VERSION)
+            configured = configured && (adapterIdentifier.empty() ||
+                SDL_SetStringProperty(props, SDL_PROP_GPU_DEVICE_CREATE_ADAPTER_STRING, adapterIdentifier.c_str()));
+#else
+            (void)adapterIdentifier; // GRHIFinal rejects explicit selection with stock SDL.
+#endif
             if (configured) {
                 device = SDL_CreateGPUDeviceWithProperties(props);
             }
@@ -67,6 +72,7 @@ namespace GRHI {
                 SDL_DestroyGPUDevice(device);
                 return nullptr;
             }
+#if !defined(SDL_PLATFORM_WINDOWS) || defined(SDL_GRHI_GPU_ADAPTERS_VERSION)
             if (!adapterIdentifier.empty()) {
                 const char * actualAdapter = SDL_GetStringProperty(
                     SDL_GetGPUDeviceProperties(device), SDL_PROP_GPU_DEVICE_ADAPTER_STRING, "");
@@ -76,6 +82,7 @@ namespace GRHI {
                     return nullptr;
                 }
             }
+#endif
 
             // Ownership transfers only after allocation and construction succeed.
             return new DeviceSDL(device);
