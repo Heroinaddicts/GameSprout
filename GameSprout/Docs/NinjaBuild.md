@@ -66,6 +66,8 @@ Foundation、GRHI、Runtime 和 ShaderTools 继续独立构建，通过公共 SD
 
 AppleClang、Clang 和 GNU 工具链下，GRHI、GameSproutRuntime 和本机 GameLogic 的 Debug 构建默认用 `-O2` 优化，保留 Debug 配置的调试符号和断言。GameLogic 的代码反射和原生编译使用同一组配置参数，参数变动会使脚本缓存自动更新。Kit 的显式 Debug 优化等级可以覆盖 GameLogic 的默认值。优化后，调试时部分变量可能被内联或优化掉。
 
+Windows MSVC 的 Debug 构建默认对 GRHI、GameSproutRuntime、GPhysics（含 Jolt）和本机 GameLogic 启用 `/O2 /Ob2`，保留 `/Zi` 调试信息和 Debug CRT（默认 `/MDd`）。MSVC 的 `/RTC` 运行时检查与优化互斥，需要使用这些检查或逐语句调试时，在相应工程的 CMake 配置传入 `-DGAMESPROUT_OPTIMIZE_MSVC_DEBUG=OFF`。GameLogic 的配置由构建 Editor 或独立 ScriptCompiler 时生成，重建相应工具即可更新。
+
 现有 Ninja 预设分别保留 Debug 和 Release 的中间文件，两者默认写入共用的 `Bin`。更新上游库时，先构建 GRHI 和 Runtime，再构建 GameSproutEditor 将对应 SDK 和脚本编译器放入应用包。重新启动 Editor 后，进程会加载应用包中更新的动态库。做性能对比时同时记录窗口尺寸、场景和实际加载的 Runtime、GRHI、GameLogic 构建配置。
 
 ## 本机验证记录
@@ -117,3 +119,15 @@ Apple M4 内屏 60 Hz，使用原项目的 `MedievalCastle.scene` 和 Editor Gam
 两轮达到上屏 P95 目标。反射可见时动态阴影仍需扩大覆盖，密集路线的 60 FPS 稳定性有待改善。相同 GameLogic 的 600 帧固定步检查确认 1000 骑均移动并更新实时骨骼，416 骑实际换装，1000 骑均保留投影，共 2000 个活动蒙皮投影部件。最终版构建、SDK 部署和原项目 Game 视口出图已验证，macOS Metal 上 Runtime CTest 50/50 与 GRHI CTest 4/4 通过。
 
 复测时让基线和候选使用同一项目快照、Game 分辨率及骑行输入，记录实际加载的 SDL、GRHI、Runtime 和 GameLogic 配置。按 GPU 通道采样定位瓶颈，再关闭通道计数器复测上屏。每轮保留上屏 P95、最长间隔和超预算帧数。引擎实现与兼容边界见 [Editor 模块边界](EditorModuleBoundaries.md#实时蒙皮实例化)。
+
+### 2026-11-26 · Windows 千骑帧率对照
+
+在 RTX 5060 Laptop 的 Windows D3D12 Player 上运行原项目 `MedievalCastle.scene`。等 1000 骑全部生成并完成 12 帧预热后，以 1280 × 720、同一朝向骑兵的固定镜头及 0.1 秒模拟步长采集 48 帧。三种构建每轮均提交 48 帧，绘制量一致，每帧主画面约 480 万三角形。
+
+| MSVC 构建 | 中位帧间隔 | 等效提交 FPS | 模拟中位耗时 | 渲染提交中位耗时 |
+| --- | ---: | ---: | ---: | ---: |
+| 原 Debug | 169.40 ms | 5.90 | 83.23 ms | 85.71 ms |
+| 优化 Debug | 76.11 ms | 13.14 | 33.01 ms | 41.28 ms |
+| RelWithDebInfo | 43.69 ms | 22.89 | 14.50 ms | 27.11 ms |
+
+三轮的帧间隔 P95 分别为 207.39、97.07 和 55.00 ms。上表按 Player 主循环间隔换算提交 FPS，渲染提交耗时包含 CPU 准备、驱动调用和取帧等待。RelWithDebInfo 使用同配置的 Player、Runtime、GRHI 和 GameLogic，使用 `/MD`，Debug 使用 `/MDd`。两种配置也改变了断言、迭代器检查和内联参数。Windows Editor 的嵌入 Game 视口需要单独复测。

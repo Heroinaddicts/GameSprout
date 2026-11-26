@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.21)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project(GPhysics VERSION 0.1 LANGUAGES CXX)
 endif()
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    include("${CMAKE_CURRENT_LIST_DIR}/../Tools/MsvcDebugOptimization.cmake")
+    GameSproutOptimizeMsvcDebugFlags("${CMAKE_CXX_FLAGS_DEBUG}" CMAKE_CXX_FLAGS_DEBUG)
+endif()
 include(FetchContent)
 # Jolt remains a private dependency. Pin both the release commit and archive
 # checksum; no upstream source is placed in any Runtime/Editor source tree.
