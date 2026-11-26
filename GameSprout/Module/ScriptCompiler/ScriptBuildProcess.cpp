@@ -1,6 +1,10 @@
 #include "ScriptBuildProcess.h"
+#include "ScriptToolchain.h"
+#include <QDir>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QThread>
+#include <utility>
 #if defined(Q_OS_UNIX)
 #include <cerrno>
 #include <csignal>
@@ -16,6 +20,29 @@
 #endif
 
 namespace {
+#if defined(Q_OS_WIN)
+void ApplyToolchainEnvironment(QProcess& process) {
+    auto environment=QProcessEnvironment::systemEnvironment();
+    const auto paths=QString::fromUtf8(GAMESPROUT_SCRIPT_WINDOWS_TOOL_DIRECTORIES);
+    if(!paths.isEmpty()) {
+        auto directories=paths.split(';');
+        for(auto& directory:directories)directory=QDir::toNativeSeparators(directory);
+        environment.insert("PATH",directories.join(';')+';'+environment.value("PATH"));
+    }
+    const std::pair<const char*,const char*> searchPaths[]={
+        {"INCLUDE",GAMESPROUT_SCRIPT_WINDOWS_INCLUDE},
+        {"LIB",GAMESPROUT_SCRIPT_WINDOWS_LIB},
+        {"LIBPATH",GAMESPROUT_SCRIPT_WINDOWS_LIBPATH},
+    };
+    for(const auto& [name,paths]:searchPaths)
+        if(*paths)environment.insert(QString::fromLatin1(name),QString::fromUtf8(paths));
+    // Ninja's MSVC dependency prefix must match cl.exe /showIncludes across
+    // developer prompts and desktop launches, including localized kits.
+    if(!paths.isEmpty())environment.insert("VSLANG","1033");
+    process.setProcessEnvironment(environment);
+}
+#endif
+
 class IsolatedProcess final : public QProcess {
 #if defined(Q_OS_UNIX) && QT_VERSION < QT_VERSION_CHECK(6,0,0)
     void setupChildProcess() override {if(::setsid()<0) ::_exit(127);}
@@ -133,6 +160,9 @@ bool ScriptBuildProcess::Run(const QString& program,const QStringList& arguments
     IsolatedProcess process;
     ProcessTree tree(process);
     if(!tree.Error().isEmpty()) {result.Error=tree.Error();return false;}
+#if defined(Q_OS_WIN)
+    ApplyToolchainEnvironment(process);
+#endif
     process.setWorkingDirectory(directory);
     process.setProcessChannelMode(mergeChannels?QProcess::MergedChannels:QProcess::SeparateChannels);
     process.start(program,arguments);tree.Started();

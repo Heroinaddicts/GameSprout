@@ -84,7 +84,10 @@ bool ScriptCompiler::Compile(const ScriptCompileRequest& request,ScriptCompileRe
     toolchain.addData(QByteArray("FixedNativeScriptBuild/1/" GAMESPROUT_SCRIPT_COMPILER "/" GAMESPROUT_SCRIPT_CONFIGURATION "/" GAMESPROUT_SCRIPT_SYSROOT "/" GAMESPROUT_SCRIPT_ARCH "/" GAMESPROUT_SCRIPT_SUFFIX "/" GAMESPROUT_SCRIPT_COMPILER_VERSION "/" GAMESPROUT_SCRIPT_COMPILER_TARGET "/" GAMESPROUT_SCRIPT_PROCESSOR "/" GAMESPROUT_SCRIPT_DEPLOYMENT "/" GAMESPROUT_SCRIPT_CRT "/" GAMESPROUT_SCRIPT_GENERATOR "/" GAMESPROUT_SCRIPT_GENERATOR_PLATFORM "/" GAMESPROUT_SCRIPT_GENERATOR_TOOLSET "/" GAMESPROUT_SCRIPT_BASE_FLAGS "/" GAMESPROUT_SCRIPT_CONFIGURATION_FLAGS "/" GAMESPROUT_SCRIPT_CMAKE "/" GAMESPROUT_SCRIPT_MAKE "/" GAMESPROUT_SCRIPT_SDK));
     // Diagnostic policy participates in both source and toolchain identity;
     // previously accepted code must not bypass new checks via a cached DLL.
-    toolchain.addData(QByteArray("ScriptDeclarationSafety/1/-Werror=shadow-field/-Werror=overloaded-virtual"));
+    toolchain.addData(QByteArray("ScriptDeclarationSafety/2/-Werror=shadow-field/-Werror=overloaded-virtual/"
+        GAMESPROUT_SCRIPT_REFLECTION_COMPILER "/" GAMESPROUT_SCRIPT_REFLECTION_VERSION "/" GAMESPROUT_SCRIPT_REFLECTION_TARGET "/"
+        GAMESPROUT_SCRIPT_VC_TOOLS "/" GAMESPROUT_SCRIPT_WINDOWS_SDK "/" GAMESPROUT_SCRIPT_WINDOWS_SDK_VERSION "/"
+        GAMESPROUT_SCRIPT_WINDOWS_INCLUDE "/" GAMESPROUT_SCRIPT_WINDOWS_LIB "/" GAMESPROUT_SCRIPT_WINDOWS_LIBPATH));
     toolchain.addData(directory.toUtf8()); // Relocated CMake trees cannot retain absolute object paths.
     const QString toolchainHash=QString::fromLatin1(toolchain.result().toHex());
     QCryptographicHash hash(QCryptographicHash::Sha256);hash.addData(QByteArray("FixedNativeScriptInputs/6/RecursiveFieldSchema/2/GameModuleCatalog/1/"));hash.addData(toolchainHash.toUtf8());
@@ -128,7 +131,14 @@ bool ScriptCompiler::Compile(const ScriptCompileRequest& request,ScriptCompileRe
     std::string hashError;QString currentLibraryHash;
     if(QFileInfo(library).isFile()) currentLibraryHash=ScriptBuildStorage::FileHash(library,hashError);
     const bool sameLibrary=state.value("Version").toInt()==2 && !currentLibraryHash.isEmpty() && state.value("LibraryHash").toString()==currentLibraryHash;
-    QFile schemaFile(schemaPath);const QByteArray schemaBytes=schemaFile.open(QIODevice::ReadOnly)?schemaFile.readAll():QByteArray();
+    QByteArray schemaBytes;
+    {
+        QFile schemaFile(schemaPath);
+        if(schemaFile.open(QIODevice::ReadOnly)) {
+            schemaBytes=schemaFile.readAll();
+            if(schemaFile.error()!=QFileDevice::NoError)schemaBytes.clear();
+        }
+    } // Release the Windows file handle before atomically replacing a bad schema.
     const QString schemaHash=QString::fromLatin1(QCryptographicHash::hash(schemaBytes,QCryptographicHash::Sha256).toHex());
     std::string schemaError;
     const bool sameSchema=!schemaBytes.isEmpty() && state.value("SchemaHash").toString()==schemaHash &&
@@ -173,7 +183,10 @@ bool ScriptCompiler::Compile(const ScriptCompileRequest& request,ScriptCompileRe
     }
     cmake+="target_include_directories(GameLogic PRIVATE \"${GAMESPROUT_RUNTIME_SDK_DIR}\" \"${CMAKE_CURRENT_SOURCE_DIR}\")\n";
     cmake+="if(CMAKE_SYSTEM_NAME STREQUAL \"iOS\")\n set_target_properties(GameLogic PROPERTIES FRAMEWORK TRUE FRAMEWORK_VERSION A MACOSX_FRAMEWORK_IDENTIFIER com.gamesprout.gamelogic)\nendif()\n";
-    cmake+="if(CMAKE_CXX_COMPILER_ID MATCHES \"^(AppleClang|Clang)$\")\n target_compile_options(GameLogic PRIVATE -Werror=overloaded-virtual -Werror=shadow-field)\nendif()\n";
+    cmake+="if(CMAKE_CXX_COMPILER_ID MATCHES \"^(AppleClang|Clang)$\")\n"
+        " if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL \"MSVC\")\n"
+        "  target_compile_options(GameLogic PRIVATE /clang:-Werror=overloaded-virtual /clang:-Werror=shadow-field)\n"
+        " else()\n  target_compile_options(GameLogic PRIVATE -Werror=overloaded-virtual -Werror=shadow-field)\n endif()\nendif()\n";
     if (!request.PrepareSourcesOnly) {
         cmake+="set_target_properties(GameLogic PROPERTIES RUNTIME_OUTPUT_DIRECTORY "+Quoted(output)+" LIBRARY_OUTPUT_DIRECTORY "+Quoted(output)+" ARCHIVE_OUTPUT_DIRECTORY "+Quoted(output)+" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)\n";
         cmake+="foreach(script_configuration IN LISTS CMAKE_CONFIGURATION_TYPES)\n string(TOUPPER \"${script_configuration}\" script_upper)\n set_target_properties(GameLogic PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+" LIBRARY_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+" ARCHIVE_OUTPUT_DIRECTORY_${script_upper} "+Quoted(output)+")\nendforeach()\n";

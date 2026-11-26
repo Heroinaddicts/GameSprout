@@ -15,29 +15,32 @@ foreach(target IN ITEMS ScriptCompiler ScriptEditor ObjectEditing)
 endforeach()
 set_target_properties(GameSproutScriptBuild PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Products/Tools/$<0:>")
-add_executable(NativeScriptChecks NativeScriptChecks.cpp)
-target_compile_features(NativeScriptChecks PRIVATE cxx_std_20)
-target_include_directories(NativeScriptChecks PRIVATE
-    "${gamesprout_root}/Module/ScriptCompiler"
-    "${gamesprout_root}/Module/ScriptEditor"
-    "${gamesprout_root}/Module/Interface"
-    "${gamesprout_root}/View/Interface"
-    "${gamesprout_root}/GameSproutEditor/Api")
-target_link_libraries(NativeScriptChecks PRIVATE ScriptCompiler ScriptEditor
-    Foundation::FoundationApi GameSproutRuntime::GameSproutRuntimeApi Qt6::Core)
-# This integration fixture reaches the candidate-loader transaction directly;
-# production modules retain their normal C++ access checks and public boundaries.
-if(CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang|GNU)$")
-    target_compile_options(NativeScriptChecks PRIVATE -fno-access-control)
-else()
-    message(FATAL_ERROR "NativeScriptChecks currently requires Clang or GCC for private integration-fixture access")
-endif()
-target_compile_definitions(NativeScriptChecks PRIVATE TEST_NATIVE_LIBRARY_SUFFIX="${CMAKE_SHARED_LIBRARY_SUFFIX}")
-set_target_properties(NativeScriptChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Products/$<0:>")
 set(SCRIPT_TEST_RUNTIME_DIRECTORY "${gamesprout_root}/../Bin" CACHE PATH "Directory containing independently built Runtime matching this SDK")
 enable_testing()
-add_test(NAME NativeScripts.CompilerAndReload COMMAND NativeScriptChecks "${SCRIPT_TEST_RUNTIME_DIRECTORY}")
-set_tests_properties(NativeScripts.CompilerAndReload PROPERTIES TIMEOUT 180)
+# These fixtures reach private editor state. Public pipeline checks below
+# exercise the native compiler on kits without a private-access switch.
+if(CMAKE_CXX_COMPILER_ID MATCHES "^(AppleClang|Clang|GNU)$")
+    if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        set(script_test_private_access /clang:-fno-access-control)
+    else()
+        set(script_test_private_access -fno-access-control)
+    endif()
+    add_executable(NativeScriptChecks NativeScriptChecks.cpp)
+    target_compile_features(NativeScriptChecks PRIVATE cxx_std_20)
+    target_include_directories(NativeScriptChecks PRIVATE
+        "${gamesprout_root}/Module/ScriptCompiler"
+        "${gamesprout_root}/Module/ScriptEditor"
+        "${gamesprout_root}/Module/Interface"
+        "${gamesprout_root}/View/Interface"
+        "${gamesprout_root}/GameSproutEditor/Api")
+    target_link_libraries(NativeScriptChecks PRIVATE ScriptCompiler ScriptEditor
+        Foundation::FoundationApi GameSproutRuntime::GameSproutRuntimeApi Qt6::Core)
+    target_compile_options(NativeScriptChecks PRIVATE ${script_test_private_access})
+    target_compile_definitions(NativeScriptChecks PRIVATE TEST_NATIVE_LIBRARY_SUFFIX="${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set_target_properties(NativeScriptChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Products/$<0:>")
+    add_test(NAME NativeScripts.CompilerAndReload COMMAND NativeScriptChecks "${SCRIPT_TEST_RUNTIME_DIRECTORY}")
+    set_tests_properties(NativeScripts.CompilerAndReload PROPERTIES TIMEOUT 180)
+endif()
 add_executable(ScriptFieldSerializationChecks ScriptFieldSerializationChecks.cpp)
 target_compile_features(ScriptFieldSerializationChecks PRIVATE cxx_std_20)
 target_include_directories(ScriptFieldSerializationChecks PRIVATE
@@ -48,18 +51,20 @@ target_link_libraries(ScriptFieldSerializationChecks PRIVATE ScriptCompiler Foun
 set_target_properties(ScriptFieldSerializationChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Products/$<0:>")
 add_test(NAME NativeScripts.PrivateProtectedReferences COMMAND ScriptFieldSerializationChecks "${SCRIPT_TEST_RUNTIME_DIRECTORY}")
 set_tests_properties(NativeScripts.PrivateProtectedReferences PROPERTIES TIMEOUT 120)
-add_executable(ScriptFieldModuleChecks ScriptFieldModuleChecks.cpp)
-target_compile_features(ScriptFieldModuleChecks PRIVATE cxx_std_20)
-target_include_directories(ScriptFieldModuleChecks PRIVATE
-    "${gamesprout_root}/Module/ScriptEditor"
-    "${gamesprout_root}/Module/ObjectEditing"
-    "${gamesprout_root}/Module/Interface"
-    "${gamesprout_root}/View/Interface"
-    "${gamesprout_root}/GameSproutEditor/Api")
-target_link_libraries(ScriptFieldModuleChecks PRIVATE ScriptEditor ObjectEditing Foundation::FoundationApi GameSproutRuntime::GameSproutRuntimeApi Qt6::Core)
-target_compile_options(ScriptFieldModuleChecks PRIVATE -fno-access-control)
-set_target_properties(ScriptFieldModuleChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Products/$<0:>")
-add_test(NAME NativeScripts.FieldService COMMAND ScriptFieldModuleChecks "${SCRIPT_TEST_RUNTIME_DIRECTORY}")
+if(DEFINED script_test_private_access)
+    add_executable(ScriptFieldModuleChecks ScriptFieldModuleChecks.cpp)
+    target_compile_features(ScriptFieldModuleChecks PRIVATE cxx_std_20)
+    target_include_directories(ScriptFieldModuleChecks PRIVATE
+        "${gamesprout_root}/Module/ScriptEditor"
+        "${gamesprout_root}/Module/ObjectEditing"
+        "${gamesprout_root}/Module/Interface"
+        "${gamesprout_root}/View/Interface"
+        "${gamesprout_root}/GameSproutEditor/Api")
+    target_link_libraries(ScriptFieldModuleChecks PRIVATE ScriptEditor ObjectEditing Foundation::FoundationApi GameSproutRuntime::GameSproutRuntimeApi Qt6::Core)
+    target_compile_options(ScriptFieldModuleChecks PRIVATE ${script_test_private_access})
+    set_target_properties(ScriptFieldModuleChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Products/$<0:>")
+    add_test(NAME NativeScripts.FieldService COMMAND ScriptFieldModuleChecks "${SCRIPT_TEST_RUNTIME_DIRECTORY}")
+endif()
 add_executable(ScriptDeclarationChecks ScriptDeclarationChecks.cpp)
 target_compile_features(ScriptDeclarationChecks PRIVATE cxx_std_20)
 target_include_directories(ScriptDeclarationChecks PRIVATE

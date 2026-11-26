@@ -1,5 +1,6 @@
 #include "ScriptFieldTypeResolver.h"
 #include "ScriptBuildStorage.h"
+#include "ScriptToolchain.h"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -78,11 +79,18 @@ bool ScriptFieldTypeResolver::Resolve(const QString& declarationProbe,const QStr
     // decltype aliases preserve complete C++ identity, including namespaces,
     // nested container arguments, arrays and private/protected marked members.
     // No constructor or field initializer is executed for reflection.
+    const bool qualifiedProbe=*GAMESPROUT_SCRIPT_REFLECTION_TARGET;
+    const QString probeType="GameSproutResolvedTypeProbe";
     QByteArray source=("#include "+Literal(QFileInfo(declarationProbe).absoluteFilePath())+
-        "\n#include <type_traits>\nnamespace GameSproutRuntime::Internal { template<> struct ScriptFieldAccess<::"+type+"> {\n").toUtf8();
+        "\n#include <type_traits>\nnamespace GameSproutRuntime::Internal {\n").toUtf8();
+    // Clang in CL mode can print an unqualified type inside decltype. The
+    // enclosing specialization exposes its complete canonical type identity.
+    if(qualifiedProbe)source+=("template<class T> struct "+probeType+" {};\n").toUtf8();
+    source+=("template<> struct ScriptFieldAccess<::"+type+"> {\n").toUtf8();
     for(qsizetype index=0;index<members.size();++index) {
         const QString field="GameSproutResolvedField_"+QString::number(index);
-        source+=("using "+field+" = decltype(::"+type+"::"+members[index]+");\n").toUtf8();
+        const QString expression="decltype(::"+type+"::"+members[index]+')';
+        source+=("using "+field+" = "+(qualifiedProbe?probeType+'<'+expression+'>':expression)+";\n").toUtf8();
     }
     source+="}; }\n";
     // One fixed scratch file per locked project compilation. Remove it before
@@ -99,7 +107,13 @@ bool ScriptFieldTypeResolver::Resolve(const QString& declarationProbe,const QStr
         const QString prefix="GameSproutResolvedField_";
         if(!name.startsWith(prefix))continue;
         bool valid=false;const int index=name.mid(prefix.size()).toInt(&valid);
-        const QString canonical=Identity(declaration);
+        QString canonical;
+        if(qualifiedProbe) {
+            const QString prefix="GameSproutRuntime::Internal::"+probeType+'<';
+            const QString specialization=declaration.value("type").toObject().value("desugaredQualType").toString();
+            if(specialization.startsWith(prefix)&&specialization.endsWith('>'))
+                canonical=specialization.sliced(prefix.size(), specialization.size()-prefix.size()-1);
+        } else canonical=Identity(declaration);
         if(!valid||index<0||index>=members.size()||canonical.isEmpty()||!identities.emplace(index,canonical).second) {
             error="Clang returned an invalid script field type identity";return false;
         }

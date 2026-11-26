@@ -79,7 +79,7 @@ private:
     GAMESPROUT_SERIALIZE_FIELD
     GameSproutRuntime::IButtonComponent* Button=nullptr;
     GAMESPROUT_SERIALIZE_FIELD
-    unsigned long long Maximum=18446744073709551615ULL;
+    unsigned long long Maximum=0ULL-1ULL;
     GAMESPROUT_SERIALIZE_FIELD
     Mode Selected=Mode::Low;
     GAMESPROUT_SERIALIZE_FIELD

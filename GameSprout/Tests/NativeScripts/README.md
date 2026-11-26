@@ -13,6 +13,8 @@ ctest --test-dir /tmp/gamesprout-native-checks --output-on-failure
 
 `SCRIPT_TEST_RUNTIME_DIRECTORY` 传动态库所在目录。Windows/Linux 按本机 Qt、工具链及 Runtime 路径配置。
 
+Windows 的 MSVC 配置在相应架构的 Visual Studio 开发者环境中生成。配置时用 `-DGAMESPROUT_SCRIPT_REFLECTION_COMPILER=<LLVM Clang 或 clang-cl 的完整路径>` 指定反射编译器，GameLogic 仍由 Editor 的编译器、配置和 CRT 生成。测试的 Runtime 与 Editor/测试程序采用相同 SDK、架构和 Debug/Release 配置。`CompilerAndReload`、`FieldService` 两个直接检查私有状态的夹具需要 Clang 或 GCC，MSVC 仍运行其余端到端脚本检查。
+
 脚本和模块的原生工厂在构造时传入所属 Runtime。新建脚本的 `.h` 使用私有构造函数、对应类型的工厂友元和 `GAMESPROUT_SCRIPT(Test)`。类型身份取自头文件的 `.meta` GUID。Clang AST 自动识别支持的公开实例字段。私有和受保护实例字段使用 `GAMESPROUT_SERIALIZE_FIELD`。字段身份为 `声明类::成员名`。故意损坏的描述和异常桥接仅用于内部测试。
 
 ```cpp

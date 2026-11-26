@@ -50,7 +50,7 @@ protected:
     std::string _Title = "玩家";
 public:
     int Count = 6 * 7;
-    std::int64_t Exact = 9223372036854775807LL;
+    std::int64_t Exact = ((1LL << 62) - 1LL) * 2LL + 1LL;
     ResourceReference Token = {"abcdef0123456789abcdef0123456789",18446744073709551615ULL};
     Vector3 Direction = {1,2,3};
 protected:
@@ -85,7 +85,9 @@ GAMESPROUT_SCRIPT(Child)
         Check(baseSecret&&childSecret&&target,"Declaring-class identities or reference kind lost");
         ScriptCompileResult cached;Check(compiler.Compile(request,cached,[]{return false;})&&cached.CacheHit&&cached.Types.size()==1&&cached.Types[0].Fields.size()==10,"Cached result lost schema");
         Write(QString::fromStdString(compiled.SchemaPath),"{\"Version\":1,\"BuildID\":\"forged\",\"Types\":[]}");
-        ScriptCompileResult repaired;Check(compiler.Compile(request,repaired,[]{return false;})&&!repaired.CacheHit&&repaired.Types.size()==1,"Damaged schema was accepted by cache");
+        ScriptCompileResult repaired;
+        const bool repairSucceeded=compiler.Compile(request,repaired,[]{return false;});
+        Check(repairSucceeded&&!repaired.CacheHit&&repaired.Types.size()==1,"Damaged schema was not rebuilt: "+repaired.Diagnostics);
         library.setFileName(QString::fromStdString(repaired.LibraryPath));Check(library.load(),library.errorString().toStdString());
         const auto entry=reinterpret_cast<GameSproutRuntime::fGetScriptModule>(library.resolve(GameSproutRuntime::ScriptModuleEntryName));Check(entry,"Module entry");const auto* module=entry();
         Check(module->Version==GameSproutRuntime::ScriptModuleABIVersion&&module->BuildID&&repaired.Fingerprint==module->BuildID&&module->Count==1,"Native schema/module build identity mismatch");

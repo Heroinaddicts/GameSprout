@@ -1,4 +1,5 @@
 #include "ScriptRecursiveFields.h"
+#include "ScriptInteger.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QRegularExpression>
@@ -126,13 +127,10 @@ bool NullRecordConstructor(const QJsonObject& record) {
     }
     return true;
 }
-bool IntegerConstant(const QJsonObject& node,__int128& result) {
+bool IntegerConstant(const QJsonObject& node,ScriptInteger& result) {
     const auto kind=Kind(node);
-    if((kind=="ConstantExpr"||kind=="IntegerLiteral")&&node.value("value").isString()) {
-        const auto value=node.value("value").toString();bool valid=false;
-        if(value.startsWith('-'))result=value.toLongLong(&valid);else result=value.toULongLong(&valid);
-        if(valid)return true;
-    }
+    if((kind=="ConstantExpr"||kind=="IntegerLiteral")&&node.value("value").isString()&&
+       ScriptInteger::Parse(node.value("value").toString(),result))return true;
     for(const auto& child:node.value("inner").toArray())if(IntegerConstant(child.toObject(),result))return true;
     return false;
 }
@@ -170,20 +168,29 @@ bool ScriptRecursiveFields::EnumValue(const QString& type,const QJsonObject& rec
     using GameSproutRuntime::ScriptValueKind;
     const bool unsignedType=TypeName(QJsonObject{{"type",record.value("fixedUnderlyingType")}}).startsWith("unsigned");
     info.Default.Kind=unsignedType?ScriptValueKind::Unsigned:ScriptValueKind::Integer;info.TypeName=type.toStdString();
-    std::map<QString,__int128> constants;__int128 current=0;
+    std::map<QString,ScriptInteger> constants;
+    ScriptInteger current;
     for(const auto& entry:record.value("inner").toArray()) {
         const auto constant=entry.toObject();if(Kind(constant)!="EnumConstantDecl")continue;
-        if(!constant.value("inner").toArray().isEmpty()&&!IntegerConstant(constant,current)) {error="Cannot evaluate enum constant: "+type.toStdString();return false;}
+        if(!constant.value("inner").toArray().isEmpty()) {
+            if(!IntegerConstant(constant,current)) {error="Cannot evaluate enum constant: "+type.toStdString();return false;}
+        } else if(!info.EnumValues.empty()) {
+            const auto maximum=unsignedType?std::numeric_limits<std::uint64_t>::max():
+                static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+            if(!current.Negative&&current.Bits==maximum)return false;
+            ++current.Bits;
+            if(!current.Bits)current.Negative=false;
+        }
         GameSproutRuntime::ScriptEnumValue value;value.Name=constant.value("name").toString().toStdString();value.IsUnsigned=unsignedType;
-        if(unsignedType){if(current<0||current>std::numeric_limits<std::uint64_t>::max())return false;value.UnsignedValue=static_cast<std::uint64_t>(current);}
-        else {if(current<std::numeric_limits<std::int64_t>::min()||current>std::numeric_limits<std::int64_t>::max())return false;value.Value=static_cast<std::int64_t>(current);}
+        if(unsignedType){if(current.Negative)return false;value.UnsignedValue=current.Bits;}
+        else {if(!current.FitsSigned())return false;value.Value=current.ToSigned();}
         constants[constant.value("id").toString()]=current;
         // AST addresses are process-local; defaults and enum declarations are
         // queried independently, so use the enumerator name across those dumps.
         constants[constant.value("name").toString()]=current;
-        info.EnumValues.push_back(value);++current;
+        info.EnumValues.push_back(value);
     }
-    __int128 value=0;
+    ScriptInteger value;
     if(!EmptyDefault(initializer)) {
         const auto expression=Unwrap(initializer);
         if(Kind(expression)=="DeclRefExpr") {
@@ -193,8 +200,8 @@ bool ScriptRecursiveFields::EnumValue(const QString& type,const QJsonObject& rec
             if(found==constants.end()){error="Enum initializer does not refer to a reflected constant: "+type.toStdString();return false;}value=found->second;
         } else if(!IntegerConstant(expression,value)){error="Enum default must be a literal or enum constant: "+type.toStdString();return false;}
     }
-    if(unsignedType){if(value<0||value>std::numeric_limits<std::uint64_t>::max())return false;info.Default.Unsigned=static_cast<std::uint64_t>(value);}
-    else {if(value<std::numeric_limits<std::int64_t>::min()||value>std::numeric_limits<std::int64_t>::max())return false;info.Default.Integer=static_cast<std::int64_t>(value);}
+    if(unsignedType){if(value.Negative)return false;info.Default.Unsigned=value.Bits;}
+    else {if(!value.FitsSigned())return false;info.Default.Integer=value.ToSigned();}
     if(std::none_of(info.EnumValues.begin(),info.EnumValues.end(),[&](const auto& entry){return unsignedType?entry.UnsignedValue==info.Default.Unsigned:entry.Value==info.Default.Integer;})) {
         if(schemaOnly&&EmptyDefault(initializer)&&!info.EnumValues.empty()) {
             info.Default.Integer=info.EnumValues.front().Value;info.Default.Unsigned=info.EnumValues.front().UnsignedValue;return true;

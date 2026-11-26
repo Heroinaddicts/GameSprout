@@ -3,6 +3,7 @@
 #include "ScriptBuildProcess.h"
 #include "ScriptDeclarationValidator.h"
 #include "ScriptFieldTypeResolver.h"
+#include "ScriptInteger.h"
 #include "ScriptRecursiveFields.h"
 #include "IGuidCreator.h"
 #include <QDir>
@@ -46,6 +47,23 @@ bool Documents(const QByteArray& bytes,std::vector<QJsonObject>& documents,std::
 }
 QStringList CompilerArguments(const QString& sourceRoot) {
     QStringList result GAMESPROUT_SCRIPT_AST_FLAGS;
+    const QString reflectionTarget=QString::fromUtf8(GAMESPROUT_SCRIPT_REFLECTION_TARGET);
+    if(!reflectionTarget.isEmpty()) {
+        // Clang already uses a conforming preprocessor in CL driver mode.
+        result.removeAll("/Zc:preprocessor");
+        const QString crt=QString::fromUtf8(GAMESPROUT_SCRIPT_CRT);
+        if(crt=="MultiThreadedDLL")result<<"/MD";
+        else if(crt=="MultiThreadedDebugDLL")result<<"/MDd";
+        else if(crt=="MultiThreaded")result<<"/MT";
+        else if(crt=="MultiThreadedDebug")result<<"/MTd";
+        result<<QStringList{"/TP","/std:c++20","/Zs","/clang:-fno-color-diagnostics","/clang:-fdiagnostics-format=clang",
+            "/clang:-Werror=overloaded-virtual","/clang:-Werror=shadow-field",
+            "/I"+QString::fromUtf8(GAMESPROUT_SCRIPT_SDK),"/I"+sourceRoot};
+        if(*GAMESPROUT_SCRIPT_VC_TOOLS)result<<"/vctoolsdir"<<QString::fromUtf8(GAMESPROUT_SCRIPT_VC_TOOLS);
+        if(*GAMESPROUT_SCRIPT_WINDOWS_SDK)result<<"/winsdkdir"<<QString::fromUtf8(GAMESPROUT_SCRIPT_WINDOWS_SDK);
+        if(*GAMESPROUT_SCRIPT_WINDOWS_SDK_VERSION)result<<"/winsdkversion"<<QString::fromUtf8(GAMESPROUT_SCRIPT_WINDOWS_SDK_VERSION);
+        return QStringList{"--no-default-config","--driver-mode=cl","--target="+reflectionTarget}+result;
+    }
     result<<QStringList{"-x","c++","-std=c++20","-fsyntax-only","-fno-color-diagnostics",
         "-Werror=overloaded-virtual","-Werror=shadow-field",
         "-I"+QString::fromUtf8(GAMESPROUT_SCRIPT_SDK),"-I"+sourceRoot};
@@ -61,7 +79,7 @@ bool Ast(const QString& path,const QString& filter,const QString& sourceRoot,
     QStringList arguments=CompilerArguments(sourceRoot);
     arguments<<"-Xclang"<<"-ast-dump=json"<<"-Xclang"<<"-ast-dump-filter="+filter<<path;
     ScriptBuildProcess::Result process;
-    if(!ScriptBuildProcess::Run(QString::fromUtf8(GAMESPROUT_SCRIPT_COMPILER),arguments,sourceRoot,false,64*1024*1024,process,cancelled)) {
+    if(!ScriptBuildProcess::Run(QString::fromUtf8(GAMESPROUT_SCRIPT_REFLECTION_COMPILER),arguments,sourceRoot,false,64*1024*1024,process,cancelled)) {
         error="Clang reflection failed:\n"+process.Error.toStdString()+"\n"+process.ErrorOutput.toStdString();return false;
     }
     return Documents(process.Output,documents,error);
@@ -81,7 +99,7 @@ bool SemanticOverrides(const QString& path,const QString& filter,const QString& 
     QStringList arguments=CompilerArguments(sourceRoot);
     arguments<<"-Xclang"<<"-ast-dump"<<"-Xclang"<<"-ast-dump-filter="+filter<<path;
     ScriptBuildProcess::Result process;
-    if(!ScriptBuildProcess::Run(QString::fromUtf8(GAMESPROUT_SCRIPT_COMPILER),arguments,sourceRoot,false,
+    if(!ScriptBuildProcess::Run(QString::fromUtf8(GAMESPROUT_SCRIPT_REFLECTION_COMPILER),arguments,sourceRoot,false,
         64*1024*1024,process,cancelled)) {
         error="Clang declaration analysis failed:\n"+process.Error.toStdString()+"\n"+process.ErrorOutput.toStdString();return false;
     }
@@ -193,45 +211,71 @@ FieldKind Supported(QString type) {
 // Keep integer defaults exact: long double is only 64-bit on Apple silicon.
 // The AST's integer literals and operations are evaluated without executing
 // constructors or converting int64/LocalID through JSON floating-point values.
-bool IntegerType(const QString& type,__int128& value) {
-    int width=0;bool unsignedType=type.startsWith("unsigned ");
-    if(type=="bool"){value=value!=0;return true;}
+bool IntegerType(const QString& type, ScriptInteger& value) {
+    int width=0;
+    const bool unsignedType=type.startsWith("unsigned ")||type=="unsigned"||
+        (type=="char"&&!std::numeric_limits<char>::is_signed);
+    if(type=="bool"){value={value.Bits!=0,false};return true;}
     if(type.contains("char"))width=8;
     else if(type.contains("short"))width=16;
     else if(type.contains("long long"))width=64;
     else if(type=="long"||type=="long int"||type=="unsigned long"||type=="unsigned long int")width=sizeof(long)*8;
     else if(type=="int"||type=="unsigned int"||type=="unsigned")width=32;
     if(!width)return false;
-    const __int128 modulus=__int128(1)<<width;
-    value%=modulus;if(value<0)value+=modulus;
-    if(!unsignedType&&value>=(modulus>>1))value-=modulus;
+    const auto mask=std::numeric_limits<std::uint64_t>::max()>>(64-width);
+    value.Bits&=mask;
+    value.Negative=!unsignedType && (value.Bits&(std::uint64_t{1}<<(width-1)))!=0;
+    if(value.Negative)value.Bits|=~mask;
     return true;
 }
-bool Integer(const QJsonObject& node,__int128& value) {
+bool Integer(const QJsonObject& node, ScriptInteger& value) {
     const auto kind=Kind(node);const auto children=node.value("inner").toArray();
-    if(kind=="IntegerLiteral") {bool valid=false;const auto literal=node.value("value").toString();value=literal.toULongLong(&valid);return valid;}
-    if(kind=="CharacterLiteral"){value=node.value("value").toInteger();return true;}
-    if(kind=="CXXBoolLiteralExpr"){value=node.value("value").toBool();return true;}
-    if(kind=="ImplicitValueInitExpr"||kind=="CXXScalarValueInitExpr"||kind=="CXXDefaultInitExpr"||(kind=="InitListExpr"&&children.isEmpty())){value=0;return true;}
+    if(kind=="IntegerLiteral")return ScriptInteger::Parse(node.value("value").toString(),value);
+    if(kind=="CharacterLiteral"){value=ScriptInteger::Signed(node.value("value").toInteger());return true;}
+    if(kind=="CXXBoolLiteralExpr"){value={node.value("value").toBool(),false};return true;}
+    if(kind=="ImplicitValueInitExpr"||kind=="CXXScalarValueInitExpr"||kind=="CXXDefaultInitExpr"||(kind=="InitListExpr"&&children.isEmpty())){value={};return true;}
     if(kind=="UnaryOperator"&&children.size()==1) {
         if(!Integer(children.first().toObject(),value))return false;const auto op=node.value("opcode").toString();
-        if(op=="-")value=-value;else if(op=="!")value=!value;else if(op=="~")value=~value;else if(op!="+")return false;
+        if(op=="-")value.Bits=std::uint64_t{0}-value.Bits;
+        else if(op=="!")value.Bits=!value.Bits;
+        else if(op=="~")value.Bits=~value.Bits;
+        else if(op!="+")return false;
     } else if(kind=="BinaryOperator"&&children.size()==2) {
-        __int128 a,b;if(!Integer(children[0].toObject(),a)||!Integer(children[1].toObject(),b))return false;
+        ScriptInteger a,b;if(!Integer(children[0].toObject(),a)||!Integer(children[1].toObject(),b))return false;
         const auto op=node.value("opcode").toString();
-        if(op=="+")value=a+b;else if(op=="-")value=a-b;else if(op=="*"){
-            if((a>std::numeric_limits<std::int64_t>::max()||b>std::numeric_limits<std::int64_t>::max())&&a&&b)return false;value=a*b;
-        }else if(op=="/"){if(!b)return false;value=a/b;}else if(op=="%"){if(!b)return false;value=a%b;}
-        else if(op=="&")value=a&b;else if(op=="|")value=a|b;else if(op=="^")value=a^b;
-        else if(op=="<<"||op==">>"){if(b<0||b>=64||a<0)return false;value=op=="<<"?a<<int(b):a>>int(b);}
-        else if(op=="==")value=a==b;else if(op=="!=")value=a!=b;else if(op=="<")value=a<b;else if(op==">")value=a>b;
-        else if(op=="<=")value=a<=b;else if(op==">=")value=a>=b;else if(op=="&&")value=a&&b;else if(op=="||")value=a||b;else return false;
+        if(op=="+")value.Bits=a.Bits+b.Bits;
+        else if(op=="-")value.Bits=a.Bits-b.Bits;
+        else if(op=="*")value.Bits=a.Bits*b.Bits;
+        else if(op=="/"||op=="%") {
+            if(!b.Bits)return false;
+            const auto magnitude=op=="/"?a.Magnitude()/b.Magnitude():a.Magnitude()%b.Magnitude();
+            const bool negative=op=="/"?a.Negative!=b.Negative:a.Negative;
+            value.Bits=negative?std::uint64_t{0}-magnitude:magnitude;
+        } else if(op=="&")value.Bits=a.Bits&b.Bits;
+        else if(op=="|")value.Bits=a.Bits|b.Bits;
+        else if(op=="^")value.Bits=a.Bits^b.Bits;
+        else if(op=="<<"||op==">>") {
+            if(b.Negative||b.Bits>=64||a.Negative)return false;
+            value.Bits=op=="<<"?a.Bits<<b.Bits:a.Bits>>b.Bits;
+        } else if(op=="==")value.Bits=a==b;
+        else if(op=="!=")value.Bits=a!=b;
+        else if(op=="<")value.Bits=a<b;
+        else if(op==">")value.Bits=b<a;
+        else if(op=="<=")value.Bits=!(b<a);
+        else if(op==">=")value.Bits=!(a<b);
+        else if(op=="&&")value.Bits=a.Bits&&b.Bits;
+        else if(op=="||")value.Bits=a.Bits||b.Bits;
+        else return false;
     } else if(children.size()==1){if(!Integer(children.first().toObject(),value))return false;}
     else return false;
     return IntegerType(CanonicalType(node),value);
 }
 bool Evaluate(const QJsonObject& node,long double& value) {
-    __int128 integer;if(Integer(node,integer)){value=static_cast<long double>(integer);return true;}
+    ScriptInteger integer;
+    if(Integer(node,integer)) {
+        value=integer.Negative?static_cast<long double>(integer.ToSigned()):static_cast<long double>(integer.Bits);
+        return true;
+    }
     const QString kind=Kind(node);const QJsonArray children=node.value("inner").toArray();
     if(kind=="IntegerLiteral"||kind=="FloatingLiteral") {try {value=std::stold(node.value("value").toString().toStdString());return std::isfinite(value);}catch(...){return false;}}
     if(kind=="CXXBoolLiteralExpr") {value=node.value("value").toBool()?1:0;return true;}
@@ -303,17 +347,17 @@ bool DefaultValue(const QJsonObject& field,FieldKind kind,GameSproutRuntime::Scr
         if(type=="bool"){value.Kind=ScriptValueKind::Boolean;value.Boolean=number!=0;}
         else if(type=="float"||type=="double"){value.Kind=ScriptValueKind::Number;value.Number=type=="float"?double(float(number)):double(number);if(!std::isfinite(value.Number))return false;}
         else {
-            __int128 exact=0;
+            ScriptInteger exact;
             if(!expression.isEmpty()&&!Integer(expression,exact)) {
                 if(number < -std::ldexp(1.0L,63)||number >= std::ldexp(1.0L,63))return false;
-                exact=static_cast<std::int64_t>(number);
+                exact=ScriptInteger::Signed(static_cast<std::int64_t>(number));
             }
             if(type.startsWith("unsigned ")||type=="unsigned") {
-                if(exact<0||exact>std::numeric_limits<std::uint64_t>::max())return false;
-                value.Kind=ScriptValueKind::Unsigned;value.Unsigned=static_cast<std::uint64_t>(exact);
+                if(exact.Negative)return false;
+                value.Kind=ScriptValueKind::Unsigned;value.Unsigned=exact.Bits;
             } else {
-                if(exact<std::numeric_limits<std::int64_t>::min()||exact>std::numeric_limits<std::int64_t>::max())return false;
-                value.Kind=ScriptValueKind::Integer;value.Integer=static_cast<std::int64_t>(exact);
+                if(!exact.FitsSigned())return false;
+                value.Kind=ScriptValueKind::Integer;value.Integer=exact.ToSigned();
             }
         }
         return true;
@@ -346,7 +390,12 @@ bool DefaultValue(const QJsonObject& field,FieldKind kind,GameSproutRuntime::Scr
     if(kind==FieldKind::Resource) {
         value.Kind=ScriptValueKind::Resource;
         if(!parts.isEmpty()){QString literal;if(!String(parts.first().toObject(),literal)||!DecodeLiteral(literal,value.Resource.Guid))return false;}
-        if(parts.size()==2&&Kind(parts[1].toObject())!="CXXDefaultInitExpr"){__int128 number;if(!Integer(parts[1].toObject(),number)||number<0||number>std::numeric_limits<std::uint64_t>::max())return false;value.Resource.LocalID=static_cast<std::uint64_t>(number);}return true;
+        if(parts.size()==2&&Kind(parts[1].toObject())!="CXXDefaultInitExpr") {
+            ScriptInteger number;
+            if(!Integer(parts[1].toObject(),number)||number.Negative)return false;
+            value.Resource.LocalID=number.Bits;
+        }
+        return true;
     }
     return false;
 }
@@ -430,8 +479,14 @@ bool ScriptBindingsGenerator::Generate(const ScriptCompileRequest& request,const
     std::vector<GameSproutRuntime::GameModuleTypeInfo>& modules,std::string& diagnostics,std::string& warnings,
     const std::function<bool()>& cancelled) {
     const QString compiler=QString::fromUtf8(GAMESPROUT_SCRIPT_COMPILER_ID);
-    if((compiler!="Clang" && compiler!="AppleClang") || QString::fromUtf8(GAMESPROUT_SCRIPT_FRONTEND)=="MSVC") {
-        diagnostics="Native script field generation requires a GCC-compatible Clang/AppleClang driver with JSON AST support; current compiler: "+compiler.toStdString();return false;
+    const QString frontend=QString::fromUtf8(GAMESPROUT_SCRIPT_FRONTEND);
+    if(compiler=="MSVC"||frontend=="MSVC") {
+        if(!*GAMESPROUT_SCRIPT_REFLECTION_COMPILER||!*GAMESPROUT_SCRIPT_REFLECTION_TARGET) {
+            diagnostics="Native script reflection requires Clang for the selected MSVC target. Set GAMESPROUT_SCRIPT_REFLECTION_COMPILER to clang-cl or an LLVM Clang executable when configuring GameSprout.";
+            return false;
+        }
+    } else if(compiler!="Clang"&&compiler!="AppleClang") {
+        diagnostics="Native script field generation requires Clang or AppleClang with JSON AST support; current compiler: "+compiler.toStdString();return false;
     }
     const QDir sourceDirectory(QFileInfo(sourceRoot).canonicalFilePath());
     std::map<QString,const ScriptCompileSource*> sourcesByPath;
