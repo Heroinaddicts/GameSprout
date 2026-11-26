@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-enum class BuildPlatform { MacOS, Android, HarmonyOS, IOS, Linux, MacOSServer, LinuxServer };
+enum class BuildPlatform { MacOS, Android, HarmonyOS, IOS, Linux, MacOSServer, LinuxServer, Windows };
 inline constexpr std::array BuildPlatforms{BuildPlatform::MacOS, BuildPlatform::Android, BuildPlatform::HarmonyOS,
-    BuildPlatform::IOS, BuildPlatform::Linux, BuildPlatform::MacOSServer, BuildPlatform::LinuxServer};
+    BuildPlatform::IOS, BuildPlatform::Linux, BuildPlatform::MacOSServer, BuildPlatform::LinuxServer, BuildPlatform::Windows};
 
 inline constexpr const char* BuildPlatformName(BuildPlatform platform) {
     switch (platform) {
@@ -18,13 +18,16 @@ inline constexpr const char* BuildPlatformName(BuildPlatform platform) {
     case BuildPlatform::Linux: return "Linux";
     case BuildPlatform::MacOSServer: return "macOS Server";
     case BuildPlatform::LinuxServer: return "Linux Server";
+    case BuildPlatform::Windows: return "Windows";
     }
     return "";
 }
 
 inline constexpr bool CanBuildPlatform(BuildPlatform platform) {
 #if defined(__APPLE__)
-    return *BuildPlatformName(platform) != '\0';
+    return platform != BuildPlatform::Windows && *BuildPlatformName(platform) != '\0';
+#elif defined(_WIN32)
+    return platform == BuildPlatform::Windows;
 #else
     return false;
 #endif
@@ -32,6 +35,7 @@ inline constexpr bool CanBuildPlatform(BuildPlatform platform) {
 
 inline constexpr const char* BuildPlatformOutputSuffix(BuildPlatform platform) {
     switch (platform) {
+    case BuildPlatform::Windows: return "";
     case BuildPlatform::Android: return "apk";
     case BuildPlatform::HarmonyOS: return "hap";
     case BuildPlatform::Linux:
@@ -53,6 +57,8 @@ enum class HarmonyBuildOutput { Hap, DevEcoProject };
 enum class HarmonySigningMode { Environment, Unsigned, ConfigurationFile };
 inline constexpr const char* HarmonyDevEcoProjectMarker = ".gamesprout-deveco";
 inline constexpr const char* HarmonyDevEcoProjectMarkerText = "GameSprout DevEco Project v1\n";
+inline constexpr const char* WindowsPlayerMarker = ".gamesprout-windows-player";
+inline constexpr const char* WindowsPlayerMarkerText = "GameSprout Windows Player v1\n";
 
 struct HarmonyBuildSettings {
     std::string ApplicationId = "org.gamesprout.player";

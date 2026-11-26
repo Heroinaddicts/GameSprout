@@ -15,6 +15,7 @@ const char* PlayerBuildPlatformKey(BuildPlatform platform) {
     case BuildPlatform::Linux: return "Linux";
     case BuildPlatform::MacOSServer: return "macOSServer";
     case BuildPlatform::LinuxServer: return "LinuxServer";
+    case BuildPlatform::Windows: return "Windows";
     }
     return "";
 }
@@ -119,10 +120,17 @@ Json::Value WriteHarmony(const HarmonyBuildSettings& settings) {
 }
 
 bool BuildSetting::LoadSettings(std::string& error) {
-    for (const auto platform : BuildPlatforms)
+#if defined(_WIN32)
+    _State.Active = BuildPlatform::Windows;
+#endif
+    for (const auto platform : BuildPlatforms) {
+#if !defined(_WIN32)
+        if (platform == BuildPlatform::Windows) continue;
+#endif
         _State.Profiles.push_back({DefaultProfileId(platform), BuildPlatformName(platform), platform, true});
+    }
     _State.ActiveProfileId = DefaultProfileId(_State.Active);
-    ShowProfile(_State.Profiles.front());
+    ShowProfile(*FindProfile(_State.ActiveProfileId));
 
     QString path;
     Json::Value project;
@@ -154,10 +162,9 @@ bool BuildSetting::LoadSettings(std::string& error) {
                 return false;
             }
             if (!ValidateProfile(profile, error)) return false;
-            if (profile.IsDefault) {
-                auto it = std::find_if(profiles.begin(), profiles.end(), [&](const auto& entry) { return entry.Id == profile.Id; });
-                *it = std::move(profile);
-            } else profiles.push_back(std::move(profile));
+            const auto it = std::find_if(profiles.begin(), profiles.end(), [&](const auto& entry) { return entry.Id == profile.Id; });
+            if (it != profiles.end()) *it = std::move(profile);
+            else profiles.push_back(std::move(profile));
         }
     }
     _GlobalScenes = std::move(scenes);
@@ -176,6 +183,13 @@ bool BuildSetting::LoadSettings(std::string& error) {
     const auto* activeProfile = FindProfile(user["ActiveProfile"].isString() ? user["ActiveProfile"].asString() : std::string{});
     if (!selectedProfile) selectedProfile = FindProfile(DefaultProfileId(selected));
     if (!activeProfile) activeProfile = FindProfile(DefaultProfileId(active));
+#if !defined(_WIN32)
+    if (selected == BuildPlatform::Windows || (selectedProfile && selectedProfile->Platform == BuildPlatform::Windows))
+        selectedProfile = FindProfile(DefaultProfileId(BuildPlatform::MacOS));
+    if (active == BuildPlatform::Windows || (activeProfile && activeProfile->Platform == BuildPlatform::Windows))
+        activeProfile = FindProfile(DefaultProfileId(BuildPlatform::MacOS));
+#endif
+    if (!selectedProfile || !activeProfile) { error = "找不到本机构建配置。"; return false; }
     auto locals = user["Harmony"];
     if (locals.isObject()) for (const auto& id : locals.getMemberNames()) {
         const auto* profile = FindProfile(id);

@@ -29,6 +29,10 @@ target_compile_definitions(ShaderRenderingChecks PRIVATE
     TEST_WATER_SHADER_SOURCE="${gamesprout_root}/Examples/Shaders/Water.shader")
 target_link_libraries(ShaderRenderingChecks PRIVATE ShaderRuntimeAssets Foundation::FoundationApi
     GRHI::GRHIApi GameSproutRuntime::GameSproutRuntimeApi Qt6::Core Qt6::Gui)
+if(WIN32)
+    include("${gamesprout_root}/PreparedResources/PreparedResources.cmake")
+    target_link_libraries(ShaderRenderingChecks PRIVATE PreparedResources::PreparedResources)
+endif()
 set_target_properties(ShaderRenderingChecks PROPERTIES BUILD_RPATH "${SHADER_TEST_BINARY_ROOT}/Logic/Module")
 enable_testing()
 add_test(NAME Shader.PreparedMaterialGPU COMMAND ShaderRenderingChecks)

@@ -296,9 +296,10 @@ void BuildSetting::Finish(bool success, const PlayerBuildJob* job) {
     if (success && job && job->Operation == BuildOperation::Building) {
         _State.LastOutput = job->Output;
         _State.Message = "构建完成。";
-        if (job->Run && IsMacPlayerBuild(job->Platform)) {
+        if (job->Run && IsLocalPlayerBuild(job->Platform)) {
             const QDir bundle(QString::fromStdString(job->Output));
-            const auto executable = bundle.filePath("Contents/MacOS/GameSproutPlayer");
+            const auto executable = bundle.filePath(job->Platform == BuildPlatform::Windows ?
+                "GameSproutPlayer.exe" : "Contents/MacOS/GameSproutPlayer");
             if (QProcess::startDetached(executable, {}, QFileInfo(executable).absolutePath()))
                 _State.Message = "构建完成，已启动独立 Player。";
             else _State.Error = "构建已完成，启动独立 Player 失败。";

@@ -39,5 +39,6 @@ struct PlayerBuildJob {
 eAssetBuildProfile AssetProfile(const PlayerBuildJob&);
 const char* PlayerBuildPlatformKey(BuildPlatform);
 bool IsMacPlayerBuild(BuildPlatform);
+bool IsLocalPlayerBuild(BuildPlatform);
 bool ExecutePlayerBuild(PlayerBuildJob&, const IAssetsPipeline&, const IScriptCompiler*,
                         const std::function<bool()>& cancelled);

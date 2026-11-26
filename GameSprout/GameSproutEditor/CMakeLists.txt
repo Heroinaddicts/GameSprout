@@ -151,6 +151,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         VERBATIM
     )
     add_dependencies(GameSproutEditor GameSproutDeployPlayerTemplate)
+elseif(WIN32)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../GameSproutPlayer" "${CMAKE_CURRENT_BINARY_DIR}/Player")
+    set_target_properties(GameSproutPlayer PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+        "$<1:${GAMESPROUT_OUTPUT_DIRECTORY}/PlayerTemplate/Windows>")
+    add_dependencies(GameSproutEditor GameSproutPlayer)
 endif()
 
 include(GNUInstallDirs)
@@ -183,4 +188,8 @@ GameSproutAddPluginDependencies("${CMAKE_CURRENT_SOURCE_DIR}/../View")
 
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(GameSproutEditor)
+endif()
+if(WIN32)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/../Tools/DeployQtWindows.cmake")
+    GameSproutDeployQtWindows(GameSproutEditor)
 endif()

@@ -269,6 +269,10 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
     if (resources.filename().empty()) resources = resources.parent_path();
     binary = resources.parent_path() / "MacOS";
     directory = resources / "Game";
+#elif defined(_WIN32)
+    const std::string_view utf8Base(base);
+    binary = std::filesystem::path(std::u8string(utf8Base.begin(), utf8Base.end()));
+    directory = binary / "Game";
 #else
     binary = std::filesystem::path(base);
     directory = binary / "Game";
@@ -280,6 +284,9 @@ bool RunPlayer(int argc, char** argv, std::string& error) {
 
 #if defined(GAMESPROUT_PLAYER_STATIC_RUNTIME)
     player.Runtime = CreateGameSproutRuntime();
+#elif defined(_WIN32)
+    const auto utf8Binary = binary.u8string();
+    player.Runtime = Export(std::string(utf8Binary.begin(), utf8Binary.end()));
 #else
     player.Runtime = Export(binary.string());
 #endif

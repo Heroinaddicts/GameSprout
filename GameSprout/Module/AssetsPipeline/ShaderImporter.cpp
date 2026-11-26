@@ -3,6 +3,17 @@
 #include "../Shared/MaterialDefinition.h"
 #include "../Shared/ShaderDefinition.h"
 
+namespace {
+bool NeedsDXIL([[maybe_unused]] const Json::Value& settings) {
+#if defined(_WIN32)
+    // The Windows editor previews imported shaders through Direct3D 12.
+    return true;
+#else
+    return settings.get("GenerateDXIL", false).asBool();
+#endif
+}
+}
+
 static bool ImportComputeShader(AssetImportJob & job) {
     Json::Value materialSchema;
     std::string materialError;
@@ -20,7 +31,7 @@ static bool ImportComputeShader(AssetImportJob & job) {
         if(!define.isString()) return job.Fail("Shader define must be a string");
         request.Defines.push_back(define.asString());
     }
-    if(job.Settings.get("GenerateDXIL",false).asBool()) request.Targets.push_back({eShaderCodeFormat::DXIL,eShaderPlatform::Direct3D12});
+    if(NeedsDXIL(job.Settings)) request.Targets.push_back({eShaderCodeFormat::DXIL,eShaderPlatform::Direct3D12});
     request.IsCancellationRequested=[&job] {return job.Context && job.Context->IsCancellationRequested();};
     ShaderCompileResult result;
     const bool compiled=job.Request.Compiler->Compile(request,result);
@@ -105,7 +116,7 @@ bool ImportShader(AssetImportJob& job) {
     request.Optimize=job.Settings.get("Optimize",true).asBool();request.GenerateDebugInfo=job.Settings.get("GenerateDebugInfo",false).asBool();
     if(job.Settings.isMember("Defines")&&!job.Settings["Defines"].isArray())return job.Fail("Shader Defines must be an array");
     for(const auto& define:job.Settings["Defines"]){if(!define.isString())return job.Fail("Shader define must be a string");request.Defines.push_back(define.asString());}
-    if(job.Settings.get("GenerateDXIL",false).asBool())request.Targets.push_back({eShaderCodeFormat::DXIL,eShaderPlatform::Direct3D12});
+    if(NeedsDXIL(job.Settings))request.Targets.push_back({eShaderCodeFormat::DXIL,eShaderPlatform::Direct3D12});
     request.IsCancellationRequested=[&job]{return job.Context&&job.Context->IsCancellationRequested();};
     Json::Value descriptor;descriptor["Format"]="GameSproutShader";descriptor["ShaderVersion"]=1;descriptor["Name"]=declaration["Name"];
     descriptor["Material"]=schema;descriptor["Settings"]=job.Settings;descriptor["ToolchainFingerprint"]=job.Request.Compiler->GetToolchainHash();

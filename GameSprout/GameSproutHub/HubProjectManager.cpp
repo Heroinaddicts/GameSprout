@@ -21,7 +21,7 @@ QString HubProjectManager::EditorExecutable() {
     return QDir::cleanPath(directory.filePath(
         QStringLiteral("../../../GameSprout.app/Contents/MacOS/GameSprout")));
 #elif defined(Q_OS_WIN)
-    return directory.filePath(QStringLiteral("GameSprout.exe"));
+    return directory.filePath(QStringLiteral("GameSproutEditor.exe"));
 #else
     return directory.filePath(QStringLiteral("GameSprout"));
 #endif

@@ -53,11 +53,22 @@ bool BuildSetting::CollectSwitch(PlayerBuildJob& job, std::string& error) const 
 
 bool BuildSetting::CollectBuild(PlayerBuildJob& job, std::string& error) const {
     const QDir app(QCoreApplication::applicationDirPath());
-    job.Template = app.filePath("PlayerTemplate/GameSproutPlayer.app").toStdString();
-    if (IsMacPlayerBuild(job.Platform) &&
-        !QFileInfo(QDir(QString::fromStdString(job.Template)).filePath("Contents/MacOS/GameSproutPlayer")).isExecutable()) {
-        error = "找不到 Player 构建模板，请先构建 GameSproutEditor。";
-        return false;
+    if (IsLocalPlayerBuild(job.Platform)) {
+        const bool windows = job.Platform == BuildPlatform::Windows;
+        const QDir player(app.filePath(windows ? "PlayerTemplate/Windows" : "PlayerTemplate/GameSproutPlayer.app"));
+        if (!QFileInfo(player.filePath(windows ? "GameSproutPlayer.exe" : "Contents/MacOS/GameSproutPlayer")).isExecutable()) {
+            error = "找不到 Player 构建模板，请先构建 GameSproutEditor。";
+            return false;
+        }
+        if (windows) {
+            for (const auto* library : {"GameSproutRuntime.dll", "GRHI.dll", "SDL3.dll"}) {
+                if (!QFileInfo(player.filePath(QString::fromLatin1(library))).isFile()) {
+                    error = std::string("Windows Player 模板缺少 ") + library + "，请重新构建 GameSproutEditor。";
+                    return false;
+                }
+            }
+        }
+        job.Template = player.absolutePath().toStdString();
     }
 
     std::map<std::string, const IAssetMeta*> sourcesByPath;
@@ -86,7 +97,7 @@ bool BuildSetting::CollectBuild(PlayerBuildJob& job, std::string& error) const {
         job.Scripts.AssetsRoot = project.filePath("Assets").toStdString();
         job.Scripts.BuildRoot = QDir(QString::fromStdString(_Library->GetLibraryRoot())).filePath(
             QStringLiteral("PlayerBuild/%1/GameLogic").arg(QString::fromLatin1(PlayerBuildPlatformKey(job.Platform)))).toStdString();
-        job.Scripts.PrepareSourcesOnly = !IsMacPlayerBuild(job.Platform);
+        job.Scripts.PrepareSourcesOnly = !IsLocalPlayerBuild(job.Platform);
         job.Scripts.LockWaitMilliseconds = 60000;
     }
 

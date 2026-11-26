@@ -5,21 +5,30 @@
 
 namespace GameSproutPlayer {
 namespace {
+std::string DisplayPath(const std::filesystem::path& path) {
+#if defined(_WIN32)
+    const auto utf8 = path.u8string();
+    return std::string(utf8.begin(), utf8.end());
+#else
+    return path.string();
+#endif
+}
+
 bool ReadTextFile(const std::filesystem::path& path, std::string& text, std::string& error) {
     std::error_code statusError;
     if (!std::filesystem::is_regular_file(std::filesystem::symlink_status(path, statusError))) {
-        error = "Packaged file is missing or is not a regular file: " + path.string();
+        error = "Packaged file is missing or is not a regular file: " + DisplayPath(path);
         return false;
     }
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     const auto size = file.tellg();
     if (!file || size <= 0 || size > 64ull * 1024 * 1024) {
-        error = "Invalid packaged file size: " + path.string();
+        error = "Invalid packaged file size: " + DisplayPath(path);
         return false;
     }
     text.resize(static_cast<std::size_t>(size));
     if (file.seekg(0) && file.read(text.data(), static_cast<std::streamsize>(text.size()))) return true;
-    error = "Cannot read packaged file: " + path.string();
+    error = "Cannot read packaged file: " + DisplayPath(path);
     return false;
 }
 }
@@ -92,7 +101,7 @@ bool Package::LocateArtifact(const GameSproutRuntime::ResourceReference& referen
     const auto path = _Directory / "Artifact" / PreparedResources::ArtifactFilename(found->first.first, found->first.second);
     std::error_code statusError;
     if (!std::filesystem::is_regular_file(std::filesystem::symlink_status(path, statusError))) {
-        error = "Packaged artifact is missing or is not a regular file: " + path.string();
+        error = "Packaged artifact is missing or is not a regular file: " + DisplayPath(path);
         return false;
     }
     artifact = {path, found->second.Size, found->second.Descriptor};

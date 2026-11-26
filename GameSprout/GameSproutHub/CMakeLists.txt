@@ -122,3 +122,7 @@ install(TARGETS GameSproutHub
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(GameSproutHub)
 endif()
+if(WIN32)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/../Tools/DeployQtWindows.cmake")
+    GameSproutDeployQtWindows(GameSproutHub)
+endif()

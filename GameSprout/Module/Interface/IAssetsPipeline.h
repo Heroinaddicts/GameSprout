@@ -83,7 +83,7 @@ struct AssetImportResult {
     AssetImportManifest Manifest;
 };
 
-enum class eAssetBuildProfile { MetalMacOS, Vulkan, MetalIOS, Headless, MetalIOSSimulator };
+enum class eAssetBuildProfile { MetalMacOS, Vulkan, MetalIOS, Headless, MetalIOSSimulator, Direct3D12 };
 
 struct AssetBuildArtifactRequest {
     AssetArtifact Artifact;

@@ -98,6 +98,10 @@ void CheckBuildShaderVariants(IAssetsPipeline& pipeline, ILibraryManager& librar
     const auto expectedHash = result.Artifact.Hash;
     Check(prepare(eAssetBuildProfile::MetalMacOS, "MSL") == metal && result.Artifact.Hash == expectedHash,
           "Corrupt cached shader was not rebuilt");
+#if defined(_WIN32)
+    const auto direct3D = prepare(eAssetBuildProfile::Direct3D12, "DXIL");
+    Check(direct3D != metal && direct3D != vulkan, "Direct3D shared a non-DXIL cache entry");
+#endif
     request.Profile = eAssetBuildProfile::Headless;
     Check(pipeline.PrepareBuildArtifact(request, result, error) && result.ArtifactPath == request.SourceArtifactPath &&
           result.Artifact.Hash == request.Artifact.Hash, "Headless preparation cooked an unused shader");
@@ -125,6 +129,14 @@ void CheckBuildComputeVariants(IAssetsPipeline& pipeline, ILibraryManager& libra
           descriptor["Variants"].size() == 1 && descriptor["Variants"][0u]["Format"] == "SPIRV" &&
           descriptor["ThreadGroupSize"][0u].asUInt() == 8 && result.Artifact.DataSize < request.Artifact.DataSize,
           "Compute target artifact kept unrelated formats or lost its dispatch layout");
+#if defined(_WIN32)
+    request.Profile = eAssetBuildProfile::Direct3D12;
+    Check(pipeline.PrepareBuildArtifact(request, result, error), error);
+    Check(AssetArtifactIO::Parse(result.Artifact.DescriptorJson, descriptor) &&
+          descriptor["Variants"].size() == 1 && descriptor["Variants"][0u]["Format"] == "DXIL" &&
+          descriptor["ThreadGroupSize"][0u].asUInt() == 8 && result.Artifact.DataSize < request.Artifact.DataSize,
+          "Direct3D compute target kept unrelated formats or lost its dispatch layout");
+#endif
 }
 std::array<int,4> Pixel(GameSproutRuntime::IRuntimeViewport& viewport) {
     std::vector<std::uint8_t> bytes;std::string error;

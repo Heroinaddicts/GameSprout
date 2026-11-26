@@ -19,6 +19,7 @@ const char* ProfileName(eAssetBuildProfile profile) {
     case eAssetBuildProfile::MetalIOS: return "iOS Metal";
     case eAssetBuildProfile::MetalIOSSimulator: return "iOS Simulator Metal";
     case eAssetBuildProfile::Vulkan: return "Vulkan";
+    case eAssetBuildProfile::Direct3D12: return "Direct3D 12";
     case eAssetBuildProfile::Headless: return "Server";
     }
     return nullptr;
@@ -29,6 +30,8 @@ int VariantPriority(const Json::Value& variant, eAssetBuildProfile profile) {
     const auto& platform = variant["Platform"];
     if (profile == eAssetBuildProfile::Vulkan)
         return format == "SPIRV" && platform == "Vulkan" ? 1 : 0;
+    if (profile == eAssetBuildProfile::Direct3D12)
+        return format == "DXIL" && platform == "Direct3D12" ? 1 : 0;
     if (format == "MSL" && platform == "Apple") return 1;
     if (format != "MetalLib") return 0;
     return ((profile == eAssetBuildProfile::MetalMacOS && platform == "macOS") ||
@@ -97,6 +100,7 @@ bool ReadPayload(const QString& path, uint64_t size, QByteArray& bytes) {
 bool ValidShaderCode(const QByteArray& bytes, const std::string& format) {
     if (format == "MSL") return bytes.endsWith('\0') && !bytes.chopped(1).contains('\0');
     if (format == "MetalLib") return bytes.startsWith("MTLB");
+    if (format == "DXIL") return bytes.size() >= 32 && bytes.startsWith("DXBC");
     return bytes.size() >= 20 && bytes.size() % 4 == 0 && bytes.startsWith(QByteArray::fromHex("03022307"));
 }
 }

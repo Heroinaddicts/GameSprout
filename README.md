@@ -121,17 +121,42 @@ flowchart TD
 
 | 依赖 | 要求与用途 |
 | --- | --- |
-| C++ 编译器 | C++20；完整原生脚本反射当前要求 GCC 风格的 Clang / AppleClang 驱动 |
+| C++ 编译器 | C++20。macOS 使用 Clang / AppleClang。Windows 的 MSVC 构建另需 Clang 进行脚本反射 |
 | CMake | 推荐 3.24+；主要工程最低 3.21，ShaderTools 最低 3.24 |
 | Ninja | 推荐生成器；各主要工程提供 Debug / Release 预设 |
 | Qt | 推荐 Qt 6 开发包，包含 Core、Gui、Widgets；独立聊天程序另需 Network |
-| SDL3 SDK | SDL3 3.2+，且包含 GRHI 显卡枚举扩展 v2 |
+| SDL3 SDK | SDL3 3.2+。显卡枚举和显式选卡需要 GRHI 扩展 v2 |
 | Git 与依赖下载 | Foundation 使用固定版本的依赖管理配置；Jolt 等依赖在首次配置时获取 |
 | Python 3 | 创建示例项目，以及执行部分资源工具 |
 
-> **SDL3 前置条件**：当前 GRHI 依赖 `SDL_GetGPUAdapters()`、`SDL_GetGPUAdapterExtensionVersion()` 等本地扩展，普通上游 SDL3 包不能直接替代。扩展源码 / 补丁目前未包含在本仓库中；需要先准备符合契约的 SDL3 SDK，再通过 `SDL3_DIR` 指定其 CMake 包目录。扩展版本、默认查找路径和验证范围见 [GRHI 构建说明](GameSprout/GRHI/README.md)。
+macOS 仍使用仓库外的 SDL3 扩展 SDK。Windows 可用官方 SDL3 SDK 启动默认 D3D12 设备。指定物理显卡时使用带扩展的 SDK。通过 `SDL3_DIR` 指定 CMake 包目录。具体契约见 [GRHI 构建说明](GameSprout/GRHI/README.md)。
 
-原生脚本生成器当前不接受 MSVC、GCC 或 MSVC frontend 的 clang-cl。选择工具链时，应同时考虑编辑器编译和游戏脚本编译；相关限制以 [脚本生成器实现](GameSprout/Module/ScriptCompiler/ScriptBindingsGenerator.cpp) 为准。
+Windows 的 MSVC Kit 使用同一套 ABI 构建 Editor、Runtime 和 GameLogic。可通过 `GAMESPROUT_SCRIPT_REFLECTION_COMPILER` 显式指定 `clang-cl.exe` 或 LLVM 的 `clang.exe` 进行 AST 反射。macOS 的构建和反射继续使用所选 Clang Kit。见 [脚本生成器](GameSprout/Module/ScriptCompiler/ScriptBindingsGenerator.cpp)。
+
+### Windows x64 构建
+
+使用启用了 MSVC 和 Windows SDK 的 x64 开发者 PowerShell，准备 Qt 6 MSVC x64、Ninja、Git 和 SDL3。先构建 Foundation、GRHI、Runtime，再构建 Editor。各 SDK 默认放入同一个 `Bin`，请使用同一架构和 Debug/Release 配置。
+
+```powershell
+$qt = 'C:/Qt/6.12.1/msvc2022_64'
+$sdl = 'C:/SDKs/SDL3/cmake'
+$clang = 'C:/Program Files/LLVM/bin/clang-cl.exe'
+$env:VSLANG = '1033'
+cmake -S GameSprout/Foundation -B GameSprout/Foundation/build/Ninja_Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build GameSprout/Foundation/build/Ninja_Debug
+cmake -S GameSprout/GRHI -B GameSprout/GRHI/build/Ninja_Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug "-DSDL3_DIR=$sdl"
+cmake --build GameSprout/GRHI/build/Ninja_Debug
+cmake -S GameSprout/GameSproutRuntime -B GameSprout/GameSproutRuntime/build/Ninja_Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build GameSprout/GameSproutRuntime/build/Ninja_Debug
+cmake -S GameSprout/Tools/ShaderTools -B GameSprout/Tools/ShaderTools/build/Ninja_Release -G Ninja -DCMAKE_BUILD_TYPE=Release "-DSDL3_DIR=$sdl"
+cmake --build GameSprout/Tools/ShaderTools/build/Ninja_Release
+cmake --install GameSprout/Tools/ShaderTools/build/Ninja_Release
+cmake -S GameSprout/GameSproutEditor -B GameSprout/GameSproutEditor/build/Ninja_Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_PREFIX_PATH=$qt" "-DSDL3_DIR=$sdl" "-DGAMESPROUT_SCRIPT_REFLECTION_COMPILER=$clang"
+cmake --build GameSprout/GameSproutEditor/build/Ninja_Debug
+.\Bin\GameSproutEditor.exe "--ProjectRoot=$((Resolve-Path MountAndBlade).Path)"
+```
+
+Windows Editor 导入自定义 Shader 时同时产出 DXIL。Build Settings 的 Windows 目标导出一个目录，包含 `GameSproutPlayer.exe`、运行时 DLL 和 `Game/`。面向普通机器的交付使用 Release 配套产物和对应的 MSVC 可再发行运行库。Debug 构建用于具备开发工具的机器。
 
 ### 构建编辑器
 

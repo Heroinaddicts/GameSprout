@@ -21,11 +21,12 @@ int SelectedSceneRow(const QTreeWidget& tree) {
     return tree.indexOfTopLevelItem(tree.currentItem());
 }
 
-bool IsGameSproutDevEcoProject(const QString& path) {
-    QFile marker(QDir(path).filePath(QString::fromLatin1(HarmonyDevEcoProjectMarker)));
+bool IsGameSproutOutputDirectory(const QString& path, BuildPlatform platform) {
+    const bool windows = platform == BuildPlatform::Windows;
+    QFile marker(QDir(path).filePath(QString::fromLatin1(windows ? WindowsPlayerMarker : HarmonyDevEcoProjectMarker)));
     const QFileInfo info(marker);
     return info.isFile() && !info.isSymLink() && marker.open(QIODevice::ReadOnly) &&
-        marker.read(64) == HarmonyDevEcoProjectMarkerText;
+        marker.read(64) == (windows ? WindowsPlayerMarkerText : HarmonyDevEcoProjectMarkerText);
 }
 }
 
@@ -63,6 +64,9 @@ bool BuildSettingUI::Initialize(GameSproutEditor::GameSproutViewApi*) {
     _Ui->sceneTree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     _Ui->sceneTree->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     for (const auto platform : BuildPlatforms) {
+#if !defined(_WIN32)
+        if (platform == BuildPlatform::Windows) continue;
+#endif
         auto* item = new QTreeWidgetItem(_Ui->platformTree);
         item->setText(0, QString::fromUtf8(BuildPlatformName(platform)));
         item->setData(0, Qt::UserRole, static_cast<int>(platform));
@@ -87,7 +91,8 @@ bool BuildSettingUI::Initialize(GameSproutEditor::GameSproutViewApi*) {
     QObject::connect(_ProjectOutputUi->buttons, &QDialogButtonBox::rejected, _ProjectOutputDialog, &QDialog::reject);
     QObject::connect(_ProjectOutputUi->browseFolderButton, &QPushButton::clicked, _ProjectOutputDialog, [this] {
         const QString directory = QFileDialog::getExistingDirectory(_ProjectOutputDialog,
-            Translate("选择 DevEco 工程的上一级目录"), _ProjectOutputUi->parentFolder->text());
+            Translate(_State.Selected == BuildPlatform::Windows ? "选择 Player 输出的上一级目录" : "选择 DevEco 工程的上一级目录"),
+            _ProjectOutputUi->parentFolder->text());
         if (!directory.isEmpty()) _ProjectOutputUi->parentFolder->setText(directory);
     });
     QObject::connect(_Ui->sceneTree, &QTreeWidget::itemChanged, _Window,
@@ -531,13 +536,16 @@ void BuildSettingUI::PickOutput(bool run) {
 }
 
 void BuildSettingUI::PickProjectOutput() {
+    const bool windows = _State.Selected == BuildPlatform::Windows;
+    _ProjectOutputDialog->setWindowTitle(Translate(windows ? "导出 Windows Player" : "导出 DevEco 工程"));
+    _ProjectOutputUi->projectFolderNameLabel->setText(Translate(windows ? "输出目录名" : "工程目录名"));
     QFileInfo previous(QString::fromStdString(_State.LastOutput));
     const bool hasPrevious = !_State.LastOutput.empty();
     _ProjectOutputUi->parentFolder->setText(hasPrevious ? previous.absolutePath() : QDir::homePath());
     const bool previousWasProject = hasPrevious && previous.isDir() &&
-        IsGameSproutDevEcoProject(previous.absoluteFilePath());
+        IsGameSproutOutputDirectory(previous.absoluteFilePath(), _State.Selected);
     _ProjectOutputUi->projectFolderName->setText(previousWasProject ?
-        previous.fileName() : QStringLiteral("GameSproutDevEco"));
+        previous.fileName() : QString::fromLatin1(windows ? "GameSproutPlayer" : "GameSproutDevEco"));
     _ProjectOutputUi->errorLabel->hide();
     _ProjectOutputDialog->open();
     _ProjectOutputUi->projectFolderName->setFocus();
@@ -562,16 +570,17 @@ void BuildSettingUI::BuildProject() {
     }
     const QString path = parent.absoluteFilePath(name);
     const QFileInfo target(path);
-    if (target.isSymLink() || (target.exists() && !target.isDir())) {
+    if (target.isSymLink() || target.isJunction() || (target.exists() && !target.isDir())) {
         showError(Translate("目标位置已被文件或符号链接占用。"));
         return;
     }
     if (target.exists()) {
-        if (!IsGameSproutDevEcoProject(path)) {
+        if (!IsGameSproutOutputDirectory(path, _State.Selected)) {
             showError(Translate("目标目录已存在。请选择新的目录名，或选择此前导出的 GameSprout 工程。"));
             return;
         }
-        if (QMessageBox::question(_ProjectOutputDialog, Translate("替换 DevEco 工程"),
+        if (QMessageBox::question(_ProjectOutputDialog,
+                Translate(_State.Selected == BuildPlatform::Windows ? "替换 Windows Player" : "替换 DevEco 工程"),
                 Translate("导出将替换整个目录「%1」及其内容。继续吗？").arg(path),
                 QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return;
     }

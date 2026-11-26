@@ -16,6 +16,7 @@
 eAssetBuildProfile AssetProfile(const PlayerBuildJob& job) {
     switch (job.Platform) {
     case BuildPlatform::MacOS: return eAssetBuildProfile::MetalMacOS;
+    case BuildPlatform::Windows: return eAssetBuildProfile::Direct3D12;
     case BuildPlatform::IOS:
         return job.IOSSimulator ? eAssetBuildProfile::MetalIOSSimulator : eAssetBuildProfile::MetalIOS;
     case BuildPlatform::MacOSServer:
@@ -29,6 +30,10 @@ eAssetBuildProfile AssetProfile(const PlayerBuildJob& job) {
 
 bool IsMacPlayerBuild(BuildPlatform platform) {
     return platform == BuildPlatform::MacOS || platform == BuildPlatform::MacOSServer;
+}
+
+bool IsLocalPlayerBuild(BuildPlatform platform) {
+    return IsMacPlayerBuild(platform) || platform == BuildPlatform::Windows;
 }
 
 namespace {
@@ -54,6 +59,14 @@ bool IsBuildOutput(const PlayerBuildJob& job, const QString& path) {
             marker.read(64) == HarmonyDevEcoProjectMarkerText && profileInfo.isFile() && !profileInfo.isSymLink();
     }
     const auto platform = job.Platform;
+    if (platform == BuildPlatform::Windows) {
+        const QDir directory(path);
+        QFile marker(directory.filePath(QString::fromLatin1(WindowsPlayerMarker)));
+        return info.isDir() && !info.isJunction() && !QFileInfo(marker).isSymLink() &&
+            marker.open(QIODevice::ReadOnly) && marker.read(64) == WindowsPlayerMarkerText &&
+            QFileInfo(directory.filePath("GameSproutPlayer.exe")).isFile() &&
+            QFileInfo(directory.filePath("Game/Player.json")).isFile();
+    }
     if (platform == BuildPlatform::IOS)
         return info.isDir() && QFileInfo(QDir(path).filePath("Game/Player.json")).isFile();
     if (!IsMacPlayerBuild(platform)) {
@@ -77,26 +90,31 @@ bool ResolveOutput(PlayerBuildJob& job, QString& output) {
     const auto name = request.fileName();
     if (parent.isEmpty() || name.isEmpty() || name == "." || name == ".." ||
         (!suffix.isEmpty() && (name.size() <= suffix.size() || !name.endsWith(suffix, Qt::CaseInsensitive)))) {
-        job.Error = suffix.isEmpty() ? "请选择已有目录下的 DevEco 工程输出目录。"
+        job.Error = suffix.isEmpty() ? "请选择已有目录下的输出目录。"
                                     : "输出必须是已有目录中的 " + suffix.toStdString() + " 路径。";
         return false;
     }
     output = QDir(parent).filePath(name);
     const QDir project(QString::fromStdString(job.ProjectRoot));
-    if (output == project.absolutePath() || project.absolutePath().startsWith(output + '/')) {
+#if defined(Q_OS_WIN)
+    constexpr auto pathCase = Qt::CaseInsensitive;
+#else
+    constexpr auto pathCase = Qt::CaseSensitive;
+#endif
+    if (output.compare(project.absolutePath(), pathCase) == 0 || project.absolutePath().startsWith(output + '/', pathCase)) {
         job.Error = "输出目录不能覆盖当前项目。";
         return false;
     }
     for (const QString& folder : {QStringLiteral("Assets"), QStringLiteral("Library"),
                                   QStringLiteral("ProjectSettings"), QStringLiteral("UserSettings"), QStringLiteral("Info")}) {
         const QString reserved = project.filePath(folder);
-        if (output == reserved || output.startsWith(reserved + '/')) {
+        if (output.compare(reserved, pathCase) == 0 || output.startsWith(reserved + '/', pathCase)) {
             job.Error = "请选择项目资源与缓存目录之外的输出路径。";
             return false;
         }
     }
     const QFileInfo current(output);
-    if (current.isSymLink() || (current.exists() && !IsBuildOutput(job, output))) {
+    if (current.isSymLink() || current.isJunction() || (current.exists() && !IsBuildOutput(job, output))) {
         job.Error = "输出已存在，且无法确认为 GameSprout Player 构建。";
         return false;
     }
@@ -110,12 +128,15 @@ bool CopyTemplate(const QDir& source, const QDir& destination, PlayerBuildJob& j
         job.Error = "无法创建 Player 打包暂存目录。";
         return false;
     }
+    const bool windows = job.Platform == BuildPlatform::Windows;
     QDirIterator entries(source.absolutePath(), QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden,
-                         QDirIterator::Subdirectories);
+                         windows ? QDirIterator::NoIteratorFlags : QDirIterator::Subdirectories);
     while (entries.hasNext()) {
         if (Cancelled(job, cancelled)) return false;
         const auto path = entries.next();
         const auto info = entries.fileInfo();
+        if (windows && info.fileName() != "GameSproutPlayer.exe" &&
+            info.suffix().compare("dll", Qt::CaseInsensitive) != 0) continue;
         const auto target = destination.filePath(source.relativeFilePath(path));
         if (info.isSymLink() || !(info.isDir() ? QDir().mkpath(target) :
             info.isFile() && QDir().mkpath(QFileInfo(target).absolutePath()) && QFile::copy(path, target))) {
@@ -170,7 +191,8 @@ bool Publish(const QString& staged, const QString& destination, QTemporaryDir& t
     const QFileInfo current(destination);
     const auto backup = temporary.filePath("Previous");
     const bool replacing = current.exists();
-    if (current.isSymLink() || (replacing && (!IsBuildOutput(job, destination) || !QDir().rename(destination, backup)))) {
+    if (current.isSymLink() || current.isJunction() ||
+        (replacing && (!IsBuildOutput(job, destination) || !QDir().rename(destination, backup)))) {
         job.Error = "无法替换现有 Player " + destination.toStdString();
         return false;
     }
@@ -312,11 +334,15 @@ bool Package(PlayerBuildJob& job, const IScriptCompiler* compiler, const std::fu
     if (!outputLock.tryLock(0)) { job.Error = "该输出正在被另一次构建使用。"; return false; }
     QTemporaryDir temporary(QFileInfo(output).absoluteDir().filePath(".GameSproutBuild-XXXXXX"));
     if (!temporary.isValid()) { job.Error = "无法在输出目录内创建打包暂存目录。"; return false; }
+    const bool windows = job.Platform == BuildPlatform::Windows;
     const auto staged = temporary.filePath(IsDevEcoProject(job) ? QStringLiteral("GameSproutDevEco") :
+        windows ? QStringLiteral("GameSproutPlayer") :
         "GameSproutPlayer." + QString::fromLatin1(BuildPlatformOutputSuffix(job.Profile)));
     const bool mac = IsMacPlayerBuild(job.Platform);
+    const bool local = IsLocalPlayerBuild(job.Platform);
     const QDir bundle(staged);
-    const QDir payload(mac ? bundle.filePath("Contents/Resources/Game") : temporary.filePath("Game"));
+    const QDir payload(mac ? bundle.filePath("Contents/Resources/Game") :
+        windows ? bundle.filePath("Game") : temporary.filePath("Game"));
     const auto root = QFileInfo(QString::fromUtf8(GAMESPROUT_BUILD_SOURCE_ROOT)).canonicalFilePath();
     const auto exporter = QDir(root).filePath("GameSprout/GameSproutPlayer/Platforms/" + ExporterName(job.Platform) + "/Export.sh");
     const QString platform = QString::fromLatin1(PlayerBuildPlatformKey(job.Platform));
@@ -324,7 +350,7 @@ bool Package(PlayerBuildJob& job, const IScriptCompiler* compiler, const std::fu
     const auto work = library.filePath("PlayerBuild/" + platform + "/Exporter");
     QLockFile workLock(work + "/.export.lock");
     workLock.setStaleLockTime(0);
-    if (mac) {
+    if (local) {
         if (!CopyTemplate(QDir(QString::fromStdString(job.Template)), bundle, job, cancelled)) return false;
     } else {
         if (root.isEmpty() || !QFileInfo(exporter).isFile()) {
@@ -347,6 +373,11 @@ bool Package(PlayerBuildJob& job, const IScriptCompiler* compiler, const std::fu
         if (!scripts.LibraryPath.empty() && !CopyVerified(QString::fromStdString(scripts.LibraryPath),
             bundle.filePath("Contents/MacOS/libGameLogic.dylib"), scripts.LibraryHash, job, cancelled)) return false;
         if (!SignBundle(staged, job, cancelled)) return false;
+    } else if (windows) {
+        if (!scripts.LibraryPath.empty() && !CopyVerified(QString::fromStdString(scripts.LibraryPath),
+            bundle.filePath("GameLogic.dll"), scripts.LibraryHash, job, cancelled)) return false;
+        if (!AssetArtifactIO::Write(bundle.filePath(QString::fromLatin1(WindowsPlayerMarker)),
+            QByteArray(WindowsPlayerMarkerText), job.Error)) return false;
     } else {
         QStringList arguments{"build", payload.absolutePath(), QString::fromStdString(scripts.SourcesDirectory),
             staged, work, QString::fromUtf8(GAMESPROUT_BUILD_CMAKE)};
@@ -356,7 +387,7 @@ bool Package(PlayerBuildJob& job, const IScriptCompiler* compiler, const std::fu
     }
     if (Cancelled(job, cancelled)) return false;
     job.Published = Publish(staged, output, temporary, job);
-    if (job.Published && job.Run && !mac) {
+    if (job.Published && job.Run && !local) {
         QStringList arguments{"run", output};
         if (job.Platform == BuildPlatform::Linux || job.Platform == BuildPlatform::LinuxServer) arguments << platform;
         job.Launched = RunExporter(exporter, root, arguments, job, cancelled, job.RunError, &job.RunOutput);
