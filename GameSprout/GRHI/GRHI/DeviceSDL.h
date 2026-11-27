@@ -2,6 +2,7 @@
 #define __DeviceSDL_h__
 #include "GRHIApi.h"
 #include <SDL3/SDL.h>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <thread>
@@ -68,10 +69,15 @@ namespace GRHI {
             return found != _Resources.end() && found->second.Kind == kind ? static_cast<T*>(found->second.Implementation) : nullptr;
         }
     private:
+        friend class CommandBufferSDL;
+        std::unique_ptr<uint8_t[]> TakeUploadStaging(size_t minimum, size_t& capacity) noexcept;
+        void RecycleUploadStaging(std::unique_ptr<uint8_t[]> bytes, size_t capacity) noexcept;
         explicit DeviceSDL(SDL_GPUDevice* device) : _Device(device), _MainThread(std::this_thread::get_id()) {}
         SDL_GPUDevice* _Device = nullptr;
         SDL_GPUTransferBuffer* _UploadTransfer = nullptr;
         uint32_t _UploadTransferSize = 0;
+        std::unique_ptr<uint8_t[]> _CachedUploadStaging;
+        size_t _CachedUploadStagingCapacity = 0;
         std::string _Error;
         std::unordered_map<uint64_t, TargetSDL> _Targets;
         std::unordered_set<CommandBufferSDL*> _Commands;

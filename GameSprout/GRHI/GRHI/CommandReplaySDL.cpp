@@ -47,7 +47,10 @@ bool CommandBufferSDL::Encode() {
         if(!transfer)return Fail(SDL_GetError());
         void* mapped=SDL_MapGPUTransferBuffer(Owner->Native(),transfer,true);
         if(!mapped)return Fail(SDL_GetError());
-        std::memcpy(mapped,_UploadBytes.get(),_UploadSize);
+        {
+            GAMESPROUT_FRAME_SCOPE(GRHI, "encode/copy_upload_bytes");
+            std::memcpy(mapped,_UploadBytes.get(),_UploadSize);
+        }
         SDL_UnmapGPUTransferBuffer(Owner->Native(),transfer);
     }
 

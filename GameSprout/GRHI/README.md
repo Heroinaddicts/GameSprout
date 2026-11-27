@@ -125,10 +125,15 @@ Windows 的 DX12/Vulkan 均在 SDL 内按物理标识选卡，GRHI 统一使用 
   重新绑定所需输入、uniform、纹理和采样器；Shader 元数据必须与编译产物一致。
 - 深度纹理使用 `D32_Float + DepthStencilTarget`，通过独立 DepthTargetView 交给 Pass；
   默认清为 1。Pipeline 的 DepthFormat 必须与 Pass 匹配，DepthTest/Write/Compare 独立设置。
-  当前不包含 stencil、MSAA、storage、可变 Buffer 写入或计算管线。
+- 顶点着色器使用 `SetVertexStorageBuffer` 绑定 `VertexStorage` 缓冲区。
+  可变缓冲区的数据经 `UploadBuffers` 更新。
 - 命令先记录 CPU 描述，Submit 统一检查资源身份、目标、绑定和索引/顶点范围后编码 SDL。
   Release/delete 后失效的资源不会进入绘制；失败的离屏命令取消。SDL 不允许取消已取得
   的窗口帧，因此此情况仅提交空的获取命令以释放帧，不编码无效绘制。
+- `UploadBuffers` 在录制时复制调用方数据，编码时将录制字节复制到 SDL transfer buffer。
+  每个在录命令独占自己的 CPU 暂存区。设备线程可在命令提交或取消后回收其中一块，
+  供后续命令复用，保留容量最高 16 MiB，释放设备时清空。其他录制线程使用独占分配。
+  诊断计数分别记录新增录制字节、复用容量、分配容量与扩容复制字节。
 - 每个 RenderPass 拥有不可变 Uniform 字节池，相同字节共享快照；调用期间仍立即复制，
   调用方修改临时变量不会影响已经录制的 Draw。快照不跨 Pass/Command 保留。
 - SDL 回放在 Pass 内跳过完全相同的 Pipeline、Viewport、顶点/索引 Buffer、纹理/采样器和

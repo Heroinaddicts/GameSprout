@@ -1,8 +1,13 @@
 #include "DeviceSDL.h"
 #include "SurfaceSDL.h"
 #include <SDL3/SDL.h>
+#include <utility>
 
 namespace GRHI {
+    namespace {
+        constexpr size_t MaximumRetainedUploadBytes = 16 * 1024 * 1024;
+    }
+
     DeviceSDL::~DeviceSDL() { Release(); }
 
     DeviceSDL * DeviceSDL::CreateDeviceSDL(const std::string &adapterIdentifier, std::string & error) {
@@ -100,6 +105,8 @@ namespace GRHI {
     void DeviceSDL::Release() {
         if (_Device != nullptr) {
             if (!_Resources.empty() || !_Commands.empty()) { Fail("Release resources and submit/cancel commands before releasing the device."); return; }
+            _CachedUploadStaging.reset();
+            _CachedUploadStagingCapacity = 0;
             SDL_WaitForGPUIdle(_Device);
             if (_UploadTransfer) SDL_ReleaseGPUTransferBuffer(_Device, _UploadTransfer);
             _UploadTransfer = nullptr;
@@ -107,6 +114,20 @@ namespace GRHI {
             SDL_DestroyGPUDevice(_Device);
             _Device = nullptr;
         }
+    }
+
+    std::unique_ptr<uint8_t[]> DeviceSDL::TakeUploadStaging(size_t minimum, size_t& capacity) noexcept {
+        // Recordings on other threads keep their own allocations.
+        if (!OnMainThread() || minimum > _CachedUploadStagingCapacity) return {};
+        capacity = std::exchange(_CachedUploadStagingCapacity, 0);
+        return std::move(_CachedUploadStaging);
+    }
+
+    void DeviceSDL::RecycleUploadStaging(std::unique_ptr<uint8_t[]> bytes, size_t capacity) noexcept {
+        if (!bytes || !OnMainThread() || capacity > MaximumRetainedUploadBytes ||
+            capacity <= _CachedUploadStagingCapacity) return;
+        _CachedUploadStaging = std::move(bytes);
+        _CachedUploadStagingCapacity = capacity;
     }
 
     SDL_GPUTransferBuffer* DeviceSDL::UploadTransfer(uint32_t size) {

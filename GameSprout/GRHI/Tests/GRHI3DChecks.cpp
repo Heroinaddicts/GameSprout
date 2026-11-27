@@ -190,10 +190,18 @@ static void ResidentUploadChecks(Fixture& f) {
         const uint32_t index=0;
         const GRHI::BufferUpload upload{visible,0,&index,sizeof(index),true};
         Check(recording.Command->UploadBuffers(&upload,1),f.Device->GetLastError());
+        {
+            Recording cancelled(f.Device);
+            const uint32_t otherIndex=1;
+            const GRHI::BufferUpload otherUpload{visible,0,&otherIndex,sizeof(otherIndex),true};
+            Check(cancelled.Command->UploadBuffers(&otherUpload,1),f.Device->GetLastError());
+            Check(f.Device->Cancel(cancelled.Command),f.Device->GetLastError());
+            cancelled.Command=nullptr;
+        }
         draw(recording,left);
         Check(recording.Submit(),f.Device->GetLastError());
     }
-    expect(left,16,48);
+    expect(left,16,48); // A cancelled command must not overwrite an earlier recording's upload.
     {
         Recording recording(f.Device);
         const uint32_t index=0;

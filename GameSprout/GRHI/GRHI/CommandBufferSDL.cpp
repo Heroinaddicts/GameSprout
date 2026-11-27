@@ -77,6 +77,8 @@ bool DeviceSDL::Cancel(ICommandBuffer* value) {
 CommandBufferSDL::~CommandBufferSDL() {
     for(auto token:FrameTokens)Owner->RemoveTarget(token);
     for(auto* pass:Passes)delete pass;
+    // Encoding copies these CPU bytes into SDL's transfer allocation before native submission.
+    Owner->RecycleUploadStaging(std::move(_UploadBytes),_UploadCapacity);
 }
 IRenderPass* CommandBufferSDL::BeginRenderPass(const RenderPassDesc& desc) {
     Owner->ClearError();
@@ -111,6 +113,7 @@ bool CommandBufferSDL::UploadBuffers(const BufferUpload* uploads,uint32_t count)
     if(!OnThread() || Active || !Error.empty())return Fail("Invalid thread, active pass or failed command.");
     if(!count)return true;
     if(!uploads)return Fail("Missing buffer upload descriptions.");
+    GAMESPROUT_FRAME_SCOPE(GRHI, "upload/record");
 
     auto total=_UploadSize;
     for(uint32_t i=0;i<count;++i) {
@@ -125,16 +128,31 @@ bool CommandBufferSDL::UploadBuffers(const BufferUpload* uploads,uint32_t count)
     }
 
     _Uploads.reserve(_Uploads.size()+count);
+    GAMESPROUT_FRAME_COUNT(GRHI, "upload/record_bytes", total - _UploadSize);
+    if (!_UploadBytes) {
+        _UploadBytes = Owner->TakeUploadStaging(total, _UploadCapacity);
+        if (_UploadBytes) GAMESPROUT_FRAME_COUNT(GRHI, "upload/reused_capacity_bytes", _UploadCapacity);
+    }
     if (total > _UploadCapacity) {
         const auto growth = std::min(_UploadCapacity, UINT32_MAX - _UploadCapacity);
         const auto capacity = std::max(total, _UploadCapacity + growth);
+        GAMESPROUT_FRAME_COUNT(GRHI, "upload/allocated_capacity_bytes", capacity);
         // Every appended byte is immediately written by the upload copy.
-        auto bytes = std::make_unique_for_overwrite<uint8_t[]>(capacity);
-        if (_UploadSize) std::memcpy(bytes.get(), _UploadBytes.get(), _UploadSize);
+        std::unique_ptr<uint8_t[]> bytes;
+        {
+            GAMESPROUT_FRAME_SCOPE(GRHI, "upload/allocate_staging");
+            bytes = std::make_unique_for_overwrite<uint8_t[]>(capacity);
+        }
+        if (_UploadSize) {
+            GAMESPROUT_FRAME_COUNT(GRHI, "upload/grow_copy_bytes", _UploadSize);
+            GAMESPROUT_FRAME_SCOPE(GRHI, "upload/grow_copy");
+            std::memcpy(bytes.get(), _UploadBytes.get(), _UploadSize);
+        }
         _UploadBytes = std::move(bytes);
         _UploadCapacity = capacity;
     }
 
+    GAMESPROUT_FRAME_SCOPE(GRHI, "upload/append_records_and_bytes");
     auto offset=_UploadSize;
     for(uint32_t i=0;i<count;++i) {
         const auto& upload=uploads[i];
