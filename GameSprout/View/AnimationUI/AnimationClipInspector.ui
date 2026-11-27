@@ -41,6 +41,40 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="unityClipGroup">
+     <property name="title">
+      <string>Unity .anim</string>
+     </property>
+     <layout class="QFormLayout" name="unityClipLayout">
+      <property name="fieldGrowthPolicy"><enum>QFormLayout::AllNonFixedFieldsGrow</enum></property>
+      <item row="0" column="0">
+       <widget class="QLabel" name="unitySkeletonLabel">
+        <property name="text"><string>目标骨架</string></property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="ResourceField" name="unitySkeletonField" />
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="unityRootPathLabel">
+        <property name="text"><string>骨架根路径</string></property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="unityRootPathEdit">
+        <property name="placeholderText"><string>留空使用骨架根节点</string></property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="QCheckBox" name="unityTransformOnlyCheck">
+        <property name="text"><string>仅导入骨骼变换</string></property>
+        <property name="toolTip"><string>保留位置、旋转与缩放曲线，跳过 BlendShape 等其他轨道。</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="AnimationClipOptionsEditor" name="clipOptionsEditor" />
    </item>
   </layout>

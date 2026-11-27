@@ -2,6 +2,7 @@
 #include "ILibraryManager.h"
 #include "IAssetsManager.h"
 #include "../Shared/AnimationDefinition.h"
+#include <utility>
 
 void CaptureAnimationResources(AssetImportRequest& request,IAssetsManager* assets,ILibraryManager* library) {
     if(!assets||!library||(request.Importer!=eAssetImporterType::AnimatorController&&request.Importer!=eAssetImporterType::AvatarMask&&request.Importer!=eAssetImporterType::AnimationClip))return;
@@ -52,7 +53,13 @@ void CaptureAnimationResources(AssetImportRequest& request,IAssetsManager* asset
         } else if(value.isArray())for(const auto& child:value)capture(child);
     };
     if(request.Importer==eAssetImporterType::AnimationClip) {
-        Json::Value meta;if(AssetArtifactIO::Parse(request.MetaJson,meta)&&meta["ImportSettings"].isMember("SourceAvatar"))capture(meta["ImportSettings"]["SourceAvatar"]);
+        Json::Value meta;
+        if(AssetArtifactIO::Parse(request.MetaJson,meta)) {
+            const auto& settings=std::as_const(meta)["ImportSettings"];
+            capture(settings["SourceAvatar"]);
+            const auto& unity=settings["UnityClip"];
+            if(unity.isObject())capture(unity["Skeleton"]);
+        }
     } else document(request.SourcePath);
 }
 

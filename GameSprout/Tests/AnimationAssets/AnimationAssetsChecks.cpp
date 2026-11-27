@@ -95,6 +95,160 @@ void NativeChecks(){
     clip["Frames"][1]["Time"]=0;Write(root.path()+"/Assets/Move.anim",clip);AssetImportJob invalid(Request(root,meta));
     Check(!RunAssetImport(invalid,context),"Invalid duplicate sample times accepted");
 }
+void UnityAnimationChecks() {
+    QTemporaryDir root;
+    Check(root.isValid()&&QDir(root.path()).mkpath("Assets")&&QDir(root.path()).mkpath("Library"),
+        "Cannot create Unity animation fixture");
+    TestMeta meta(eAssetImporterType::AnimationClip,Guid(31,32,33,34),"Unity.anim");
+    const auto rig=Guid(41,42,43,44).GetGuidString();
+    const GameSproutRuntime::ResourceReference skeleton{rig,20};
+    const auto sourcePath=root.path()+"/Assets/Unity.anim";
+    const QByteArray source=R"(%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!74 &7400000
+AnimationClip:
+  m_Name: 'Unity motion'
+  m_RotationCurves: []
+  m_PositionCurves:
+  - curve:
+      m_Curve:
+      - time: 1
+        value: {x: 0, y: 0, z: 0}
+        outSlope: {x: 10, y: .inf, z: 0}
+      - time: 3
+        value: {x: 6, y: 10, z: 0}
+        inSlope: {x: 2, y: 0, z: 0}
+    path: >-
+      Branch/Child
+      Bone
+  m_ScaleCurves: []
+  m_FloatCurves:
+  - curve:
+      m_Curve:
+      - time: 1
+        value: 1
+    attribute: blendShape.Expression
+    path: Face
+  m_SampleRate: 2
+  m_AnimationClipSettings:
+    m_StartTime: 1
+    m_StopTime: 3
+    m_LoopTime: 1
+)";
+    std::string error;
+    Check(AssetArtifactIO::Write(sourcePath,source,error),error);
+    Check(AssetArtifactIO::Write(root.path()+"/Assets/Rig.fbx",QByteArray("Fixture rig source"),error),error);
+    Json::Value rigMeta;
+    rigMeta["Version"]=1;
+    rigMeta["Guid"]=rig;
+    rigMeta["Path"]="Rig.fbx";
+    rigMeta["ImporterType"]="Model";
+    rigMeta["ImportSettings"]=Json::Value(Json::objectValue);
+    Json::Value identity;
+    identity["LocalID"]=Json::UInt64(skeleton.LocalID);
+    identity["Type"]=static_cast<unsigned>(eAssetType::Skeleton);
+    identity["SourceKey"]="skeleton";
+    identity["Name"]="Skeleton";
+    rigMeta["SubAssets"].append(identity);
+    Write(root.path()+"/Assets/Rig.fbx.meta",rigMeta);
+
+    const auto array=[](std::initializer_list<float> values) {
+        Json::Value result(Json::arrayValue);
+        for(auto value:values)result.append(value);
+        return result;
+    };
+    Json::Value pose;
+    pose["Translation"]=array({0,0,0});
+    pose["Rotation"]=array({0,0,0,1});
+    pose["Scale"]=array({1,2,3});
+    const auto node=[&](const char* path,const char* name,int parent) {
+        Json::Value result;
+        result["Path"]=path;result["Name"]=name;
+        result["Parent"]=parent;result["Transform"]=pose;
+        return result;
+    };
+    constexpr auto rootNode="/#0/Rig#0";
+    constexpr auto childNode="/#0/Rig#0/Branch#0/Child Bone#0";
+    Json::Value rigBody;
+    rigBody["Nodes"].append(node("/#0","",-1));
+    rigBody["Nodes"].append(node(rootNode,"Rig",0));
+    rigBody["Nodes"].append(node("/#0/Rig#0/Branch#0","Branch",1));
+    rigBody["Nodes"].append(node(childNode,"Child Bone",2));
+    Json::Value descriptor;
+    descriptor["Encoding"]="BinaryValueLE1";
+    const auto preparedPath=root.path()+"/Library/Rig.asset";
+    auto request=Request(root,meta);
+    request.SourcePaths[rig]="Rig.fbx";
+    const auto publishSkeleton=[&] {
+        QByteArray payload;
+        Check(AssetValueBinary::Encode(rigBody,payload),"Cannot encode fixture Skeleton");
+        Check(AssetArtifactIO::Write(preparedPath,payload,error),error);
+        auto& resource=request.PreparedResources[rig+"_"+std::to_string(skeleton.LocalID)];
+        resource.Type=eAssetType::Skeleton;
+        resource.Path=preparedPath.toStdString();
+        resource.DescriptorJson=AssetArtifactIO::JsonText(descriptor);
+        resource.Hash=AssetArtifactIO::Hash(payload);
+        resource.Size=static_cast<std::uint64_t>(payload.size());
+        resource.Version=AssetArtifactIO::CurrentDataVersion(eAssetType::Skeleton);
+    };
+    publishSkeleton();
+
+    Json::Value metaValue;
+    Check(AssetArtifactIO::Parse(request.MetaJson,metaValue),"Cannot read fixture animation Meta");
+    auto& binding=metaValue["ImportSettings"]["UnityClip"];
+    binding["Skeleton"]=AnimationDefinition::Reference(skeleton);
+    binding["RootPath"]=rootNode;
+    request.MetaJson=AssetArtifactIO::JsonText(metaValue);
+    Context context;
+    AssetImportJob strict(request);
+    Check(!RunAssetImport(strict,context)&&strict.Result.Error.find("TransformOnly")!=std::string::npos,
+        "Unsupported source tracks were silently accepted");
+
+    binding["TransformOnly"]=true;
+    AnimationClipImportSettings settings;
+    Json::Value roundTrip;
+    Check(settings.ConvertFromJson(metaValue["ImportSettings"]) &&
+        !settings.SetSourceAvatar({rig,21}) && settings.ConvertToJson(roundTrip) && roundTrip["UnityClip"]==binding,
+        "Unity import settings did not survive the asset Meta round trip");
+    request.MetaJson=AssetArtifactIO::JsonText(metaValue);
+    AssetImportJob job(request);
+    if(!RunAssetImport(job,context))throw std::runtime_error("Unity animation import: "+job.Result.Error);
+    Check(job.Result.Diagnostics.find("m_FloatCurves")!=std::string::npos,"Transform-only import did not report ignored source curves");
+    const auto ref=Ref(job,eAssetType::AnimationClip);
+    Library library;
+    library.Add(job);
+    LibraryRuntimeResources provider(nullptr,&library);
+    GameSproutRuntime::AnimationClipData clip;
+    Check(provider.LoadAnimationClip(ref,clip,error),error);
+    Check(clip.Tracks.size()==1&&clip.Tracks[0]==childNode&&clip.Frames.size()==5&&clip.Duration==2&&clip.SampleRate==2,
+        "Unity clip did not retain its source timing and target Skeleton path");
+    const auto& middle=clip.Frames[2];
+    const auto& sampled=middle.Poses[0];
+    Check(middle.Time==1&&std::abs(sampled.Position.X-5)<1e-5f&&sampled.Position.Y==0,
+        "Unity clip did not preserve cubic or step interpolation");
+    Check(sampled.Scale.X==1&&sampled.Scale.Y==2&&sampled.Scale.Z==3&&sampled.Rotation.W==1,
+        "Unanimated channels did not use the Skeleton bind pose");
+    Json::Value clipDescriptor;
+    auto* preparedClip=library.QueryAsset(Guid(ref.Guid),ref.LocalID);
+    Check(preparedClip&&AssetArtifactIO::Parse(preparedClip->GetDataDescriptorJson(),clipDescriptor)&&
+        clipDescriptor["SourceFormat"]=="UnityYAML"&&clipDescriptor["SourceLoop"].asBool(),"Unity source loop was lost");
+    QFile stored(sourcePath);
+    Check(stored.open(QIODevice::ReadOnly)&&stored.readAll()==source,"Unity source file was changed during import");
+
+    binding["RootPath"]="/#0";
+    request.MetaJson=AssetArtifactIO::JsonText(metaValue);
+    AssetImportJob wrongRoot(request);
+    Check(!RunAssetImport(wrongRoot,context)&&wrongRoot.Result.Error.find("missing or ambiguous")!=std::string::npos,
+        "Unity binding accepted a missing transform path");
+
+    binding["RootPath"]=rootNode;
+    request.MetaJson=AssetArtifactIO::JsonText(metaValue);
+    rigBody["Nodes"].append(node("/#0/Rig#0/Branch#0/Child Bone#1","Child Bone",2));
+    publishSkeleton();
+    AssetImportJob ambiguous(request);
+    Check(!RunAssetImport(ambiguous,context)&&ambiguous.Result.Error.find("missing or ambiguous")!=std::string::npos,
+        "Unity binding guessed between duplicate sibling names");
+}
 void FBXChecks(const QString& file){
     QTemporaryDir root;Check(root.isValid()&&QDir(root.path()).mkpath("Assets"),"Cannot create FBX fixture");
     Check(QFile::copy(file,root.path()+"/Assets/Woman.fbx"),"Cannot copy FBX");TestMeta meta(eAssetImporterType::Model,Guid(71,72,73,74),"Woman.fbx");
@@ -136,5 +290,5 @@ void FBXChecks(const QString& file){
 #include "AnimationMotionAssetChecks.h"
 #include "AvatarMaskAssetChecks.h"
 #include "HumanoidAssetChecks.h"
-int main(int argc,char** argv){QGuiApplication app(argc,argv);try{SchemaChecks();NativeChecks();CheckMotionAssets();CheckMaskSchema();CheckMaskImport();CheckHumanoidSchema();if(argc==3&&std::string(argv[1])=="--fbx"){FBXChecks(QString::fromUtf8(argv[2]));CheckHumanoidFBX(QString::fromUtf8(argv[2]));}
+int main(int argc,char** argv){QGuiApplication app(argc,argv);try{SchemaChecks();NativeChecks();UnityAnimationChecks();CheckMotionAssets();CheckMaskSchema();CheckMaskImport();CheckHumanoidSchema();if(argc==3&&std::string(argv[1])=="--fbx"){FBXChecks(QString::fromUtf8(argv[2]));CheckHumanoidFBX(QString::fromUtf8(argv[2]));}
     std::cout<<"Animation asset/schema checks passed\n";return 0;}catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

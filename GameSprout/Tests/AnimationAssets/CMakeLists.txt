@@ -5,6 +5,7 @@ get_filename_component(repository_root "${gamesprout_root}/.." ABSOLUTE)
 include("${gamesprout_root}/Foundation/FoundationApi.cmake")
 include("${gamesprout_root}/GRHI/GRHI.cmake")
 include("${gamesprout_root}/GameSproutRuntime/GameSproutRuntime.cmake")
+include("${gamesprout_root}/PreparedResources/PreparedResources.cmake")
 find_package(Qt6 REQUIRED COMPONENTS Core Gui)
 if(APPLE)
     set(module_root "${repository_root}/Bin/GameSproutEditor.app/Contents/MacOS/Logic/Module")
@@ -26,7 +27,7 @@ target_compile_definitions(AnimationAssetsChecks PRIVATE TEST_BINARY_ROOT="${mod
 target_include_directories(AnimationAssetsChecks PRIVATE "${gamesprout_root}/Module/AssetsPipeline" "${gamesprout_root}/Module/Interface"
     "${gamesprout_root}/GameSproutEditor/Api" "${gamesprout_root}/View/Interface")
 target_link_libraries(AnimationAssetsChecks PRIVATE AssetsPipeline RuntimeAssets AnimationEditor Foundation::FoundationApi GRHI::GRHIApi
-    GameSproutRuntime::GameSproutRuntimeApi Qt6::Core Qt6::Gui)
+    GameSproutRuntime::GameSproutRuntimeApi PreparedResources::PreparedResources Qt6::Core Qt6::Gui)
 set_target_properties(AnimationAssetsChecks PROPERTIES BUILD_RPATH "${module_root}")
 enable_testing()
 add_test(NAME Assets.AnimationFormat COMMAND AnimationAssetsChecks)

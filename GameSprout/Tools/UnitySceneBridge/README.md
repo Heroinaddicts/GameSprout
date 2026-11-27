@@ -68,6 +68,17 @@ Unity 与 Runtime 世界坐标统一为左手系、Y 向上、局部 +Z 向前�
 
 完整场景／资产源数据可被导出与 GameSprout 画面完整复刻是两项验收。材质、光照、透明状态及环境效果的差异应结合清单和实际画面对照确认。
 
+### 原始 Unity 动画片段
+
+GameSprout 的 AnimationClip 导入器可以直接读取 Unity 文本序列化的 `.anim`。这是独立的资产导入流程。上表中的场景导出菜单仍生成当前姿态的静态快照。
+
+1. 将原始 `.anim` 放到项目 `Assets` 下，在动画片段检查器的 **Unity .anim** 区域选择对应的 Skeleton。
+2. 检查骨骼路径。目标骨架有多个根或需要绑定特定子树时，可在 `.meta` 的 `ImportSettings.UnityClip.RootPath` 指定骨架根路径。局部旋转差异可按 Unity 相对路径写入 `RotationCorrections`。这些导入设置与源文件独立保存。
+3. 保存设置以生成动画产物。导入器采样位置、四元数旋转和缩放，并检查路径能否绑定到目标骨架。源片段包含额外属性曲线时，可启用 `TransformOnly`，产物仅包含骨骼变换。
+4. 在 GameSprout Animator Controller 内引用片段并设置状态。Controller 使用 GameSprout 原生格式。Unity 文件中的循环标记会记录在导入产物里，运行时按 Controller 状态的循环设置播放。
+
+内置 `GameSprout/Lit` 支持线性 ORM 以及翼膜一类材质的定向透射近似。材质可以指定独立的 UV 变换和逐通道增益与偏移。当前场景导出菜单仍采用表中的基础材质映射，Unity HDRP Mask Map 和自定义 Graph 的通道需按来源单独映射。
+
 ### 当前方向光阴影
 
 方向光 Inspector 的“实时阴影”组用于编辑 `LightSettings.Shadows`，参数通过 LightingAuthoring 事务写入 Scene／Prefab，支持撤销和重做。Runtime API 也可通过 `ILightComponent::GetShadows()`／`SetShadows()` 读取或整体修改；非法值保留原设置，且不发送变更事件。默认关闭阴影，不会因为加载没有显式启用阴影的场景而擅自打开。

@@ -1,4 +1,6 @@
 #include "AssetImportJob.h"
+#include "UnityAnimationImport.h"
+#include "UnityAnimationSource.h"
 #include "../Shared/MaterialDefinition.h"
 #include "../Shared/ShaderDefinition.h"
 #include "../Shared/PrefabDefinition.h"
@@ -210,16 +212,22 @@ bool ImportDocument(AssetImportJob & job) {
     }
     if (type==eAssetType::Material && job.SourceBytes.size()>MaterialDefinition::MaxDocumentBytes)
         return job.Fail("Material source exceeds the 16 MiB authoring limit");
+    const bool unityClip=type==eAssetType::AnimationClip&&UnityAnimationSource::LooksLikeUnityClip(
+        {job.SourceBytes.constData(),static_cast<std::size_t>(job.SourceBytes.size())});
+    if(type==eAssetType::AnimationClip&&!unityClip&&job.Settings.isMember("UnityClip"))
+        return job.Fail("UnityClip settings require a Unity text .anim source");
     Json::Value document;
-    if (!ParseNativeDocument(job.SourceBytes,document) || !document.isObject()) return job.Fail("Native resource must be a JSON object in GameSprout format");
-    const unsigned sourceVersion=type==eAssetType::Scene?GameSproutRuntime::SceneDocumentVersion:1u;
-    if (!document["Version"].isUInt() || document["Version"].asUInt()!=sourceVersion)
-        return job.Fail("Native resource Version must be "+std::to_string(sourceVersion));
-    // Recompose from current source snapshots before removing authoring records.
-    if(type==eAssetType::Scene&&!ResolveScenePrefabInstances(job,document))return false;
-    if (type==eAssetType::Material && !MaterialValues(job,document)) return false;
-    std::set<std::string> referencedGuids;
-    if (!References(job,document,referencedGuids)) return false;
+    if(!unityClip) {
+        if (!ParseNativeDocument(job.SourceBytes,document) || !document.isObject()) return job.Fail("Native resource must be a JSON object in GameSprout format");
+        const unsigned sourceVersion=type==eAssetType::Scene?GameSproutRuntime::SceneDocumentVersion:1u;
+        if (!document["Version"].isUInt() || document["Version"].asUInt()!=sourceVersion)
+            return job.Fail("Native resource Version must be "+std::to_string(sourceVersion));
+        // Recompose from current source snapshots before removing authoring records.
+        if(type==eAssetType::Scene&&!ResolveScenePrefabInstances(job,document))return false;
+        if (type==eAssetType::Material && !MaterialValues(job,document)) return false;
+        std::set<std::string> referencedGuids;
+        if (!References(job,document,referencedGuids)) return false;
+    }
     // The current native format has one main object. Preserve an explicitly assigned ID.
     const Json::Value requested = job.Settings.get("MainObjectID", Json::UInt64(0));
     if (!requested.isUInt64()) return job.Fail("MainObjectID must be an unsigned integer");
@@ -238,6 +246,7 @@ bool ImportDocument(AssetImportJob & job) {
             job.Identities.append(identity);
         }
     }
+    if(unityClip)return ImportUnityAnimation(job);
     if(type==eAssetType::PhysicsMaterial) {
         GameSproutRuntime::PhysicsMaterialData material;std::vector<std::uint8_t> encoded;std::string error;
         if(!PhysicsMaterialDefinition::Read(document,material,error)||!PhysicsMaterialDefinition::Encode(material,encoded,error))return job.Fail(error);

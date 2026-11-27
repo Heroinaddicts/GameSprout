@@ -11,5 +11,6 @@ public:
     void BindSourceAvatar(IAssetsManager*,ILibraryManager*,ISelectionManager*,const std::string& key);
     void SetNodePaths(const std::vector<std::string>&);
 private:
+    void RefreshEnabled() override;
     Ui::AnimationClipInspectorForm* _Ui=nullptr;
 };
