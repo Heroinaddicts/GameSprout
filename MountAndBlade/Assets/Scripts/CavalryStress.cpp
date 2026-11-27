@@ -34,14 +34,19 @@ Vector3 HeadingDirection(float heading) {
     return {std::sin(heading), 0, std::cos(heading)};
 }
 
-bool PlaceRider(ITransformComponent& transform, Vector3 position, Vector3 normal, Vector3 forward) {
+bool SameComponents(Vector3 left, Vector3 right) {
+    return left.X==right.X && left.Y==right.Y && left.Z==right.Z;
+}
+
+bool PlaceRider(ITransformComponent& transform, Vector3 position, Vector3 normal, Vector3 forward,
+        bool updatePosition=true) {
     // Lift the XZ movement direction into the ground tangent. Orthogonal
     // projection would also change heading on a slope with crossfall.
     forward.Y = -(forward.X * normal.X + forward.Z * normal.Z) / normal.Y;
     Quaternion rotation;
     if (!RuntimeMath::TryMakeLookRotation(forward, normal, rotation))
         return false;
-    transform.SetLocalPosition(position);
+    if (updatePosition) transform.SetLocalPosition(position);
     return transform.SetLocalRotation(rotation);
 }
 
@@ -108,35 +113,55 @@ bool BuildModelMatrices(const ModelData& model, std::vector<Mat4>& worlds, std::
     return true;
 }
 
-TransformPose Mix(const TransformPose& left, const TransformPose& right, float weight) {
+enum ConstantPoseChannel : std::uint8_t { ConstantPosition=1, ConstantScale=2 };
+
+bool CanReuseVector(Vector3 first, Vector3 key) {
+    // Nonzero normal floats are unchanged by adding an exactly zero delta.
+    // Keep the original arithmetic for signed zeros and exceptional values.
+    return SameComponents(first,key) && std::isnormal(first.X) && std::isnormal(first.Y) && std::isnormal(first.Z);
+}
+
+float RotationDot(const Quaternion& a, const Quaternion& b) {
+    return a.X*b.X + a.Y*b.Y + a.Z*b.Z + a.W*b.W;
+}
+
+TransformPose Mix(const TransformPose& left, const TransformPose& right, float weight, bool alignedKeys=false,
+        std::uint8_t constantChannels=0) {
     const auto& a = left.Rotation;
     auto b = right.Rotation;
-    if (a.X*b.X + a.Y*b.Y + a.Z*b.Z + a.W*b.W < 0)
+    if (!alignedKeys && RotationDot(a,b) < 0)
         b = {-b.X,-b.Y,-b.Z,-b.W};
     // Source samples are 30 Hz. Normalized interpolation follows the short
     // quaternion arc and also blends position/scale in the clip's local space.
-    return {left.Position + (right.Position - left.Position) * weight,
+    return {(constantChannels&ConstantPosition) ? left.Position : left.Position + (right.Position - left.Position) * weight,
         {std::lerp(a.X,b.X,weight),std::lerp(a.Y,b.Y,weight),std::lerp(a.Z,b.Z,weight),std::lerp(a.W,b.W,weight)},
-        left.Scale + (right.Scale - left.Scale) * weight};
+        (constantChannels&ConstantScale) ? left.Scale : left.Scale + (right.Scale - left.Scale) * weight};
 }
 
 struct SamplingInterval {
-    const AnimationFrame& Left;
-    const AnimationFrame& Right;
+    const TransformPose* Left;
+    const TransformPose* Right;
+    const std::uint8_t* ConstantChannels;
     float Weight;
+    bool AlignedKeys;
 };
-SamplingInterval Interval(const std::vector<AnimationFrame>& frames, float time) {
-    auto right = std::upper_bound(frames.begin(),frames.end(),time,
+SamplingInterval Interval(const std::vector<AnimationFrame>& frames, const std::uint8_t* constantChannels,
+        float time, bool alignedKeys) {
+    // CaptureVisual validates nonempty clips and stores each frame in compact joint order.
+    const auto* begin=frames.data();
+    const auto* end=begin+frames.size();
+    const auto* right=std::upper_bound(begin,end,time,
         [](float value, const AnimationFrame& sample) { return value < sample.Time; });
-    if (right == frames.begin()) return {*right,*right,0};
-    const auto left = right - 1;
-    if (right == frames.end()) return {*left,*left,0};
-    return {*left,*right,std::clamp((time-left->Time)/(right->Time-left->Time),0.f,1.f)};
+    if (right==begin) return {right->Poses.data(),right->Poses.data(),constantChannels,0,alignedKeys};
+    const auto* left=right-1;
+    if (right==end) return {left->Poses.data(),left->Poses.data(),constantChannels,0,alignedKeys};
+    return {left->Poses.data(),right->Poses.data(),constantChannels,
+        std::clamp((time-left->Time)/(right->Time-left->Time),0.f,1.f),alignedKeys};
 }
 
 TransformPose SampleTrack(const SamplingInterval& interval, std::size_t track) {
-    return interval.Weight == 0 ? interval.Left.Poses[track] :
-        Mix(interval.Left.Poses[track],interval.Right.Poses[track],interval.Weight);
+    return interval.Weight==0 ? interval.Left[track] :
+        Mix(interval.Left[track],interval.Right[track],interval.Weight,interval.AlignedKeys,interval.ConstantChannels[track]);
 }
 
 IGameObject* FindNamed(IGameObject& root, std::string_view name) {
@@ -148,6 +173,13 @@ IGameObject* FindNamed(IGameObject& root, std::string_view name) {
             pending.push_back(node->GetChild(child));
     }
     return nullptr;
+}
+
+IGameObject* ResolveRiderChild(IGameSproutRuntime& runtime, const IGameObject* root,
+        std::size_t index, std::uint64_t id) {
+    // Spawn puts the seat first, followed by the horse parts. A moved or reordered child still resolves by ID.
+    auto* child=root ? root->GetChild(index) : nullptr;
+    return child && child->GetInstanceID()==id ? child : runtime.QueryGameObject(id);
 }
 }
 
@@ -312,11 +344,16 @@ bool CavalryStress::CaptureVisual(IGameSproutRuntime& runtime, std::string& erro
         || !prepare(_ScoutKit,knightModel,knightRest,"CoatOfArms_LOD4",{},false))
         return false;
 
-    for (std::size_t part=HorseBody;part<=Tail;++part)
-        if (_Parts[part].Bones.empty()) {
+    std::size_t largestPalette=0;
+    for (std::size_t part=HorseBody;part<=Tail;++part) {
+        const auto bones=_Parts[part].Bones.size();
+        if (!bones) {
             error = "Cavalry horse mesh has no skin: " + _Parts[part].Name;
             return false;
         }
+        largestPalette=std::max(largestPalette,bones);
+    }
+    _PaletteScratch.resize(largestPalette);
     // Evaluate the common horse skeleton once per agent, restricted to the
     // ancestors of joints referenced by visible horse parts or the saddle.
     const auto& nodes = horseModel.Nodes;
@@ -350,6 +387,8 @@ bool CavalryStress::CaptureVisual(IGameSproutRuntime& runtime, std::string& erro
         const auto& source=importedClips[gait];
         auto& clip=_Clips[gait];
         clip.Duration=source.Duration;
+        clip.AlignedKeys=true;
+        clip.ConstantChannels.assign(_HorseJoints.size(),ConstantPosition|ConstantScale);
         clip.Frames.reserve(source.Frames.size());
         for (const auto& sourceFrame:source.Frames) {
             AnimationFrame frame;
@@ -359,6 +398,25 @@ bool CavalryStress::CaptureVisual(IGameSproutRuntime& runtime, std::string& erro
                 if (!required[index]) continue;
                 const auto track=trackForNode[gait][index];
                 frame.Poses.push_back(track==NoNode ? nodes[index].Transform : sourceFrame.Poses[track]);
+            }
+            const auto& first=clip.Frames.empty() ? frame.Poses : clip.Frames.front().Poses;
+            // Prepared clips have finite, nonnegative increasing times. Leave interpolation alone
+            // if another provider supplies invalid keys that could produce a nonfinite weight.
+            if (!std::isfinite(frame.Time) || frame.Time<0 || (!clip.Frames.empty() && frame.Time<=clip.Frames.back().Time))
+                std::fill(clip.ConstantChannels.begin(),clip.ConstantChannels.end(),0);
+            for (std::size_t track=0;track<frame.Poses.size();++track) {
+                auto& channels=clip.ConstantChannels[track];
+                if ((channels&ConstantPosition) && !CanReuseVector(first[track].Position,frame.Poses[track].Position))
+                    channels&=~ConstantPosition;
+                if ((channels&ConstantScale) && !CanReuseVector(first[track].Scale,frame.Poses[track].Scale))
+                    channels&=~ConstantScale;
+            }
+            if (clip.AlignedKeys && !clip.Frames.empty()) {
+                // Check immutable adjacent keys once, away from the hemisphere boundary.
+                // Cross-clip blends still check their two sampled rotations at runtime.
+                const auto& previous=clip.Frames.back().Poses;
+                clip.AlignedKeys=std::equal(previous.begin(),previous.end(),frame.Poses.begin(),frame.Poses.end(),
+                    [](const TransformPose& a,const TransformPose& b) {return RotationDot(a.Rotation,b.Rotation)>.5f;});
             }
             clip.Frames.push_back(std::move(frame));
         }
@@ -527,13 +585,17 @@ bool CavalryStress::CreateRider(IGameObject& group, std::string& error) {
 void CavalryStress::SampleHorse(const Rider& rider) {
     const auto interval=[&](Gait gait) {
         const auto& clip=_Clips[gait];
-        return Interval(clip.Frames,gait==Idle ? rider.IdleTime : rider.StridePhase*clip.Duration);
+        return Interval(clip.Frames,clip.ConstantChannels.data(),
+            gait==Idle ? rider.IdleTime : rider.StridePhase*clip.Duration,clip.AlignedKeys);
     };
+    const auto* joints=_HorseJoints.data();
+    auto* world=_HorseWorld.data();
+    const auto jointCount=_HorseJoints.size();
     const auto evaluate=[&](unsigned active,auto sample) {
-        for (std::size_t index=0;index<_HorseJoints.size();++index) {
-            const auto& joint=_HorseJoints[index];
+        for (std::size_t index=0;index<jointCount;++index) {
+            const auto& joint=joints[index];
             const auto local=(joint.Tracks&active) ? SampledMatrix(sample(index)) : joint.RestMatrix;
-            _HorseWorld[index]=AffineProduct(joint.Parent==NoNode ? _HorseRig : _HorseWorld[joint.Parent],local);
+            world[index]=AffineProduct(joint.Parent==NoNode ? _HorseRig : world[joint.Parent],local);
         }
     };
     const auto idleWeight=rider.IdleWeight;
@@ -561,25 +623,30 @@ void CavalryStress::SampleHorse(const Rider& rider) {
     });
 }
 
-bool CavalryStress::UpdateVisual(IGameSproutRuntime& runtime, Rider& rider, std::string& error) {
+bool CavalryStress::UpdateVisual(IGameSproutRuntime& runtime, Rider& rider, std::string& error, const IGameObject* root) {
     SampleHorse(rider);
-    auto* seat = runtime.QueryGameObject(rider.SeatID);
-    if (!seat || !PlacePart(*seat,AffineProduct(_HorseWorld[_SeatBone],_Seat))) {
+    const auto* world=_HorseWorld.data();
+    auto* palette=_PaletteScratch.data();
+    auto* seat = ResolveRiderChild(runtime,root,0,rider.SeatID);
+    if (!seat || !PlacePart(*seat,AffineProduct(world[_SeatBone],_Seat))) {
         error = "Cannot place the rider on the animated saddle socket";
         return false;
     }
     for (std::size_t slot = HorseBody; slot <= Tail; ++slot) {
         const auto& part = _Parts[slot];
-        auto* object = runtime.QueryGameObject(rider.Parts[slot]);
+        auto* object = ResolveRiderChild(runtime,root,slot+1,rider.Parts[slot]);
         auto* skin = object ? object->GetComponent<ISkinnedMeshRendererComponent>() : nullptr;
         if (!skin) {
             error = "Cavalry live skin is missing: " + part.Name;
             return false;
         }
-        _PaletteScratch.clear();
-        for (const auto& bone : part.Bones)
-            _PaletteScratch.push_back(AffineProduct(AffineProduct(part.InverseLocal,_HorseWorld[bone.Node]),bone.InverseBind));
-        if (!skin->SetSkinPose(_PaletteScratch)) {
+        const auto* bones=part.Bones.data();
+        const auto boneCount=part.Bones.size();
+        for (std::size_t index=0;index<boneCount;++index) {
+            const auto& bone=bones[index];
+            palette[index]=AffineProduct(AffineProduct(part.InverseLocal,world[bone.Node]),bone.InverseBind);
+        }
+        if (!skin->SetSkinPose(std::span<const Mat4>{palette,boneCount})) {
             error = "Cavalry rejected the pose of " + part.Name;
             return false;
         }
@@ -657,11 +724,12 @@ bool CavalryStress::UpdateRiders(IGameSproutRuntime& runtime, float delta, std::
             if (!Ground(rider.X,rider.Z,position,normal)) continue;
         }
         auto* transform = root->GetTransform();
-        const auto distance = (position - transform->GetLocalPosition()).Length();
+        const auto priorPosition=transform->GetLocalPosition();
+        const auto distance = (position - priorPosition).Length();
         // The height grid has continuous positions, but its slopes can jump
         // across cell boundaries. Smooth the mount and saddle's visual tilt.
         rider.VisualGroundNormal = rider.VisualGroundNormal + (normal - rider.VisualGroundNormal) * normalWeight;
-        if (!PlaceRider(*transform,position,rider.VisualGroundNormal,forward)) {
+        if (!PlaceRider(*transform,position,rider.VisualGroundNormal,forward,!SameComponents(position,priorPosition))) {
             error = "Invalid terrain basis for moving cavalry";
             return false;
         }
@@ -687,7 +755,7 @@ bool CavalryStress::UpdateRiders(IGameSproutRuntime& runtime, float delta, std::
                 if (rider.IdleTime >= _Clips[Idle].Duration)
                     rider.IdleTime = std::fmod(rider.IdleTime,_Clips[Idle].Duration);
             }
-            if (!UpdateVisual(runtime,rider,error)) return false;
+            if (!UpdateVisual(runtime,rider,error,root)) return false;
         }
     }
     return true;

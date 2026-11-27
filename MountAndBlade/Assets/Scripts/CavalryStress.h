@@ -59,7 +59,9 @@ private:
     enum Gait : std::size_t { Walk, Canter, Idle, GaitCount };
     struct Clip {
         float Duration = 0;
+        bool AlignedKeys = false;
         // Poses are in the shared _HorseJoints order.
+        std::vector<std::uint8_t> ConstantChannels;
         std::vector<GameSproutRuntime::AnimationFrame> Frames;
     };
     struct HorseJoint {
@@ -99,7 +101,8 @@ private:
     bool Ground(float x, float z, GameSproutRuntime::Vector3& position, GameSproutRuntime::Vector3& normal) const;
     bool CreateRider(GameSproutRuntime::IGameObject& group, std::string& error);
     bool UpdateRiders(GameSproutRuntime::IGameSproutRuntime&, float delta, std::string& error);
-    bool UpdateVisual(GameSproutRuntime::IGameSproutRuntime&, Rider&, std::string& error);
+    bool UpdateVisual(GameSproutRuntime::IGameSproutRuntime&, Rider&, std::string& error,
+        const GameSproutRuntime::IGameObject* root = nullptr);
     bool ApplyOutfit(GameSproutRuntime::IGameSproutRuntime&, const Rider&, std::string& error);
     bool ConfigurePart(GameSproutRuntime::IGameObject&, const Part&, std::string& error);
     void SampleHorse(const Rider&);
