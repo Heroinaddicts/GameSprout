@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "87db4f52b2c8267438e2fde12ca3c261",
+  "Path": "Characters/WyvernDragon/Materials/MI_Dragon_03_NoHole.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MI_Dragon_03_NoHole"
+    }
+  ]
+}

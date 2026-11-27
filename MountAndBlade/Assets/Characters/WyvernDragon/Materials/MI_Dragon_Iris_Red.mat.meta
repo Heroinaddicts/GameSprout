@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "6c3c21083181a5c48873971bd2035697",
+  "Path": "Characters/WyvernDragon/Materials/MI_Dragon_Iris_Red.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MI_Dragon_Iris_Red"
+    }
+  ]
+}

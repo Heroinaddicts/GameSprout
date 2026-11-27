@@ -1,0 +1,162 @@
+{
+  "Guid": "c45893ca439cea747a8151a6f487e62d",
+  "ImportSettings": {
+    "AnimationClips": [],
+    "AnimationType": "Generic",
+    "GenerateLightmapUVs": false,
+    "HumanBones": [],
+    "HumanReferencePose": [],
+    "HumanScale": 0.0,
+    "ImportAnimation": false,
+    "ImportBlendShapes": false,
+    "ImportCameras": false,
+    "ImportLights": false,
+    "ImportMaterials": true,
+    "KeepCPUCopy": false,
+    "MaterialRemaps": {
+      "material/Mat_D5#0": {
+        "Guid": "c6c2766e5a8dfb944838cc5ff8c874a5",
+        "LocalID": 1
+      },
+      "material/water_cornea4#0": {
+        "Guid": "41ac0a647f7e5894ca1ed9f2a270a696",
+        "LocalID": 1
+      },
+      "material/iris4#0": {
+        "Guid": "6c3c21083181a5c48873971bd2035697",
+        "LocalID": 1
+      },
+      "material/Mat_D1#0": {
+        "Guid": "52ae129efd74ce5469e14de0315319c5",
+        "LocalID": 1
+      },
+      "material/Mat_D4#0": {
+        "Guid": "5bbd9c5b319dd49469cfc5cc31019ae6",
+        "LocalID": 1
+      },
+      "material/Mat_D2#0": {
+        "Guid": "6f68487113ada2440ab4eaea45bed6e6",
+        "LocalID": 1
+      },
+      "material/Mat_D3#0": {
+        "Guid": "87db4f52b2c8267438e2fde12ca3c261",
+        "LocalID": 1
+      }
+    },
+    "MeshCompression": "Off",
+    "NormalSmoothingAngle": 60.0,
+    "NormalsMode": "Import",
+    "OptimizeMesh": true,
+    "ScaleFactor": 1.0,
+    "TangentsMode": "Calculate",
+    "UseFileScale": true,
+    "WeldVertices": true
+  },
+  "ImporterType": "Model",
+  "Path": "Characters/WyvernDragon/Models/SK_Dragon_No_Hole.fbx",
+  "SubAssets": [
+    {
+      "LocalID": 2105356394260452155,
+      "Name": "",
+      "SourceKey": "mesh//#0/Group#0/Geometry#0/geo#0/tongue#0",
+      "Type": 3
+    },
+    {
+      "LocalID": 13968170047194123203,
+      "Name": "",
+      "SourceKey": "mesh//#0/Group#0/Geometry#0/geo#0/righteye#0",
+      "Type": 3
+    },
+    {
+      "LocalID": 6360774504703421246,
+      "Name": "",
+      "SourceKey": "mesh//#0/Group#0/Geometry#0/geo#0/lefteye#0",
+      "Type": 3
+    },
+    {
+      "LocalID": 6259587623107943902,
+      "Name": "",
+      "SourceKey": "mesh//#0/Group#0/Geometry#0/geo#0/saliva#0",
+      "Type": 3
+    },
+    {
+      "LocalID": 17640591094832065032,
+      "Name": "",
+      "SourceKey": "mesh//#0/Group#0/Geometry#0/geo#0/upperteeth#0",
+      "Type": 3
+    },
+    {
+      "LocalID": 1355883904366617923,
+      "Name": "",
+      "SourceKey": "mesh//#0/Group#0/Geometry#0/geo#0/lowerteeth#0",
+      "Type": 3
+    },
+    {
+      "LocalID": 661973815225490310,
+      "Name": "",
+      "SourceKey": "mesh//#0/Group#0/Geometry#0/geo#0/body#0",
+      "Type": 3
+    },
+    {
+      "LocalID": 2378866133396324400,
+      "Name": "Mat_D5",
+      "SourceKey": "material/Mat_D5#0",
+      "Type": 5
+    },
+    {
+      "LocalID": 5451721717208797163,
+      "Name": "water_cornea4",
+      "SourceKey": "material/water_cornea4#0",
+      "Type": 5
+    },
+    {
+      "LocalID": 14481664545010935963,
+      "Name": "iris4",
+      "SourceKey": "material/iris4#0",
+      "Type": 5
+    },
+    {
+      "LocalID": 10476163273116580450,
+      "Name": "Mat_D1",
+      "SourceKey": "material/Mat_D1#0",
+      "Type": 5
+    },
+    {
+      "LocalID": 4338084477378528082,
+      "Name": "Mat_D4",
+      "SourceKey": "material/Mat_D4#0",
+      "Type": 5
+    },
+    {
+      "LocalID": 3383066146974429197,
+      "Name": "Mat_D2",
+      "SourceKey": "material/Mat_D2#0",
+      "Type": 5
+    },
+    {
+      "LocalID": 14821577902257032599,
+      "Name": "Mat_D3",
+      "SourceKey": "material/Mat_D3#0",
+      "Type": 5
+    },
+    {
+      "LocalID": 980698805863986881,
+      "Name": "Skeleton",
+      "SourceKey": "skeleton",
+      "Type": 30
+    },
+    {
+      "LocalID": 14400376046457777655,
+      "Name": "Avatar",
+      "SourceKey": "avatar",
+      "Type": 31
+    },
+    {
+      "LocalID": 12129063053868126227,
+      "Name": "SK_Dragon_No_Hole",
+      "SourceKey": "main",
+      "Type": 4
+    }
+  ],
+  "Version": 1
+}

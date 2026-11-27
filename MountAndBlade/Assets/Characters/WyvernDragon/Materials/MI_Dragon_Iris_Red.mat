@@ -1,0 +1,50 @@
+{
+  "Version": 1,
+  "Name": "MI_Dragon_Iris_Red",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "BaseColorTexture": {
+    "Guid": "a334cc29039a9a245b2e05f10f81e732",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "3e3f68ac67acc284c8b93fcfbe87a461",
+    "LocalID": 1
+  },
+  "NormalScale": 2.75,
+  "Roughness": 0.078,
+  "Metallic": 0.0,
+  "Emission": [
+    0.085,
+    0.018,
+    0.005,
+    1
+  ],
+  "ORMTexture": {
+    "Guid": "bda7eece727968849b18093c29fab3be",
+    "LocalID": 1
+  },
+  "ORMTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ],
+  "ORMTextureRemapScale": [
+    1.0,
+    1.0,
+    1.93,
+    0
+  ],
+  "ORMTextureRemapBias": [
+    0.0,
+    0.0,
+    -0.20240300596634886,
+    0
+  ]
+}

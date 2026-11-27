@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "8c90c3a362ea51e1b1a92fdd01fc2634",
+  "Path": "Characters/WyvernDragon/Models/Right Iris.mesh",
+  "ImporterType": "Mesh",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Right Iris"
+    }
+  ]
+}

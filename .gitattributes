@@ -1,1 +1,4 @@
 MountAndBlade/美术资产/Wyvern[[:space:]]Dragon.unitypackage filter=lfs diff=lfs merge=lfs -text
+MountAndBlade/Assets/Characters/WyvernDragon/Animations/*.anim filter=lfs diff=lfs merge=lfs -text
+MountAndBlade/Assets/Characters/WyvernDragon/Models/*.fbx filter=lfs diff=lfs merge=lfs -text
+MountAndBlade/Assets/Characters/WyvernDragon/Textures/*.png filter=lfs diff=lfs merge=lfs -text

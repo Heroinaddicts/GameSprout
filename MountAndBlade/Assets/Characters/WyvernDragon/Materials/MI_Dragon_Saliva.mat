@@ -1,0 +1,13 @@
+{
+  "Version": 1,
+  "Name": "MI_Dragon_Saliva",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    0.2735849,
+    0.2735849,
+    0.2735849,
+    1
+  ],
+  "Roughness": 0.12,
+  "Metallic": 0
+}

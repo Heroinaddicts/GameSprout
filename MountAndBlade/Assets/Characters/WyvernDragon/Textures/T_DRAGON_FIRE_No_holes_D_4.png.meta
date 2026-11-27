@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Guid": "82f83034a41b3ce4898e8ac235e979d2",
+  "Path": "Characters/WyvernDragon/Textures/T_DRAGON_FIRE_No_holes_D_4.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "SRGB",
+    "AlphaSource": "FromSource",
+    "GenerateMipmaps": true,
+    "MaxSize": 2048,
+    "FilterMode": "Bilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat"
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "T_DRAGON_FIRE_No_holes_D_4"
+    }
+  ]
+}

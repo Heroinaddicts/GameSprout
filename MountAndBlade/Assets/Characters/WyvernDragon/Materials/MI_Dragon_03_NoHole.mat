@@ -1,0 +1,61 @@
+{
+  "Version": 1,
+  "Name": "MI_Dragon_03_NoHole",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "BaseColorTexture": {
+    "Guid": "619ef325cf8047d4c82ad05990f92c38",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "e2eafe94c68d5c344839f05a92702e6f",
+    "LocalID": 1
+  },
+  "NormalScale": 1.5,
+  "Roughness": 0.574,
+  "Metallic": 0.002,
+  "ORMTexture": {
+    "Guid": "b6893e75df7999f4cbd9cb4c8e35d697",
+    "LocalID": 1
+  },
+  "ORMTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ],
+  "TransmissionTexture": {
+    "Guid": "2dbc8e37047ccfa46a4623ba7baf31c3",
+    "LocalID": 1
+  },
+  "TransmissionTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ],
+  "TransmissionStrength": 0.35,
+  "TransmissionTint": [
+    1,
+    0.507,
+    0.37,
+    1
+  ],
+  "ORMTextureRemapScale": [
+    1.0,
+    1.3,
+    1.0,
+    0
+  ],
+  "ORMTextureRemapBias": [
+    0.0,
+    -0.06529129224720931,
+    0.0,
+    0
+  ]
+}

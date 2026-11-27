@@ -1,0 +1,51 @@
+{
+  "Version": 1,
+  "Name": "MI_Dragon_01",
+  "Shader": "GameSprout/Lit",
+  "BaseColor": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "BaseColorTexture": {
+    "Guid": "a373af412eaf79f4789c8e43a8641ab2",
+    "LocalID": 1
+  },
+  "NormalTexture": {
+    "Guid": "f093262d9c78a9a4ebf72dffe524a3b4",
+    "LocalID": 1
+  },
+  "NormalScale": 1.5,
+  "Roughness": 0.632,
+  "Metallic": 0.003,
+  "ORMTexture": {
+    "Guid": "cf83fe097e4646a43b6ac63e666f0180",
+    "LocalID": 1
+  },
+  "ORMTextureST": [
+    1,
+    -1,
+    0,
+    1
+  ],
+  "TransmissionStrength": 0.08,
+  "TransmissionTint": [
+    1,
+    0.507,
+    0.37,
+    1
+  ],
+  "ORMTextureRemapScale": [
+    1.0,
+    1.3,
+    1.0,
+    0
+  ],
+  "ORMTextureRemapBias": [
+    0.0,
+    -0.06529129224720931,
+    0.0,
+    0
+  ]
+}

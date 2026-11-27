@@ -1,0 +1,303 @@
+{
+  "Version": 1,
+  "Parameters": [],
+  "Layers": [
+    {
+      "Name": "Base Layer",
+      "BlendingMode": "Override",
+      "DefaultWeight": 1,
+      "DefaultState": "A_Dragon_idle_a",
+      "States": [
+        {
+          "Name": "A_Dragon_idle_a",
+          "Clip": {
+            "Guid": "0ea3717e96548c34fab73fb45617366c",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_bite_attack",
+          "Clip": {
+            "Guid": "eb6befa861a063c47be3e59fe1d994b2",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_breath_fire_horizontal",
+          "Clip": {
+            "Guid": "258e709bf6d90614598c1db07339735d",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_left_foot_attack",
+          "Clip": {
+            "Guid": "05b6c8b3b6beec040b2ef5953d94441a",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_right_foot_attack",
+          "Clip": {
+            "Guid": "8d3f3b9e2d5036b469eeb5c7f471e33e",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_turn_180_tail_attack",
+          "Clip": {
+            "Guid": "334884afe3298d44aabd9bd111bbc5e3",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_Death_Animation",
+          "Clip": {
+            "Guid": "f717350b8d24153448426c73b9cc17eb",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_fly_breath_fire_loop",
+          "Clip": {
+            "Guid": "3b263bc1acb003648942ea9434b4156b",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_fly_end_to_ground_roar",
+          "Clip": {
+            "Guid": "f445efd7a8d79f34e80240b60f1ef184",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_fly_end_to_ground",
+          "Clip": {
+            "Guid": "473a5225b5b2f2448bac735e1aeaf9a5",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_fly_normal_loop_V1",
+          "Clip": {
+            "Guid": "9f4a29fe7b463f54db2978d41307c3e0",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_fly_start_to_vertical",
+          "Clip": {
+            "Guid": "b2044074c9d714e4ca8b0e4c1d6b6796",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_fly_vertical_loop",
+          "Clip": {
+            "Guid": "b31dbc72cd5840046914c4278c587e32",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_glide_breath_fire_loop",
+          "Clip": {
+            "Guid": "1c73f68994d63684fafcf84f00dd3448",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_glide_left_loop",
+          "Clip": {
+            "Guid": "63dcde2d4b481b74b998715d34ec00a7",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_glide_normal_loop",
+          "Clip": {
+            "Guid": "10fc8dad72e54a844af6ebd5c31976e5",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_glide_right_loop",
+          "Clip": {
+            "Guid": "822319cbb31608c4aa23e82b42b22dc5",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_roar_a",
+          "Clip": {
+            "Guid": "95d2d06d691928141bb79dfd62a95a66",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_turn_180_Root",
+          "Clip": {
+            "Guid": "c0d775a43ab7f604ea9c5b90e6860c97",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_turn_180",
+          "Clip": {
+            "Guid": "26e0d2a6c7b07a04487023ec6f33bc46",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_B_Root",
+          "Clip": {
+            "Guid": "74b6ddaf2f3d406439a88cb1f3dd3dec",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_B",
+          "Clip": {
+            "Guid": "ac37e13728ac8f944be5d3be414dd1b6",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_F_Root",
+          "Clip": {
+            "Guid": "d177a05e0f3b8b248aad70ac200b0e24",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_F",
+          "Clip": {
+            "Guid": "a7cbdc2b0982c94428b774621ab3606e",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_LB_Root",
+          "Clip": {
+            "Guid": "1ee509cffeb63dc49968782ccc363aa5",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_LB",
+          "Clip": {
+            "Guid": "4b57c7e59c0f2ad4a8dc838718cdef63",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_LF_Root",
+          "Clip": {
+            "Guid": "a549dac43d6647a49a4eae7e19dd3b40",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_LF",
+          "Clip": {
+            "Guid": "d86227db14d6920498eb412d761a67eb",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_RB_Root",
+          "Clip": {
+            "Guid": "ca6927e3cc01bcc4a81226434776f104",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_RB",
+          "Clip": {
+            "Guid": "3c3a59c0cf44dba40a20c96f262ad4e1",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_RF_Root",
+          "Clip": {
+            "Guid": "6a92bff8c1ceee943bc1b89b1a09b1d1",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        },
+        {
+          "Name": "A_Dragon_walk_RF",
+          "Clip": {
+            "Guid": "c66c2b50078e5be409f3bb63f8691c8f",
+            "LocalID": 1
+          },
+          "Speed": 1,
+          "Loop": true
+        }
+      ],
+      "Transitions": []
+    }
+  ]
+}

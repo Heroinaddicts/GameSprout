@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "41ac0a647f7e5894ca1ed9f2a270a696",
+  "Path": "Characters/WyvernDragon/Materials/MI_Dragon_Saliva.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MI_Dragon_Saliva"
+    }
+  ]
+}

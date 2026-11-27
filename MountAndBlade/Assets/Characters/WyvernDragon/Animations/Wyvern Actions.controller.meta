@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "5ba57aa2e0d3432b9cd642c00e8347d2",
+  "Path": "Characters/WyvernDragon/Animations/Wyvern Actions.controller",
+  "ImporterType": "AnimatorController",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 15,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Wyvern Actions"
+    }
+  ]
+}

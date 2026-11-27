@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "c6c2766e5a8dfb944838cc5ff8c874a5",
+  "Path": "Characters/WyvernDragon/Materials/MI_Dragon_05.mat",
+  "ImporterType": "Material",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "MI_Dragon_05"
+    }
+  ]
+}

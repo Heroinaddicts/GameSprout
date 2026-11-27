@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "ebf430e1e6f15bb685011e7dee9e9103",
+  "Path": "Characters/WyvernDragon/Models/Left Iris.mesh",
+  "ImporterType": "Mesh",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 3,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Left Iris"
+    }
+  ]
+}

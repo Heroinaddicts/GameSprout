@@ -1,0 +1,34 @@
+{
+  "Version": 1,
+  "Guid": "f717350b8d24153448426c73b9cc17eb",
+  "Path": "Characters/WyvernDragon/Animations/A_Dragon_Death_Animation.anim",
+  "ImporterType": "AnimationClip",
+  "ImportSettings": {
+    "UnityClip": {
+      "Skeleton": {
+        "Guid": "c45893ca439cea747a8151a6f487e62d",
+        "LocalID": 980698805863986881
+      },
+      "TransformOnly": true,
+      "RotationCorrections": [
+        {
+          "Path": "root",
+          "Rotation": [
+            0,
+            1,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  },
+  "SubAssets": [
+    {
+      "Type": 14,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "A_Dragon_Death_Animation"
+    }
+  ]
+}

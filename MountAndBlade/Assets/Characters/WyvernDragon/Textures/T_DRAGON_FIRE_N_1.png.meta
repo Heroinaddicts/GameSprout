@@ -1,0 +1,23 @@
+{
+  "Version": 1,
+  "Guid": "f093262d9c78a9a4ebf72dffe524a3b4",
+  "Path": "Characters/WyvernDragon/Textures/T_DRAGON_FIRE_N_1.png",
+  "ImporterType": "Texture",
+  "ImportSettings": {
+    "ColorSpace": "Linear",
+    "AlphaSource": "None",
+    "GenerateMipmaps": true,
+    "MaxSize": 2048,
+    "FilterMode": "Bilinear",
+    "WrapU": "Repeat",
+    "WrapV": "Repeat"
+  },
+  "SubAssets": [
+    {
+      "Type": 1,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "T_DRAGON_FIRE_N_1"
+    }
+  ]
+}

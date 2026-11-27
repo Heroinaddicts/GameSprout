@@ -40,6 +40,7 @@ GameSprout 使用 **C++20** 构建引擎核心，以 **Qt Widgets** 提供桌面
 
 - 使用 **GUID + LocalID** 标识资源与子资源，区分源文件、导入设置和运行产物。
 - 对模型、贴图、材质、动画、场景、Prefab、Shader 等资源执行预处理与依赖追踪。
+- Unity 文本 `.anim` 可直接作为动画源文件，由导入设置绑定模型骨架。[导入步骤](GameSprout/Tools/UnitySceneBridge/README.md#原始-unity-动画片段)
 - 后台执行导入任务，在宿主线程校验与发布，拦截已被后续修改取代的结果。
 - 通过文件、设置与工具链指纹管理缓存和重导入。
 - 以暂存目录、发布日志和数据库事务协调产物更新，保留失败回滚与中断恢复路径。
@@ -49,6 +50,7 @@ GameSprout 使用 **C++20** 构建引擎核心，以 **Qt Widgets** 提供桌面
 
 - **GRHI + SDL3 GPU**：公共图形接口与私有后端实现分离。
 - 网格、材质、自定义 HLSL Shader、深度测试、GPU 实例化和骨骼蒙皮。
+- 内置 Lit 支持线性 ORM 和定向透射近似。大骨架通过顶点存储缓冲绘制，Windows 按批次准备蒙皮包围盒和上传数据。[渲染职责与配置](GameSprout/Docs/EditorModuleBoundaries.md)
 - 方向光、级联阴影、环境漫反射、球谐环境光、天空与距离雾。
 - 视锥剔除、静态阴影复用，以及多视口共享设备与渲染资源。
 - 原生窗口呈现、离屏渲染与显式像素读回。
@@ -58,6 +60,8 @@ GameSprout 使用 **C++20** 构建引擎核心，以 **Qt Widgets** 提供桌面
 - **动画**：Clip、Animator Controller、1D 混合、动画层与 Mask、Root Motion、动画事件、Humanoid 重定向及 IK。
 - **物理**：基于 Jolt Physics 的刚体、基础碰撞体、网格与凸包碰撞体、射线查询、碰撞 / 触发事件和碰撞层。
 - **游戏 UI**：Runtime 中的 Canvas、RectTransform、Image、Text、Button、布局与指针交互，不依赖编辑器的 Qt 控件。
+
+[MountAndBlade 城堡场景](MountAndBlade/README.md) 提供骑兵压测以及可切换 32 个原始动作的 Wyvern 骨架和材质实例。
 
 ### 原生 C++ 游戏逻辑
 

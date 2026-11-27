@@ -1,0 +1,34 @@
+{
+  "Version": 1,
+  "Guid": "10fc8dad72e54a844af6ebd5c31976e5",
+  "Path": "Characters/WyvernDragon/Animations/A_Dragon_glide_normal_loop.anim",
+  "ImporterType": "AnimationClip",
+  "ImportSettings": {
+    "UnityClip": {
+      "Skeleton": {
+        "Guid": "c45893ca439cea747a8151a6f487e62d",
+        "LocalID": 980698805863986881
+      },
+      "TransformOnly": true,
+      "RotationCorrections": [
+        {
+          "Path": "root",
+          "Rotation": [
+            0,
+            1,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  },
+  "SubAssets": [
+    {
+      "Type": 14,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "A_Dragon_glide_normal_loop"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "fb88f772ec8b58efbc614f31da910a35",
+  "Path": "Characters/WyvernDragon/Wyvern Dragon.prefab",
+  "ImporterType": "Prefab",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 255,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Wyvern Dragon"
+    }
+  ]
+}

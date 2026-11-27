@@ -16,9 +16,21 @@ HDR 全景与内院预览分别在 `Preview/MedievalCastleHDR.png` 和 `Preview/
 
 同机位预览位于 `Preview/SpatialLighting`。每组 `-on.png` 和 `-off.png` 只切换该组对照的功能。烘制位置和场景参数保存在 `Tools/CastleSpatialLighting.json`。使用 `Tools/ApplyCastleSpatialLighting.py --compiled <已烘制目录>` 可把对应的 `.environment` 和 `.irradiance` 资源及引用写回场景。
 
-### 1000 骑实时蒙皮压测
+### Wyvern Dragon
 
-`MedievalCastle.scene` 的 `Cavalry Stress` 在 Play 时创建 1000 骑。每骑运行时求值步态与骨骼矩阵，移动、阴影和换装走 GameSprout 的骨骼网格实例化路径。测试要求 Editor 与 GameLogic 使用同一套 ABI 12 SDK。
+在 `MedievalCastle.scene` 的 Hierarchy 中选择根节点 `Wyvern Dragon`。龙放在城外，当前场景位置约为 `(56.848, 0.118, 15.875)`，缩放为 `(1, 1, 1)`。可复用的 `Assets/Characters/WyvernDragon/Wyvern Dragon.prefab` 保存了独立的默认缩放 `(0.32, 0.32, 0.32)`。
+
+项目使用 `美术资产/Wyvern Dragon.unitypackage` 中的完整翼 FBX 和 32 条原始 Unity `.anim`。动画导入设置把片段绑定到原模型骨架，并应用该资产所需的根节点旋转校准。城堡实例和 Prefab 使用同一个 `Animations/Wyvern Actions.controller`，启动后循环播放 12 秒原版待机。
+
+在编辑状态下打开龙的 Animator 检查器，进入「Controller 预览」，选择 `Base Layer` 的动作后点「播放」。状态保留原始片段名称和循环设置，覆盖待机、咆哮、步行、转身、飞行、降落、攻击与死亡，其中七条是原包以 `_Root` 命名的步行或转身版本。城堡实例关闭了角色根运动，控制器以手动选取状态为主。
+
+六个龙身及虹膜 Lit 材质使用线性 ORM 贴图，R、G、B 分别是遮蔽、粗糙度和金属度。逐通道增益和偏移保留原 Shader Graph 的遮蔽和粗糙度变化，部分翼膜材质使用透射近似。显示效果仍受城堡灯光和曝光影响，原包的 HDRP 扩散表现、面部 BlendShape 和喷火粒子超出本轮接入范围。
+
+Windows Debug 使用实际主城堡场景离屏验证。32 个状态均能切换并驱动 529 根蒙皮骨骼，待机、咆哮、前行、飞行、水平喷火和死亡输出了六张不同姿态的图像。离屏工具输出报告和截图后以退出码 2170 结束。
+
+### 骑兵实时蒙皮压测
+
+`MedievalCastle.scene` 的 `Cavalry Stress` 默认在 Play 时创建 300 骑。复测千骑时，先在 Inspector 将 `RiderCount` 改为 1000。每骑运行时求值步态与骨骼矩阵，移动、阴影和换装走 GameSprout 的骨骼网格实例化路径。测试要求 Editor 与 GameLogic 使用同一套 ABI 12 SDK。
 
 `CavalryStress` 从 Warhorse Rig 读取模型校准角，每匹马由各自的移动方向驱动根节点。玩家运行中的 Mount Visual 转向不会传给骑兵。地形边界的视觉倾角平滑过渡，步态相位随实际位移推进。用 Game 窗口的 W、Shift + W、S 和右键镜头测试走、跑、倒退、转镜，松开移动键后验证回到 Idle。
 
@@ -34,6 +46,6 @@ HDR 全景与内院预览分别在 `Preview/MedievalCastleHDR.png` 和 `Preview/
 
 路线从谷地土路进入村庄，可继续走到远处的石拱门和塔楼。路面有车辙、碎石和不规则路肩，草丛、林带和石墙沿途分布。场景使用傍晚侧光、软阴影、距离雾和程序生成的云层。地形和建筑碰撞使用 GameSprout 的项目资源及 Runtime 接口。
 
-马匹、鞍具和步态来自 Horse Animset Pro，骑士装备来自 Knighthood。项目使用从 `美素资产` 导入的工作副本。马的混合蒙皮权重均为零，导入副本采用等效线性蒙皮。三条马匹步态已处理为原地动画，位移由 `HorseRider` 脚本和物理控制。骑士使用贴合马鞍的坐姿。
+马匹、鞍具和步态来自 Horse Animset Pro，骑士装备来自 Knighthood。项目使用从 `美术资产` 导入的工作副本。马的混合蒙皮权重均为零，导入副本采用等效线性蒙皮。三条马匹步态已处理为原地动画，位移由 `HorseRider` 脚本和物理控制。骑士使用贴合马鞍的坐姿。
 
 场景已写入 Assets，`Preview/ValleyRoad.png` 和 `Preview/ValleyRoadRide.png` 分别是起点和骑行途中画面。要重新组装，可在项目根目录运行 `python3 Tools/BuildTour.py Tools/TourAssets.json --replace`。该命令会重建场景、程序生成的环境资源和骑士材质，会覆盖这些文件上的手工修改。
