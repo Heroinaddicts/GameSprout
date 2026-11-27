@@ -304,7 +304,8 @@ void Renderer::Diagnostic(const std::string& error) {
 }
 void Renderer::PreparePackedSkinVertexStream(MeshGPU& mesh) {
     const auto& source=mesh.Data;
-    static_assert(MaxSkinBones<=256);
+    // Keep the imported UInt32x4 joint indices when the compact stream cannot represent them.
+    if(source.Bones.size()>std::size_t(std::numeric_limits<std::uint8_t>::max())+1)return;
     // Only the built-in stages use this stream. Their vertex indices stay
     // identical to the original mesh, picking data and imported topology.
     MeshGPU::SkinVertexStream stream;
@@ -358,8 +359,7 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
                 entry.Positions.reserve(entry.Data.VertexCount);
                 struct JointVertexBounds {Vector3 Minimum,Maximum;bool Used=false;};
                 std::vector<JointVertexBounds> jointVertices;
-                if(!entry.Data.Bones.empty()&&entry.Data.Bones.size()<=MaxSkinBones)
-                    jointVertices.resize(entry.Data.Bones.size());
+                jointVertices.resize(entry.Data.Bones.size());
                 for(std::uint32_t vertex=0;vertex<entry.Data.VertexCount;++vertex) {
                     const auto* bytes=entry.Data.Bytes.data()+std::uint64_t(vertex)*entry.Data.VertexStride+entry.Data.PositionOffset;
                     const Vector3 point{std::bit_cast<float>(Read32(bytes)),std::bit_cast<float>(Read32(bytes+4)),std::bit_cast<float>(Read32(bytes+8))};

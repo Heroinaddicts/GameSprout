@@ -59,7 +59,7 @@ ShadowClipBounds ProjectShadowBounds(const Bounds& bounds,const Mat4& projection
 bool Renderer::DrawShadow(GRHI::IRenderPass& pass,const ShadowBatch& batch,const Mat4& lightViewProjection,
     const InstanceStream& instances) {
     const auto& draw=*batch.Caster;
-    const bool instanced=batch.Count>1;
+    const bool instanced=batch.Count>1||RequiresSkinStorage(*draw.Object);
     const auto& data=draw.Mesh->Data;
     PipelineKey key;key.Shadow=true;key.Stride=data.VertexStride;key.Position=data.PositionOffset;
     key.DoubleSided=draw.DoubleSided;key.Negative=draw.Object->Negative;key.Instanced=instanced;
@@ -69,14 +69,7 @@ bool Renderer::DrawShadow(GRHI::IRenderPass& pass,const ShadowBatch& batch,const
     static_assert(sizeof(ShadowDrawUniform)==128,"Shadow draw matrices must match HLSL layout");
     const ShadowDrawUniform uniform{instanced?Mat4{}:draw.Object->Model,lightViewProjection};
     pass.SetPipeline(pipeline);pass.SetVertexBuffer(0,vertices,0);
-    if(instanced) {
-        pass.SetVertexBuffer(1,instances.Buffer,batch.IndexOffset*sizeof(std::uint32_t));
-        pass.SetVertexStorageBuffer(0,_InstanceTransformsBuffer);
-        if(draw.Object->Skinned) {
-            pass.SetVertexStorageBuffer(1,_SkinPaletteOffsetsBuffer);
-            pass.SetVertexStorageBuffer(2,_SkinPaletteBuffer);
-        }
-    }
+    if(instanced)BindResidentInstances(pass,*draw.Object,instances,batch.IndexOffset,batch.Count);
     auto* skinIndices=draw.Object->Skinned?draw.Mesh->SkinDepthIndices.get():nullptr;
     pass.SetIndexBuffer(skinIndices?skinIndices:draw.Mesh->Buffer,GRHI::IndexFormat::UInt32,
         skinIndices?0:static_cast<std::size_t>(data.IndexOffset));

@@ -47,6 +47,7 @@ private:
     void InvalidateLocalMatrix();
     void NotifyAuthoringChange();
     const Mat4& ResolveBuiltinWorldMatrix() const;
+    const Mat4& ResolveWorldFromParent(const Mat4& world,std::uint64_t parentChange,std::uint64_t epoch) const;
     GameObjectState* _OwnerState=nullptr;
     mutable bool _LocalMatrixKnown=false;
     mutable Mat4 _LocalMatrixCache,_WorldMatrixCache;
@@ -72,5 +73,6 @@ private:
     std::uint64_t _AuthoringRevision=0;
     friend class Runtime;
     friend class Scene;
+    friend class Renderer;
 };
 }

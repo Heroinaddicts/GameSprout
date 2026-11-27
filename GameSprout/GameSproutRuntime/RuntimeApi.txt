@@ -209,7 +209,8 @@ IMeshRendererComponent 和 ISkinnedMeshRendererComponent 提供 GetShadowCasting
 动画和装备沿用现有 Mesh、MeshRenderer、SkinnedMeshRenderer 和 Animator。模型导入后可直接播放 Clip 或 Controller，并用 SetAnimatorObjectID 将共用骨架的装备绑定到同一个 Animator。
 运行中通过 IMeshComponent::SetMesh 和 IMeshRendererComponent::SetMaterials 更换装备网格与材质。各网格按自己的骨骼顺序和逆绑定矩阵求值。
 内置不透明颜色和实时阴影分别对兼容的网格分段做实例化。每个实例读取独立的姿态；材质的 EnableGPUInstancing 或视口的 RenderView::EnableGPUInstancing 可关闭该路径。
-自定义动画求值器可用 ISkinnedMeshRendererComponent::SetSkinPose 写入网格局部空间的骨骼矩阵。数据按 Mesh 骨骼顺序排列，需包含逆绑定矩阵，最多 128 根骨骼，传空值恢复 Animator 绑定。Runtime 拷贝矩阵并仅在运行期间保留。
+自定义动画求值器可用 ISkinnedMeshRendererComponent::SetSkinPose 写入网格局部空间的骨骼矩阵。数据按 Mesh 骨骼顺序排列，需包含逆绑定矩阵，矩阵数须匹配网格骨骼数。传空值恢复 Animator 绑定。Runtime 拷贝矩阵并仅在运行期间保留。
+128 根骨骼是内置单实例蒙皮 Uniform 的容量。超出时内置颜色和实时阴影使用顶点存储缓冲读取姿态，关闭实例合批时也支持这条路径。容量取决于网格数据和缓冲区限制。
 RenderStatistics 的 SkinnedInstancedDrawCalls 和 SkinnedInstancedInstances 统计颜色通道中的蒙皮合批与实例数。InstanceSkinPaletteUploadBytes 统计本帧骨骼矩阵和寻址数据的上传字节数。
 
 宿主控制阴影复用

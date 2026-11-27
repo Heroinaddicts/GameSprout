@@ -69,6 +69,9 @@ private:
         std::vector<SkinVertex> Skin;
         std::vector<SkinInfluenceBounds> JointBounds;
         double MinimumSkinWeightSum=1.0,MaximumSkinWeightSum=1.0;
+        bool HasCompleteSkinBindings() const {
+            return !Data.Bones.empty()&&Data.BoneIndicesOffset>=0&&Data.BoneWeightsOffset>=0&&Skin.size()==Positions.size();
+        }
         std::vector<std::uint32_t> Indices;
         GRHI::IBuffer* Buffer=nullptr;
         GRHI::IBuffer* ShaderVertexBuffer=nullptr; // Canonical P/N/C/UV, only allocated for user shaders.
@@ -191,6 +194,12 @@ private:
         std::uint64_t OverrideRevision=0;
         SkinnedMeshRendererComponent* SnapshotSkin=nullptr;
         MeshComponent* SnapshotMesh=nullptr;
+    };
+    struct PreparedSkinBounds {
+        Bounds Local;
+        std::optional<RenderFrustum::Box> World;
+        bool NeedsExactFallback=false;
+        bool Outside=false;
     };
     struct DrawUniform {Mat4 Model,ViewProjection,Normal;Color BaseColor;Vector4 TextureST{1,1,0,0};};
     struct FrameUniform {Vector4 Time,CameraPosition,MainLightDirection,MainLightColor;};
@@ -337,6 +346,9 @@ private:
     bool UploadResidentInstances(GRHI::ICommandBuffer&);
     bool UploadSkinPalettes(GRHI::ICommandBuffer&);
     bool UploadInstanceStream(GRHI::ICommandBuffer&,InstanceStream&);
+    bool PrepareSingleInstanceIndices();
+    void BindResidentInstances(GRHI::IRenderPass&,const DrawObject&,const InstanceStream&,
+        std::size_t indexOffset,std::uint32_t instanceCount) const;
     bool PrepareColorInstances(GRHI::ICommandBuffer&,const RenderView&);
     bool ExtractPlanarObjects(const RenderView&,const Renderer& source);
     bool RenderPlanarReflection(GRHI::ICommandBuffer&,const RenderView&,std::uint32_t width,std::uint32_t height,
@@ -364,9 +376,12 @@ private:
     LitUniform MakeLitUniform(const RenderView&,const PreparedDraw&,const std::vector<DirectionalLight>&);
     RenderFrustum::Box LocalLightObjectBounds(const DrawObject&,const MeshGPU&) const;
     bool RenderSpotShadows(GRHI::ICommandBuffer&,const RenderView&,const Mat4& viewProjection);
-    // Keep this limit equal to Preview.hlsl. Uniform data is per object, never shared with the Mesh.
-    static constexpr std::size_t MaxSkinBones = 128;
-    struct SkinUniform { Mat4 Bones[MaxSkinBones]; };
+    // Keep this uniform layout equal to Preview.hlsl. Larger skins use vertex storage.
+    static constexpr std::size_t SkinUniformBoneCount=128;
+    struct SkinUniform { Mat4 Bones[SkinUniformBoneCount]; };
+    static bool RequiresSkinStorage(const DrawObject& object) {
+        return object.SkinMatrices.size()>SkinUniformBoneCount;
+    }
     struct DebugVertex {Vector3 Position;Color Tint;};
     struct DebugBatch {std::vector<DebugVertex> Vertices;bool Triangles=false,DepthTest=false;};
     struct UIBatch {
@@ -400,6 +415,12 @@ private:
     bool RefreshSceneBindings(const Scene& scene);
     void PrepareDraws(const RenderView&,const Mat4& viewProjection);
     void RefreshSkinPoses(const Scene& scene,const RenderFrustum::Frustum& frustum);
+    void RefreshSkinPose(SkinnedDrawState& skin,const Scene& scene,bool matchingScene,const RenderFrustum::Frustum& frustum);
+    void ApplySkinPose(SkinnedDrawState& skin,MeshComponent* component,SkinnedMeshRendererComponent* overrideSkin,
+        std::optional<std::span<const Mat4>> palette,const RenderFrustum::Frustum& frustum,const PreparedSkinBounds* prepared=nullptr);
+    static bool IsSameSkinPose(const DrawObject& object,const SkinnedDrawState& skin,std::span<const Mat4> palette,
+        const SkinnedMeshRendererComponent* overrideSkin);
+    static bool HasCachedSkinBounds(const MeshGPU& mesh,const SkinnedMeshRendererComponent* overrideSkin);
     MeshGPU* Mesh(const ResourceReference& reference);
     ColliderMeshWire* ColliderMesh(IColliderComponent& collider,const ResourceReference& reference,bool convex,const Mat4& relative);
     TextureGPU* Texture(const ResourceReference& reference,bool* pending=nullptr);
@@ -442,6 +463,7 @@ private:
         std::vector<Mat4>& scratch,SkinnedMeshRendererComponent** overrideSkin=nullptr,
         SkinnedMeshRendererComponent* snapshotSkin=nullptr);
     bool SkinPoseBounds(const MeshGPU& mesh,std::span<const Mat4> matrices,Bounds& bounds);
+    static bool TryConservativeSkinPoseBounds(const MeshGPU& mesh,std::span<const Mat4> matrices,Bounds& bounds) noexcept;
     bool PosedPositions(IGameObject& object,const MeshGPU& mesh,std::vector<Vector3>& positions);
     bool PosedPositions(const MeshGPU& mesh,std::span<const Mat4> matrices,std::vector<Vector3>& positions);
     void SyncRevision();
@@ -550,6 +572,7 @@ private:
     std::size_t _SpotShadowCount=0;
     bool _SpotShadowValid=false,_SpotShadowRecorded=false,_SpotShadowHasSkinned=false;
     GRHI::IBuffer* _InstanceTransformsBuffer=nullptr;
+    GRHI::IBuffer* _SingleInstanceIndicesBuffer=nullptr;
     GRHI::IBuffer* _SkinPaletteOffsetsBuffer=nullptr;
     GRHI::IBuffer* _SkinPaletteBuffer=nullptr;
     std::vector<std::uint32_t> _SkinPaletteOffsets;
@@ -557,8 +580,15 @@ private:
         float Row0[4],Row1[4],Row2[4];
     };
     static_assert(sizeof(InstanceBoneMatrix)==48);
+    static void PackSkinMatrices(const Mat4* source,InstanceBoneMatrix* destination,std::uint32_t count) noexcept;
+    struct SkinPalettePackRange {
+        std::size_t ObjectIndex;
+        std::uint32_t Begin,Count;
+    };
+    std::vector<SkinPalettePackRange> _SkinPalettePackRanges;
     std::vector<InstanceBoneMatrix> _SkinPaletteMatrices;
     bool _SkinPaletteLayoutDirty=true;
+    bool _HasStorageSkin=false;
     std::vector<InstanceVertex> _InstanceTransforms;
     std::vector<std::uint32_t> _ChangedInstanceTransforms;
     std::vector<InstanceDraw> _ColorInstanceDraws;

@@ -1,7 +1,9 @@
 #include "RuntimeRenderer.h"
+#include "GameSproutRuntime.h"
 #include "../../Tools/FrameTiming.h"
 #include <algorithm>
 #include <limits>
+#include <numeric>
 
 namespace GameSproutRuntime {
 void Renderer::RefreshDrawSortRanks() {
@@ -89,6 +91,8 @@ void Renderer::InvalidateInstanceUploads() {
 void Renderer::ClearInstanceBuffers() {
     delete _InstanceTransformsBuffer;
     _InstanceTransformsBuffer=nullptr;
+    delete _SingleInstanceIndicesBuffer;
+    _SingleInstanceIndicesBuffer=nullptr;
     delete _SkinPaletteOffsetsBuffer;
     delete _SkinPaletteBuffer;
     _SkinPaletteOffsetsBuffer=nullptr;
@@ -192,6 +196,45 @@ bool Renderer::UploadInstanceStream(GRHI::ICommandBuffer& command,InstanceStream
     return true;
 }
 
+bool Renderer::PrepareSingleInstanceIndices() {
+    const auto count=_SceneObjects.size();
+    const std::uint64_t capacity=_SingleInstanceIndicesBuffer?_SingleInstanceIndicesBuffer->GetSize()/sizeof(std::uint32_t):0;
+    if(count<=capacity)return true;
+    constexpr std::uint64_t maximum=std::numeric_limits<std::uint32_t>::max()/sizeof(std::uint32_t);
+    if(count>maximum)return Fail("Scene exceeds the resident instance index buffer limit");
+    const auto grownCapacity=std::max<std::uint64_t>(count,std::min(maximum,capacity+capacity/2));
+    std::vector<std::uint32_t> indices(static_cast<std::size_t>(grownCapacity));
+    std::iota(indices.begin(),indices.end(),std::uint32_t{0});
+    const auto bytes=indices.size()*sizeof(std::uint32_t);
+    // These indices are immutable and initialized independently of the frame command.
+    const GRHI::BufferInitialData initial{indices.data(),bytes};
+    auto* buffer=_Device.CreateBuffer({bytes,GRHI::BufferUsage::Vertex,false},&initial);
+    if(!buffer)return Fail(DeviceError("Allocate single instance index buffer"));
+    delete _SingleInstanceIndicesBuffer;
+    _SingleInstanceIndicesBuffer=buffer;
+    return true;
+}
+
+void Renderer::BindResidentInstances(GRHI::IRenderPass& pass,const DrawObject& object,
+    const InstanceStream& stream,std::size_t indexOffset,std::uint32_t instanceCount) const {
+    if(instanceCount>1)pass.SetVertexBuffer(1,stream.Buffer,indexOffset*sizeof(std::uint32_t));
+    else pass.SetVertexBuffer(1,_SingleInstanceIndicesBuffer,object.InstanceIndex*sizeof(std::uint32_t));
+    pass.SetVertexStorageBuffer(0,_InstanceTransformsBuffer);
+    if(object.Skinned) {
+        pass.SetVertexStorageBuffer(1,_SkinPaletteOffsetsBuffer);
+        pass.SetVertexStorageBuffer(2,_SkinPaletteBuffer);
+    }
+}
+
+void Renderer::PackSkinMatrices(const Mat4* source,InstanceBoneMatrix* destination,std::uint32_t count) noexcept {
+    // Instanced skinning uses xyz of the transformed position and the
+    // linear part for normals. Preserve all of those coefficients.
+    for(std::uint32_t i=0;i<count;++i) {
+        const auto& m=source[i].Data;
+        destination[i]={{m[0],m[4],m[8],m[12]},{m[1],m[5],m[9],m[13]},{m[2],m[6],m[10],m[14]}};
+    }
+}
+
 bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
     GAMESPROUT_FRAME_SCOPE(Runtime, "render/skin_palette_upload");
     if(_SkinnedDraws.empty())return true;
@@ -224,25 +267,59 @@ bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
     bool fullUpload=layoutChanged;
     auto* objects=_SceneObjects.data();
     const auto* offsets=_SkinPaletteOffsets.data();
+    auto* packed=_SkinPaletteMatrices.data();
+    constexpr std::size_t minimumParallelMatrices=8192;
+    auto& workers=_Runtime.GetRenderWorkers();
+    const bool collectRanges=_SkinPaletteMatrices.size()>=minimumParallelMatrices&&workers.WorkerCount()!=0;
+    auto& ranges=_SkinPalettePackRanges;
+    std::size_t dirtyMatrixCount=0;
+    if(collectRanges) {
+        ranges.clear();
+        ranges.reserve(_SkinnedDraws.size());
+    }
+    const auto finishRange=[&](DrawObject& object,std::uint32_t begin,std::uint32_t count) {
+        object.SkinUploadDirty=false;
+        if(fullUpload)return;
+        const auto end=begin+count;
+        if(spanCount&&spans[spanCount-1].End==begin)spans[spanCount-1].End=end;
+        else if(spanCount==maxSpans)fullUpload=true;
+        else spans[spanCount++]={begin,end};
+    };
     for(const auto& skinned:_SkinnedDraws) {
         auto& object=objects[skinned.ObjectIndex];
         if(!object.SkinPoseReady||(!layoutChanged&&!object.SkinUploadDirty))continue;
         const auto begin=offsets[object.InstanceIndex];
         const auto count=static_cast<std::uint32_t>(object.SkinMatrices.size());
-        const auto end=begin+count;
-        // Instanced skinning uses xyz of the transformed position and the
-        // linear part for normals. Preserve all of those coefficients.
-        auto* packed=_SkinPaletteMatrices.data()+begin;
-        const auto* matrices=object.SkinMatrices.data();
-        for(std::uint32_t i=0;i<count;++i) {
-            const auto& m=matrices[i].Data;
-            packed[i]={{m[0],m[4],m[8],m[12]},{m[1],m[5],m[9],m[13]},{m[2],m[6],m[10],m[14]}};
+        if(collectRanges) {
+            ranges.push_back({skinned.ObjectIndex,begin,count});
+            dirtyMatrixCount+=count;
+        } else {
+            PackSkinMatrices(object.SkinMatrices.data(),packed+begin,count);
+            finishRange(object,begin,count);
         }
-        object.SkinUploadDirty=false;
-        if(fullUpload)continue;
-        if(spanCount&&spans[spanCount-1].End==begin)spans[spanCount-1].End=end;
-        else if(spanCount==maxSpans)fullUpload=true;
-        else spans[spanCount++]={begin,end};
+    }
+    if(collectRanges&&!ranges.empty()) {
+        struct PackWork {
+            const SkinPalettePackRange* Ranges;
+            const DrawObject* Objects;
+            InstanceBoneMatrix* Destination;
+        } work{ranges.data(),objects,packed};
+        const auto packRanges=[](void* context,std::size_t begin,std::size_t end) noexcept {
+            const auto& batch=*static_cast<const PackWork*>(context);
+            for(auto i=begin;i<end;++i) {
+                const auto& range=batch.Ranges[i];
+                PackSkinMatrices(batch.Objects[range.ObjectIndex].SkinMatrices.data(),batch.Destination+range.Begin,range.Count);
+            }
+        };
+        // Layout gives each drawable its own range. The worker batch joins
+        // before touching dirty flags, upload spans, or the graphics device.
+        if(dirtyMatrixCount>=minimumParallelMatrices) {
+            GAMESPROUT_FRAME_COUNT(Runtime, "render/skin_palette_worker_jobs", dirtyMatrixCount);
+            GAMESPROUT_FRAME_SCOPE(Runtime, "render/skin_palette_worker_batch");
+            workers.RunBlocks(ranges.size(),&work,packRanges);
+        } else packRanges(&work,0,ranges.size());
+        for(const auto& range:ranges)finishRange(objects[range.ObjectIndex],range.Begin,range.Count);
+        ranges.clear();
     }
     if(!fullUpload&&!spanCount)return true;
     // Repack and retry the full palette if this upload cannot be recorded.
@@ -275,8 +352,10 @@ bool Renderer::PrepareColorInstances(GRHI::ICommandBuffer& command,const RenderV
         _ColorInstanceBatchesKnown=true;
         _ColorInstancingEnabled=view.EnableGPUInstancing;
     }
-    if(view.EnableGPUInstancing)
-        return UploadResidentInstances(command)&&UploadSkinPalettes(command)&&UploadInstanceStream(command,_ColorInstances);
+    if(_HasStorageSkin&&!PrepareSingleInstanceIndices())return false;
+    if(view.EnableGPUInstancing||_HasStorageSkin)
+        return UploadResidentInstances(command)&&UploadSkinPalettes(command)&&
+            (!view.EnableGPUInstancing||UploadInstanceStream(command,_ColorInstances));
     if(!_ChangedInstanceTransforms.empty()) {
         _InstanceTransformsDirty=true;
         _ChangedInstanceTransforms.clear();

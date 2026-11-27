@@ -1,5 +1,6 @@
 #include "RuntimeRenderer.h"
 #include "Components/MeshRendererComponent.h"
+#include "Components/TransformComponent.h"
 #include "GameObject.h"
 #include "GameSproutRuntime.h"
 #include "RuntimeRenderResourceCache.h"
@@ -25,7 +26,7 @@ void Renderer::SetDrawTransform(DrawObject& object,const RenderObjectTransform& 
 
 bool Renderer::UpdateDrawTransform(DrawObject& draw,const Mat4& model,const RenderFrustum::Frustum& frustum) {
     if(!std::memcmp(draw.Model.Data,model.Data,sizeof(model.Data)))return true;
-    return UpdateDrawTransform(draw,RenderObjectTransform::FromModel(model),frustum);
+    return UpdateDrawTransform(draw,RenderObjectTransform::FromModel(model,draw.Model,draw.Normal,draw.Negative),frustum);
 }
 
 bool Renderer::UpdateDrawTransform(DrawObject& draw,const RenderObjectTransform& transform,const RenderFrustum::Frustum& frustum) {
@@ -133,6 +134,8 @@ bool Renderer::UpdateSceneObjects(const Scene& scene,const std::vector<RenderObj
                     if(!shared)shared=scene.BindRenderObjectTransform(*node);
                     else if(shared->Revision!=scene.GetRenderRevision()&&!scene.RefreshRenderObjectTransform(*shared,*node))return false;
                     if(!shared||!UpdateDrawTransform(draw,shared->Value,preparedFrustum))return false;
+                } else if(const auto* transform=node->BuiltinTransform;transform&&!_Runtime.HasPresentationOverrides()) {
+                    if(!UpdateDrawTransform(draw,transform->ResolveBuiltinWorldMatrix(),preparedFrustum))return false;
                 } else if(!UpdateDrawTransform(draw,node->Object->GetTransform()->GetPresentationWorldMatrix(),preparedFrustum))return false;
             }
             for(auto* child=branch->FirstChild;child;child=child->NextSibling)

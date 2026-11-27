@@ -17,6 +17,8 @@ struct RenderObjectTransform {
     bool Negative=false;
 
     static RenderObjectTransform FromModel(const Mat4& model);
+    static RenderObjectTransform FromModel(const Mat4& model,const Mat4& previousModel,const Mat4& previousNormal,
+        bool previousNegative);
 };
 struct CachedRenderObjectTransform {
     RenderObjectTransform Value;

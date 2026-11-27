@@ -7,8 +7,32 @@
 #include <limits>
 #include <optional>
 #include <vector>
+#if defined(_WIN32) && (defined(_M_X64) || defined(__SSE2__))
+#include <emmintrin.h>
+#endif
 
 namespace {
+GameSproutRuntime::Mat4 MultiplyWorldMatrix(const GameSproutRuntime::Mat4& parent,
+    const GameSproutRuntime::Mat4& local) {
+#if defined(_WIN32) && (defined(_M_X64) || defined(__SSE2__))
+    const auto parentX=_mm_loadu_ps(parent.Data);
+    const auto parentY=_mm_loadu_ps(parent.Data+4);
+    const auto parentZ=_mm_loadu_ps(parent.Data+8);
+    const auto parentW=_mm_loadu_ps(parent.Data+12);
+    GameSproutRuntime::Mat4 world;
+    for(std::size_t i=0;i<16;i+=4) {
+        auto column=_mm_add_ps(_mm_setzero_ps(),_mm_mul_ps(parentX,_mm_set1_ps(local.Data[i])));
+        column=_mm_add_ps(column,_mm_mul_ps(parentY,_mm_set1_ps(local.Data[i+1])));
+        column=_mm_add_ps(column,_mm_mul_ps(parentZ,_mm_set1_ps(local.Data[i+2])));
+        column=_mm_add_ps(column,_mm_mul_ps(parentW,_mm_set1_ps(local.Data[i+3])));
+        _mm_storeu_ps(world.Data+i,column);
+    }
+    return world;
+#else
+    return parent*local;
+#endif
+}
+
 bool UnitRotation(GameSproutRuntime::Quaternion value,GameSproutRuntime::Quaternion& unit) {
     const double squared=double(value.X)*value.X+double(value.Y)*value.Y+double(value.Z)*value.Z+double(value.W)*value.W;
     // Float单位四元数本身有舍入误差。保留此范围内的分量，使getter值写回/撤销恢复精确幂等。
@@ -151,6 +175,10 @@ Mat4 TransformComponent::GetWorldMatrix() const {
 const Mat4& TransformComponent::ResolveBuiltinWorldMatrix() const {
     const auto epoch=_OwnerState->Owner.GetTransformEpoch();
     if(_WorldMatrixEpoch==epoch)return _WorldMatrixCache;
+    if(const auto* parent=_OwnerState->Parent) {
+        if(const auto* transform=parent->BuiltinTransform;transform&&transform->_WorldMatrixEpoch==epoch)
+            return ResolveWorldFromParent(transform->_WorldMatrixCache,transform->_WorldMatrixChangeEpoch,epoch);
+    } else return ResolveWorldFromParent(Mat4{},0,epoch);
     // A new epoch asks for verification. Only a local change or a changed
     // parent matrix requires recomputing the cached result.
     std::array<const TransformComponent*,16> chain;
@@ -183,15 +211,18 @@ const Mat4& TransformComponent::ResolveBuiltinWorldMatrix() const {
     while(count>0) {
         --count;
         const auto* item=count<chain.size()?chain[count]:(*deepChain)[count-chain.size()];
-        if(!item->_WorldMatrixChangeEpoch||item->_ParentMatrixChangeEpoch!=parentChange) {
-            item->_WorldMatrixCache=world*item->GetLocalMatrix();
-            item->_WorldMatrixChangeEpoch=epoch;
-            item->_ParentMatrixChangeEpoch=parentChange;
-        }
-        item->_WorldMatrixEpoch=epoch;
-        world=item->_WorldMatrixCache;
+        world=item->ResolveWorldFromParent(world,parentChange,epoch);
         parentChange=item->_WorldMatrixChangeEpoch;
     }
+    return _WorldMatrixCache;
+}
+const Mat4& TransformComponent::ResolveWorldFromParent(const Mat4& world,std::uint64_t parentChange,std::uint64_t epoch) const {
+    if(!_WorldMatrixChangeEpoch||_ParentMatrixChangeEpoch!=parentChange) {
+        _WorldMatrixCache=MultiplyWorldMatrix(world,GetLocalMatrix());
+        _WorldMatrixChangeEpoch=epoch;
+        _ParentMatrixChangeEpoch=parentChange;
+    }
+    _WorldMatrixEpoch=epoch;
     return _WorldMatrixCache;
 }
 Mat4 TransformComponent::GetPresentationWorldMatrix() const {

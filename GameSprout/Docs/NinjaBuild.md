@@ -72,6 +72,14 @@ tracy-csvexport mountandblade.tracy
 
 实时查询可用同版本的 Tracy MCP 服务。运行 `live_connect` 时指定 `127.0.0.1:8086`，用 `eval` 查询帧、区间及计数，用 `save_trace` 保存追踪。MCP、Tracy 界面和 `tracy-capture` 一次只能有一个连接到同一进程。MCP 的 Python 依赖独立于 GameSprout。参见 [Tracy MCP 构建和运行说明](https://raw.githubusercontent.com/wolfpld/tracy/v0.15.0/manual/tracy.tex#L2712)。
 
+### Runtime 蒙皮并行
+
+蒙皮并行由 Runtime 内部按工作量调度。GameLogic 沿用现有的姿态提交接口。Windows 在报告至少 8 个逻辑处理器时默认启用 4 个后台线程，其余环境默认串行。性能对照可在启动 Editor 或 Player 前设置环境变量 `GAMESPROUT_SKIN_BOUNDS_WORKERS`，`0` 强制串行，`2` 和 `4` 分别启用对应数量的后台线程。
+
+大批次支持已缓存的内置蒙皮包围盒与视锥计算，以及待上传蒙皮矩阵的打包。资源查询、结果应用、诊断、上传范围和 GPU 提交由渲染调用线程处理。
+
+比较三种模式时使用相同构建、场景和机位，并分别启动进程。用 `render/skin_bounds_worker_jobs` 和 `render/skin_palette_worker_jobs` 核对实际工作量，比较蒙皮阶段、整帧耗时及实际出屏间隔。
+
 ## 工程范围
 
 GameSproutEditor 已经统一构建其 Module 和 View 插件，日常构建 Editor 时无需再单独重复构建 Module、View。它们的预设保留给独立插件开发使用。

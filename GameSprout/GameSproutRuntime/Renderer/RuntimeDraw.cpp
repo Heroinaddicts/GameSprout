@@ -11,7 +11,8 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
     PipelineKey key;key.Format=format;key.Stride=data.VertexStride;key.Position=data.PositionOffset;key.Normal=data.NormalOffset;
     key.Color=draw.Object->Skinned&&!draw.Mesh->SkinHasNonWhiteVertexColor?-1:data.ColorOffset;
     key.UV=data.UVOffset;key.DoubleSided=draw.Material->DoubleSided;key.Negative=draw.Object->Negative;
-    key.Lit=draw.Material->ShadingModel==MaterialShadingModel::Lit;key.Instanced=instanceCount>1;
+    key.Lit=draw.Material->ShadingModel==MaterialShadingModel::Lit;
+    key.Instanced=instanceCount>1||RequiresSkinStorage(*draw.Object);
     const bool skyReflection=key.Lit&&draw.Material->EnvironmentReflections&&reflections;
     key.SpatialLighting=key.Lit&&(draw.ReflectionProbeIndex||UsesPlanarReflection(draw)||UsesIndirectLighting(draw));
     key.EnvironmentReflections=skyReflection&&!key.SpatialLighting;
@@ -21,14 +22,7 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
     if(!key.Instanced){uniform.Model=draw.Object->Model;uniform.Normal=draw.Object->Normal;}
     uniform.BaseColor=draw.Material->BaseColor;uniform.TextureST=draw.Material->BaseColorTextureST;
     pass.SetPipeline(pipeline);pass.SetVertexBuffer(0,vertices,0);
-    if(key.Instanced) {
-        pass.SetVertexBuffer(1,_ColorInstances.Buffer,firstInstance*sizeof(std::uint32_t));
-        pass.SetVertexStorageBuffer(0,_InstanceTransformsBuffer);
-        if(draw.Object->Skinned) {
-            pass.SetVertexStorageBuffer(1,_SkinPaletteOffsetsBuffer);
-            pass.SetVertexStorageBuffer(2,_SkinPaletteBuffer);
-        }
-    }
+    if(key.Instanced)BindResidentInstances(pass,*draw.Object,_ColorInstances,firstInstance,instanceCount);
     auto* skinIndices=draw.Object->Skinned?draw.Mesh->SkinColorIndices.get():nullptr;
     if(draw.Object->Skinned&&!draw.Transparent&&draw.Mesh->SkinOrderedColorIndices)
         skinIndices=draw.Mesh->SkinOrderedColorIndices.get();

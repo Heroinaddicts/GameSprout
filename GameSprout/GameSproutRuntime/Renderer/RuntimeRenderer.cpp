@@ -141,8 +141,8 @@ bool Renderer::Render(const RenderView& view) {
                 if(!RenderPlanarReflection(*command.Command,view,width,height,environment,sky,reflections))return false;
             }
             EndTexturePrefetchFrame();
-            for(auto* buffer:{_InstanceTransformsBuffer,_SkinPaletteOffsetsBuffer,_SkinPaletteBuffer,_ColorInstances.Buffer,_StaticShadowInstances.Buffer,
-                _DynamicShadowInstances.Buffer,_SpotShadowInstances.Buffer})
+            for(auto* buffer:{_InstanceTransformsBuffer,_SingleInstanceIndicesBuffer,_SkinPaletteOffsetsBuffer,_SkinPaletteBuffer,
+                _ColorInstances.Buffer,_StaticShadowInstances.Buffer,_DynamicShadowInstances.Buffer,_SpotShadowInstances.Buffer})
                 if(buffer)_Statistics.ResidentInstanceBytes+=buffer->GetSize();
         }
         if(view.DrawUI&&!PrepareUI(*view.Scene,width,height,view.UIPreviewObjectID,view.UIScreenPreviewLayoutSize))return false;

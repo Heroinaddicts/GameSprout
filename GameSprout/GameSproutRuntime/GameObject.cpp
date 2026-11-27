@@ -121,7 +121,8 @@ IComponent* GameObjectState::GetComponent(const std::type_info& type) const {
     const bool collider=type==typeid(IColliderComponent);
     for(std::size_t i=0;i<count;++i) {
         const auto& component=entries[i];
-        if (component.Pointer->GetComponentType()==type ||
+        const auto& interfaceType=component.BuiltinType?*component.BuiltinType:component.Pointer->GetComponentType();
+        if (interfaceType==type ||
             (collider && dynamic_cast<IColliderComponent*>(component.Pointer))) return component.Pointer;
     }
     if(const auto* registration=Owner.FindScriptType(type))
@@ -175,6 +176,7 @@ IComponent* GameObjectState::AddComponent(const std::type_info& type) {
         Components.push_back({component,++NextComponentSerial,false});
         registered=true;
         Components.back().TickMask=tickMask;
+        Components.back().BuiltinType=&component->GetComponentType();
         Owner.RegisterComponentTick(ID,tickMask);
         Owner.RegisterAnimationComponent(ID,component);
         const auto serial=NextComponentSerial;
@@ -260,7 +262,8 @@ void NotifyRuntimePropertiesChanged(IGameObject* owner,bool notifyObservers) {
             // Let each viewport refresh only the affected scene data.
             state.SceneOwner->InvalidateRenderSnapshot(state.ID);
             if (FindUIScreenCanvasRoot(*owner)) state.SceneOwner->InvalidateUI();
-            if(notifyObservers)state.Owner.MarkObjectPropertiesChanged(state.ID,RuntimePropertyChange::TransformPose);
+            if(notifyObservers&&state.HasPropertyObservers)
+                state.Owner.MarkObjectPropertiesChanged(state.ID,RuntimePropertyChange::TransformPose);
         }
     }
 }

@@ -14,7 +14,8 @@ public:
         bool InitializationQueued = false;
         bool InitializationFailed = false;
         std::uint8_t TickMask = Runtime::AllTicks; // Unknown/custom implementations retain every hook.
-
+        // Only the native built-in factory supplies a fixed interface type.
+        const std::type_info* BuiltinType = nullptr;
     };
     GameObjectState(Runtime& owner, IGameObject* object, Scene* scene, std::string name, std::uint64_t id);
     ~GameObjectState();
@@ -61,6 +62,7 @@ public:
     bool PendingAttach = false;
     bool Destroying = false;
     bool Initializing = true;
+    bool HasPropertyObservers = false;
 };
 
 class ObjectAccess {

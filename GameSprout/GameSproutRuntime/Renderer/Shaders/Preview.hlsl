@@ -109,7 +109,7 @@ MeshOutput InstancedMeshNoUVNoColorVertex(MeshNoUVNoColorInput input, [[vk::loca
     return TransformInstanceVertex(input.Position, input.Normal, float4(1, 1, 1, 1), float2(0, 0), slot);
 }
 
-// Same 128-matrix limit as Renderer::MaxSkinBones. b0 remains the ordinary draw uniform.
+// Matches Renderer::SkinUniformBoneCount. Larger palettes use storage buffers.
 cbuffer SkinUniform : register(b1, space1)
 {
     column_major float4x4 SkinBones[128];

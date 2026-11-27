@@ -2,6 +2,7 @@
 #include "Api/GameSproutRuntimeApi.h"
 #include "Api/RuntimePropertyObserver.h"
 #include "Animation/AnimationResources.h"
+#include "Renderer/RuntimeRenderWorkers.h"
 #include "GRHIApi.h"
 #include <deque>
 #include <chrono>
@@ -412,6 +413,8 @@ private:
     RuntimePhysicsSystem* _PhysicsSystem=nullptr;
     ScriptComponent* _InvokingScript=nullptr;
     std::string _LastPhysicsError;
+    RuntimeRenderWorkers& GetRenderWorkers() noexcept {return _RenderWorkers;}
+    RuntimeRenderWorkers _RenderWorkers;
 };
 
 // 所有回调与树/组件遍历共用一个屏障。退出最外层后再执行结构命令。

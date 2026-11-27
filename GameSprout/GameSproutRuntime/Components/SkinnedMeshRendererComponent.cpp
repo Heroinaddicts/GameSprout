@@ -5,11 +5,33 @@
 #include "Scene.h"
 #include <algorithm>
 #include <cstring>
+#if defined(__SSE2__) || defined(_M_X64)
+#include <emmintrin.h>
+#endif
 namespace GameSproutRuntime {
 namespace {
 GameObjectState* OwnerState(IGameObject* owner) {
     const auto* access=dynamic_cast<const ObjectAccess*>(owner);
     return access?&access->State():nullptr;
+}
+bool IsFiniteSkinPose(std::span<const Mat4> matrices) {
+#if defined(__SSE2__) || defined(_M_X64)
+    const auto exponent=_mm_set1_epi32(0x7f800000);
+    for(const auto& matrix:matrices) {
+        const auto* values=matrix.Data;
+        const auto badExponent=[&](std::size_t offset) {
+            const auto bits=_mm_castps_si128(_mm_loadu_ps(values+offset));
+            return _mm_cmpeq_epi32(_mm_and_si128(bits,exponent),exponent);
+        };
+        const auto invalid=_mm_or_si128(_mm_or_si128(badExponent(0),badExponent(4)),
+            _mm_or_si128(badExponent(8),badExponent(12)));
+        if(_mm_movemask_epi8(invalid))return false;
+    }
+    return true;
+#else
+    return std::all_of(matrices.begin(),matrices.end(),
+        [](const Mat4& matrix){return RuntimeMath::IsFinite(matrix);});
+#endif
 }
 }
 SkinnedMeshRendererComponent::SkinnedMeshRendererComponent(IGameObject* object)
@@ -25,11 +47,10 @@ bool SkinnedMeshRendererComponent::SetAnimatorObjectID(std::uint64_t id){
     return true;
 }
 bool SkinnedMeshRendererComponent::SetSkinPose(std::span<const Mat4> matrices) {
-    if(matrices.size()>128||!_OwnerState||!_OwnerState->Owner.IsUsable(_OwnerState))return false;
+    if(!_OwnerState||!_OwnerState->Owner.IsUsable(_OwnerState)||matrices.size()>_SkinPose.max_size())return false;
     if(matrices.size()==_SkinPose.size()&&
        (matrices.empty()||!std::memcmp(matrices.data(),_SkinPose.data(),matrices.size_bytes())))return true;
-    if(!std::all_of(matrices.begin(),matrices.end(),
-        [](const Mat4& matrix){return RuntimeMath::IsFinite(matrix);}))return false;
+    if(!IsFiniteSkinPose(matrices))return false;
     _SkinPose.assign(matrices.begin(),matrices.end());
     ++_SkinPoseRevision;
     _SkinBoundsMeshIdentity=0;

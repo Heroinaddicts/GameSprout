@@ -14,6 +14,7 @@ bool Runtime::RegisterObjectPropertyObserver(std::uint64_t objectID,IRuntimeProp
     const bool first=observation.Observers.empty();
     observation.SceneID=object->SceneOwner->GetInstanceID();
     observation.Observers.emplace(observer,++_NextPropertyObserver);
+    object->HasPropertyObservers=true;
     if(first) {
         CheckObservedScriptProperties(objectID);
         const auto current=_PropertyObservations.find(objectID);
@@ -26,7 +27,10 @@ void Runtime::UnregisterObjectPropertyObserver(std::uint64_t objectID,IRuntimePr
     const auto found=_PropertyObservations.find(objectID);
     if(found==_PropertyObservations.end())return;
     found->second.Observers.erase(observer);
-    if(found->second.Observers.empty())_PropertyObservations.erase(found);
+    if(found->second.Observers.empty()) {
+        if(auto* object=Find(objectID))object->HasPropertyObservers=false;
+        _PropertyObservations.erase(found);
+    }
 }
 void Runtime::MarkObjectPropertiesChanged(std::uint64_t objectID,RuntimePropertyChange change) {
     const auto found=_PropertyObservations.find(objectID);
@@ -71,7 +75,11 @@ void Runtime::DispatchObjectPropertyChanges() {
     for(const auto& [id,changes]:pending) {
         auto found=_PropertyObservations.find(id);auto* node=Find(id);
         if(found==_PropertyObservations.end())continue;
-        if(!IsInScene(node)){_PropertyObservations.erase(found);continue;}
+        if(!IsInScene(node)) {
+            if(node)node->HasPropertyObservers=false;
+            _PropertyObservations.erase(found);
+            continue;
+        }
         const auto observers=found->second.Observers;const auto sceneID=node->SceneOwner->GetInstanceID();
         RuntimeOperation operation(*this);
         for(const auto& [observer,sequence]:observers) {

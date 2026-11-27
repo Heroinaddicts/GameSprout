@@ -2,6 +2,7 @@
 #include "Components/TransformComponent.h"
 #include "RuntimeMath.h"
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace GameSproutRuntime {
@@ -20,6 +21,22 @@ RenderObjectTransform RenderObjectTransform::FromModel(const Mat4& model) {
     return result;
 }
 
+RenderObjectTransform RenderObjectTransform::FromModel(const Mat4& model,const Mat4& previousModel,
+    const Mat4& previousNormal,bool previousNegative) {
+    // A translation reuses the already validated linear basis and normal.
+    // Also bound the inverse translation that TryInverseAffine would check:
+    // rounding the stored normal to float cannot approach overflow here.
+    constexpr float safe=1e16f;
+    if(model(3,3)==previousModel(3,3)&&!std::memcmp(model.Data,previousModel.Data,12*sizeof(float))&&
+       std::fabs(model(0,3))<=safe&&std::fabs(model(1,3))<=safe&&std::fabs(model(2,3))<=safe) {
+        for(std::size_t column=0;column<3;++column)
+            for(std::size_t row=0;row<3;++row)
+                if(std::fabs(previousNormal(row,column))>safe)return FromModel(model);
+        return {model,previousNormal,true,previousNegative};
+    }
+    return FromModel(model);
+}
+
 CachedRenderObjectTransform* Scene::BindRenderObjectTransform(const GameObjectState& node) const {
     auto& cached=_RenderObjectTransforms.try_emplace(node.ID).first->second;
     if(cached.Revision!=_RenderRevision&&!RefreshRenderObjectTransform(cached,node))return nullptr;
@@ -29,8 +46,10 @@ CachedRenderObjectTransform* Scene::BindRenderObjectTransform(const GameObjectSt
 bool Scene::RefreshRenderObjectTransform(CachedRenderObjectTransform& cached,const GameObjectState& node) const {
     const auto revision=_RenderRevision;
     const auto refresh=[&](const Mat4& model) {
-        if(!cached.Revision||std::memcmp(cached.Value.Model.Data,model.Data,sizeof(model.Data)))
-            cached.Value=RenderObjectTransform::FromModel(model);
+        auto& previous=cached.Value;
+        if(!cached.Revision||std::memcmp(previous.Model.Data,model.Data,sizeof(model.Data)))
+            previous=previous.Valid?RenderObjectTransform::FromModel(model,previous.Model,previous.Normal,previous.Negative):
+                RenderObjectTransform::FromModel(model);
     };
     if(const auto* transform=node.BuiltinTransform) {
         if(node.Owner.HasPresentationOverrides())refresh(transform->GetPresentationWorldMatrix());

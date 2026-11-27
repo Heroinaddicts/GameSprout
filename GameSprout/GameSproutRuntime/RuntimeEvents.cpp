@@ -118,7 +118,9 @@ void Runtime::RecordNodeChange(GameObjectState& object,SceneNodeEventType type,c
     std::uint64_t oldParent,bool builtinTransform) {
     const auto authoringBatch=_ConstructionDepth?_ConstructionAuthoringBatch:_CommandAuthoringBatch;
     object.SceneOwner->RecordAuthoringChange(object.ID,type,component,authoringBatch,builtinTransform);
-    MarkObjectPropertiesChanged(object.ID,RuntimePropertyChange::Authored);
+    if(object.HasPropertyObservers)MarkObjectPropertiesChanged(object.ID,RuntimePropertyChange::Authored);
+    // A listener registered after this edit never receives its notification.
+    if(_Listeners.empty())return;
     // 通知失败不能破坏已提交的对象/组件状态，事件本身不借用节点或组件指针。
     try {
         SceneNodeEvent event;
@@ -148,10 +150,13 @@ void Runtime::DispatchEvents() {
     // 固定本轮批次；回调产生的新通知保留到下一次 Update，避免无限递归派发。
     std::deque<EventRecord> batch;
     batch.swap(_Events);
-    std::vector<std::uint64_t> nodeListeners;
+    struct NodeListener {std::uint64_t ID;IRuntimeListener* Pointer;std::uint64_t AfterSequence;};
+    std::vector<NodeListener> nodeListeners;
+    const auto lastListener=_NextListener;
     if(!batch.empty()) {
         nodeListeners.reserve(_Listeners.size());
-        for(const auto& entry:_Listeners)nodeListeners.push_back(entry.first);
+        for(const auto& [id,listener]:_Listeners)
+            nodeListeners.push_back({id,listener.Pointer,listener.AfterSequence});
     }
     // Keep the fixed built-in component name out of each queued record. The
     // dispatched value still carries an owned string for callers that copy it.
@@ -168,11 +173,17 @@ void Runtime::DispatchEvents() {
         }
         RuntimeOperation operation(*this);
         // A registration made by this batch starts after its newest sequence.
-        // Still resolve each ID because earlier callbacks may unregister it.
-        for(auto id:nodeListeners) {
-            const auto found=_Listeners.find(id);
-            if(found==_Listeners.end() || record.Sequence<=found->second.AfterSequence) continue;
-            try {found->second.Pointer->OnSceneNodeEvent(record.Event);} catch (...) {}
+        // Listener IDs never repeat. Resolve by ID after any change to the
+        // registrations, since an earlier callback can unregister a listener.
+        for(const auto& listener:nodeListeners) {
+            if(record.Sequence<=listener.AfterSequence)continue;
+            IRuntimeListener* target;
+            if(_NextListener!=lastListener || _Listeners.size()!=nodeListeners.size()) {
+                const auto found=_Listeners.find(listener.ID);
+                if(found==_Listeners.end())continue;
+                target=found->second.Pointer;
+            } else target=listener.Pointer;
+            try {target->OnSceneNodeEvent(record.Event);} catch (...) {}
         }
         if(record.BuiltinTransform)record.Event.ComponentType.swap(transformType);
     }
