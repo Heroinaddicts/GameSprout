@@ -13,6 +13,10 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
     key.UV=data.UVOffset;key.DoubleSided=draw.Material->DoubleSided;key.Negative=draw.Object->Negative;
     key.Lit=draw.Material->ShadingModel==MaterialShadingModel::Lit;
     key.Instanced=instanceCount>1||RequiresSkinStorage(*draw.Object);
+    const auto* surface=draw.CachedMaterial?&draw.CachedMaterial->Surface:nullptr;
+    const bool transmits=surface&&surface->TransmissionStrength>0&&
+        (draw.TransmissionTexture||surface->Transmission.Guid.empty());
+    key.MappedLit=key.Lit&&(draw.ORMTexture||transmits);
     const bool skyReflection=key.Lit&&draw.Material->EnvironmentReflections&&reflections;
     key.SpatialLighting=key.Lit&&(draw.ReflectionProbeIndex||UsesPlanarReflection(draw)||UsesIndirectLighting(draw));
     key.EnvironmentReflections=skyReflection&&!key.SpatialLighting;
@@ -48,7 +52,18 @@ bool Renderer::DrawBuiltin(GRHI::IRenderPass& pass,const PreparedDraw& draw,cons
             pass.SetFragmentUniform(1,&environment,sizeof(environment));
             if(key.EnvironmentReflections)pass.SetFragmentTextureSampler(5,reflections->Specular.get(),EnvironmentSampler());
         }
-        pass.SetFragmentUniform(0,&lightUniform,sizeof(lightUniform));
+        if(key.MappedLit) {
+            const MappedLitUniform mapped{lightUniform,surface->ORMTextureST,surface->TransmissionTextureST,
+                {draw.ORMTexture?1.f:0.f,transmits?1.f:0.f,surface->TransmissionStrength,0},surface->TransmissionTint,
+                surface->ORMTextureRemapScale,surface->ORMTextureRemapBias};
+            pass.SetFragmentUniform(0,&mapped,sizeof(mapped));
+            const std::uint32_t slot=key.SpatialLighting?9:key.EnvironmentReflections?6:5;
+            const auto bind=[&](std::uint32_t index,const TextureGPU* texture) {
+                pass.SetFragmentTextureSampler(index,texture?texture->Texture:_White,texture?texture->Sampler:_DefaultSampler);
+            };
+            bind(slot,draw.ORMTexture);
+            bind(slot+1,draw.TransmissionTexture);
+        } else pass.SetFragmentUniform(0,&lightUniform,sizeof(lightUniform));
         const auto& shadowSource=_PlanarShadowSource?*_PlanarShadowSource:*this;
         pass.SetFragmentUniform(2,&shadowSource._ShadowUniform,sizeof(_ShadowUniform));
         pass.SetFragmentUniform(3,&shadowSource._SpotShadowUniform,sizeof(_SpotShadowUniform));

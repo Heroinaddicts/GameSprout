@@ -305,6 +305,22 @@ void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
                 if(!normalTexture&&!pending){skipped=true;continue;}
                 if(normalTexture&&normalTexture->SRGB){Diagnostic("Lit normal map must be imported in Linear color space");skipped=true;continue;}
             }
+            TextureGPU* ormTexture=nullptr;
+            TextureGPU* transmissionTexture=nullptr;
+            if(cachedMaterial&&material->ShadingModel==MaterialShadingModel::Lit) {
+                const auto linearMap=[&](const ResourceReference& reference,const char* label) -> TextureGPU* {
+                    if(reference.Guid.empty())return nullptr;
+                    if(mesh->Data.UVOffset<0){Diagnostic(std::string(label)+" requires mesh UV coordinates");return nullptr;}
+                    bool pending=false;
+                    auto* map=Texture(reference,&pending);
+                    if(map&&map->SRGB){Diagnostic(std::string(label)+" must be imported in Linear color space");return nullptr;}
+                    return map;
+                };
+                const auto& surface=cachedMaterial->Surface;
+                ormTexture=linearMap(surface.ORM,"Lit ORM map");
+                if(surface.TransmissionStrength>0)
+                    transmissionTexture=linearMap(surface.Transmission,"Lit transmission map");
+            }
             float distance=0;
             if(transparent) {
                 const Vector3 difference{object.Model(0,3)-position.X,object.Model(1,3)-position.Y,object.Model(2,3)-position.Z};
@@ -315,6 +331,8 @@ void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
             }else hasOpaqueShader=true;
             visible.push_back({&object,mesh,section,material,materialReference,texture,normalTexture,cachedMaterial,
                 shader,transparent,distance,sectionOrdinal});
+            visible.back().ORMTexture=ormTexture;
+            visible.back().TransmissionTexture=transmissionTexture;
             drawn=true;
         }
         if(drawn) ++_Statistics.VisibleObjects;

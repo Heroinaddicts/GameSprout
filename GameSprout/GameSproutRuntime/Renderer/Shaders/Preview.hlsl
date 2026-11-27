@@ -261,6 +261,14 @@ cbuffer LitUniform : register(b0, space3)
     float4 LocalLightParameters[4];
     float4 LocalLightRadiances[4];
     float4 PlanarReflection;
+#ifdef GAMESPROUT_MAPPED_LIT
+    float4 ORMTextureST;
+    float4 TransmissionTextureST;
+    float4 SurfaceMapFlags; // Has ORM, has transmission, transmission strength, reserved.
+    float4 TransmissionTint;
+    float4 ORMTextureRemapScale;
+    float4 ORMTextureRemapBias;
+#endif
 };
 struct IndirectVolume
 {
@@ -454,6 +462,13 @@ float DirectionalShadow(float3 worldPosition, float3 normal)
 Texture2D<float4> NormalTexture : register(t1, space2);
 SamplerState NormalSampler : register(s1, space2);
 
+#ifdef GAMESPROUT_MAPPED_LIT
+Texture2D<float4> ORMTexture : register(GAMESPROUT_ORM_TEXTURE_REGISTER, space2);
+SamplerState ORMSampler : register(GAMESPROUT_ORM_SAMPLER_REGISTER, space2);
+Texture2D<float4> TransmissionTexture : register(GAMESPROUT_TRANSMISSION_TEXTURE_REGISTER, space2);
+SamplerState TransmissionSampler : register(GAMESPROUT_TRANSMISSION_SAMPLER_REGISTER, space2);
+#endif
+
 float3 SafeDirection(float3 value, float3 fallback)
 {
     float lengthSquared = dot(value, value);
@@ -510,9 +525,10 @@ TextureCube<float4> SpecularEnvironment : register(t5, space2);
 SamplerState SpecularEnvironmentSampler : register(s5, space2);
 #include "ReflectionProbes.hlsl"
 
-float3 ReflectedEnvironment(float3 world, float3 normal, float3 view, float nDotV, float3 f0, bool spatial)
+float3 ReflectedEnvironment(float3 world, float3 normal, float3 view, float nDotV, float3 f0,
+    float perceptualRoughness, bool spatial)
 {
-    const float roughness = saturate(LitParameters.y);
+    const float roughness = saturate(perceptualRoughness);
     const float3 ray = reflect(-view, normal);
     const float weight = spatial ? ReflectionProbeWeight(world) : 0.0;
     float3 radiance = 0.0;
@@ -567,9 +583,28 @@ float4 EvaluateLit(MeshOutput input, bool useReflections, bool useSpatialLightin
     float4 base = BaseTexture.Sample(BaseSampler, input.UV) * input.Color;
     float3 albedo = saturate(base.rgb);
     float metallic = saturate(LitParameters.x);
+    float perceptualRoughness = LitParameters.y;
+    float occlusion = 1.0;
+#ifdef GAMESPROUT_MAPPED_LIT
+    if (SurfaceMapFlags.x > 0.5)
+    {
+        const float2 uv = input.NormalUV * ORMTextureST.xy + ORMTextureST.zw;
+        const float3 sampledORM = ORMTexture.Sample(ORMSampler, uv).rgb;
+        const float3 orm = saturate(sampledORM * ORMTextureRemapScale.rgb + ORMTextureRemapBias.rgb);
+        occlusion = orm.r;
+        perceptualRoughness = orm.g;
+        metallic = orm.b;
+    }
+    float transmission = 0.0;
+    if (SurfaceMapFlags.y > 0.5 && SurfaceMapFlags.z > 0.0)
+    {
+        const float2 uv = input.NormalUV * TransmissionTextureST.xy + TransmissionTextureST.zw;
+        transmission = saturate(TransmissionTexture.Sample(TransmissionSampler, uv).r) * saturate(SurfaceMapFlags.z);
+    }
+#endif
     // The UI roughness is perceptual; GGX alpha is its square. The floor avoids
     // singular, subpixel ideal mirrors without changing the stored author value.
-    float alpha = max(LitParameters.y * LitParameters.y, 0.0025);
+    float alpha = max(perceptualRoughness * perceptualRoughness, 0.0025);
     float alphaSquared = alpha * alpha;
     float3 normal = SurfaceNormal(input);
     float3 view = SafeDirection(CameraPosition.xyz - input.WorldPosition, normal);
@@ -582,17 +617,32 @@ float4 EvaluateLit(MeshOutput input, bool useReflections, bool useSpatialLightin
     // irradiance remains independent of the viewing camera.
     float3 irradiance = DiffuseEnvironment(normal);
     if (useSpatialLighting) irradiance = DiffuseIndirectLighting(input.WorldPosition, normal, irradiance);
-    float3 ambient = irradiance * diffuse;
+    float3 ambient = irradiance * diffuse * occlusion;
     color += ambient;
     float3 stylizedDirect = 0.0;
     float stylizedIllumination = 0.0;
     float3 geometricNormal = SafeDirection(input.Normal, float3(0, 1, 0));
+#ifdef GAMESPROUT_MAPPED_LIT
+    // Orient the geometric normal toward the viewer on either face of thin sheets.
+    const float3 viewerSideNormal = dot(geometricNormal, view) < 0.0 ? -geometricNormal : geometricNormal;
+    float3 transmittedColor = 0.0;
+#endif
     [unroll] for (int index = 0; index < 4; ++index)
     {
         float3 light = LightDirections[index].xyz;
         float nDotL = saturate(dot(normal, light));
+#ifdef GAMESPROUT_MAPPED_LIT
+        const float viewThrough = saturate(dot(-light, view));
+        const float backlight = transmission * saturate(dot(-viewerSideNormal, light)) * viewThrough * viewThrough;
+        if (LightDirections[index].w < 0.5 || max(nDotL, backlight) <= 0.0) continue;
+        const float3 shadowNormal = backlight > 0.0 ? -viewerSideNormal : geometricNormal;
+        float shadow = LightDirections[index].w > 1.5 ? DirectionalShadow(input.WorldPosition, shadowNormal) : 1.0;
+        transmittedColor += saturate(TransmissionTint.rgb) * LightRadiances[index].rgb * (backlight * shadow);
+        if (nDotL <= 0.0) continue;
+#else
         if (LightDirections[index].w < 0.5 || nDotL <= 0.0) continue;
         float shadow = LightDirections[index].w > 1.5 ? DirectionalShadow(input.WorldPosition, geometricNormal) : 1.0;
+#endif
         AccumulateDirectLight(light, LightRadiances[index].rgb, shadow, 1.0, nDotL, normal, view, nDotV,
             alphaSquared, f0, diffuse, color, stylizedDirect, stylizedIllumination);
     }
@@ -628,13 +678,34 @@ float4 EvaluateLit(MeshOutput input, bool useReflections, bool useSpatialLightin
         stylized = max(lerp(luminance.xxx, stylized, StyleParameters.w), 0.0);
         color = lerp(color, stylized, StyleParameters.x);
     }
+#ifdef GAMESPROUT_MAPPED_LIT
+    color += transmittedColor;
+#endif
     if (useSpatialLighting)
-        color = ApplyPlanarReflection(color, ReflectedEnvironment(input.WorldPosition, normal, view, nDotV, f0, true),
-            input.Position.xy, input.WorldPosition.y, normal, view, saturate(LitParameters.y), f0);
-    else if (useReflections) color += ReflectedEnvironment(input.WorldPosition, normal, view, nDotV, f0, false);
+        color = ApplyPlanarReflection(color,
+            ReflectedEnvironment(input.WorldPosition, normal, view, nDotV, f0, perceptualRoughness, true) * occlusion,
+            input.Position.xy, input.WorldPosition.y, normal, view, saturate(perceptualRoughness), f0);
+    else if (useReflections)
+        color += ReflectedEnvironment(input.WorldPosition, normal, view, nDotV, f0, perceptualRoughness, false) * occlusion;
     return float4(ApplySceneFog(color, input.WorldPosition), base.a);
 }
 
+#ifdef GAMESPROUT_MAPPED_LIT
+float4 LitMappedFragment(MeshOutput input) : SV_Target0
+{
+    return EvaluateLit(input, false, false);
+}
+
+float4 LitMappedEnvironmentFragment(MeshOutput input) : SV_Target0
+{
+    return EvaluateLit(input, true, false);
+}
+
+float4 LitMappedSpatialFragment(MeshOutput input) : SV_Target0
+{
+    return EvaluateLit(input, false, true);
+}
+#else
 float4 LitFragment(MeshOutput input) : SV_Target0
 {
     return EvaluateLit(input, false, false);
@@ -649,6 +720,7 @@ float4 LitSpatialFragment(MeshOutput input) : SV_Target0
 {
     return EvaluateLit(input, false, true);
 }
+#endif
 
 struct GridInput {
     [[vk::location(0)]] float3 Position : TEXCOORD0;

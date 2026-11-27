@@ -114,10 +114,18 @@ private:
         std::string Error;
     };
     struct BoundUniform {std::uint32_t Slot=0;std::vector<std::uint8_t> Bytes;};
+    struct LitSurfaceMaps {
+        ResourceReference ORM,Transmission;
+        Vector4 ORMTextureST{1,1,0,0},TransmissionTextureST{1,1,0,0};
+        Vector4 ORMTextureRemapScale{1,1,1,0},ORMTextureRemapBias{};
+        Color TransmissionTint{1,1,1,1};
+        float TransmissionStrength=0;
+    };
     struct Material {
         std::uint64_t ResourceRevision=0;
         std::uint64_t SortRank=0;
         MaterialRenderData Data;bool Loaded=false;std::string Error;
+        LitSurfaceMaps Surface;
         bool ShaderAttempted=false,ShaderReady=false;
         std::vector<BoundUniform> VertexUniforms,FragmentUniforms;
         std::vector<TextureGPU*> ShaderTextures;
@@ -151,9 +159,10 @@ private:
         bool Grid=false,DoubleSided=false,Negative=false,DebugTriangles=false,DepthTest=true,Lit=false,Instanced=false,Shadow=false;
         bool EnvironmentReflections=false;
         bool SpatialLighting=false;
+        bool MappedLit=false;
         bool operator<(const PipelineKey& other) const {
-            return std::tie(Format,Stride,Position,Normal,Color,UV,BoneIndices,BoneWeights,BoneIndexFormat,Grid,DoubleSided,Negative,DebugTriangles,DepthTest,Lit,Instanced,Shadow,EnvironmentReflections,SpatialLighting)<
-                std::tie(other.Format,other.Stride,other.Position,other.Normal,other.Color,other.UV,other.BoneIndices,other.BoneWeights,other.BoneIndexFormat,other.Grid,other.DoubleSided,other.Negative,other.DebugTriangles,other.DepthTest,other.Lit,other.Instanced,other.Shadow,other.EnvironmentReflections,other.SpatialLighting);
+            return std::tie(Format,Stride,Position,Normal,Color,UV,BoneIndices,BoneWeights,BoneIndexFormat,Grid,DoubleSided,Negative,DebugTriangles,DepthTest,Lit,Instanced,Shadow,EnvironmentReflections,SpatialLighting,MappedLit)<
+                std::tie(other.Format,other.Stride,other.Position,other.Normal,other.Color,other.UV,other.BoneIndices,other.BoneWeights,other.BoneIndexFormat,other.Grid,other.DoubleSided,other.Negative,other.DebugTriangles,other.DepthTest,other.Lit,other.Instanced,other.Shadow,other.EnvironmentReflections,other.SpatialLighting,other.MappedLit);
         }
     };
     struct Depth {GRHI::ITexture* Texture=nullptr;std::uint64_t LastUsed=0;};
@@ -240,6 +249,13 @@ private:
         Vector4 PlanarReflection; // Strength, reciprocal main width/height, plane height.
     };
     static_assert(sizeof(LitUniform)==512,"Lit material block must match HLSL packing");
+    struct MappedLitUniform {
+        LitUniform Lighting;
+        Vector4 ORMTextureST,TransmissionTextureST,SurfaceMapFlags;
+        Color TransmissionTint;
+        Vector4 ORMTextureRemapScale,ORMTextureRemapBias;
+    };
+    static_assert(sizeof(MappedLitUniform)==608,"Mapped Lit material block must match HLSL packing");
     struct PreparedDraw;
     struct ShadowUniform {
         Mat4 WorldToShadow[4];
@@ -286,6 +302,8 @@ private:
         std::uint64_t SectionOrdinal=0;
         std::array<std::uint32_t,MaxLocalLights> LocalLightIndices{}; // One-based indices, zero terminator.
         std::size_t ReflectionProbeIndex=0; // One-based authored index, zero selects the global sky.
+        TextureGPU* ORMTexture=nullptr;
+        TextureGPU* TransmissionTexture=nullptr;
     };
     struct ShadowCandidate {
         const DrawObject* Object;

@@ -107,6 +107,8 @@ GRHI::IGraphicsPipeline* Renderer::Pipeline(const PipelineKey& key) {
     GRHI::GraphicsPipelineDesc description;
     const std::size_t fragment=key.Shadow?static_cast<std::size_t>(PreviewShader::ShadowFragment):
         key.Grid?static_cast<std::size_t>(PreviewShader::GridFragment):
+        key.MappedLit?static_cast<std::size_t>(key.SpatialLighting?PreviewShader::LitMappedSpatialFragment:
+            key.EnvironmentReflections?PreviewShader::LitMappedEnvironmentFragment:PreviewShader::LitMappedFragment):
         key.SpatialLighting?static_cast<std::size_t>(PreviewShader::LitSpatialFragment):
         key.EnvironmentReflections?static_cast<std::size_t>(PreviewShader::LitEnvironmentFragment):
         static_cast<std::size_t>(key.Lit?PreviewShader::LitFragment:PreviewShader::MeshFragment);

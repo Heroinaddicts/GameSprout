@@ -529,6 +529,34 @@ Renderer::Material* Renderer::MaterialData(const ResourceReference& reference) {
                     (data.NormalTexture.Guid.empty()!=(data.NormalTexture.LocalID==0))||!data.Shader.Guid.empty()) {
                     entry.Error="Invalid prepared Lit material parameters, normal map or conflicting user Shader";entry.Loaded=false;
                 }
+                auto& surface=entry.Surface;
+                for(const auto& binding:data.Textures) {
+                    auto* target=binding.Name=="ORMTexture"?&surface.ORM:
+                        binding.Name=="TransmissionTexture"?&surface.Transmission:nullptr;
+                    if(!target)continue;
+                    if(!target->Guid.empty()||binding.Texture.Guid.empty()!=(binding.Texture.LocalID==0)) {
+                        entry.Error="Invalid prepared Lit surface texture identity";entry.Loaded=false;break;
+                    }
+                    *target=binding.Texture;
+                }
+                for(const auto& property:data.Properties) {
+                    const auto* value=property.Numbers;
+                    auto* vector=property.Name=="ORMTextureST"?&surface.ORMTextureST:
+                        property.Name=="ORMTextureRemapScale"?&surface.ORMTextureRemapScale:
+                        property.Name=="ORMTextureRemapBias"?&surface.ORMTextureRemapBias:
+                        property.Name=="TransmissionTextureST"?&surface.TransmissionTextureST:nullptr;
+                    if(vector&&property.Type==ShaderValueType::Float4&&finite({value[0],value[1],value[2],value[3]})) {
+                        *vector={value[0],value[1],value[2],value[3]};
+                    } else if(property.Name=="TransmissionStrength"&&property.Type==ShaderValueType::Float&&
+                        std::isfinite(value[0])&&value[0]>=0&&value[0]<=1) {
+                        surface.TransmissionStrength=value[0];
+                    } else if(property.Name=="TransmissionTint"&&property.Type==ShaderValueType::Float4&&
+                        std::all_of(value,value+4,[](float channel){return std::isfinite(channel)&&channel>=0&&channel<=1;})) {
+                        surface.TransmissionTint={value[0],value[1],value[2],value[3]};
+                    } else if(vector||property.Name=="TransmissionStrength"||property.Name=="TransmissionTint") {
+                        entry.Error="Invalid prepared Lit surface parameters";entry.Loaded=false;break;
+                    }
+                }
             }
         } catch(const std::exception& exception) {entry.Error=exception.what();entry.Loaded=false;}
         catch(...) {entry.Error="Resource provider threw while loading material";entry.Loaded=false;}

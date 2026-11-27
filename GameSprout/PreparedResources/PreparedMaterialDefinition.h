@@ -140,11 +140,13 @@ inline Json::Value PreviewSchema() {
 inline Json::Value LitSchema() {
     Json::Value schema(Json::objectValue);schema["Name"]="GameSprout/Lit";
     schema["Properties"]=Json::Value(Json::arrayValue);
-    const auto add=[&](const char* name,const char* display,const char* type,const Json::Value& value,const char* group) {
+    const auto add=[&](const char* name,const char* display,const char* type,const Json::Value& value,const char* group,
+        const char* tooltip=nullptr) {
         Json::Value property;property["Name"]=name;property["DisplayName"]=display;
         property["Type"]=type;property["Default"]=value;property["Group"]=group;
         if(std::string(type)=="Range"){property["Min"]=0.0;property["Max"]=1.0;}
         if(std::string(type)=="Color")property["ColorSpace"]="Linear";
+        if(tooltip)property["Tooltip"]=tooltip;
         schema["Properties"].append(property);
     };
     add("BaseColor","基础颜色","Color",Vector(1,1,1,1),"表面");
@@ -165,6 +167,16 @@ inline Json::Value LitSchema() {
     add("LightSoftness","明暗过渡","Range",.25,"风格化");
     add("ColorSaturation","颜色饱和度","Float",1.0,"风格化");
     schema["Properties"][12]["Min"]=0.0;
+    add("ORMTexture","遮蔽、粗糙度与金属度贴图","Texture",Json::Value(),"表面",
+        "以 Linear 颜色空间导入。R 通道为遮蔽，G 通道为粗糙度，B 通道为金属度。");
+    add("ORMTextureRemapScale","ORM 通道增益","Vector",Vector(1,1,1,0),"表面",
+        "依次设置遮蔽、粗糙度和金属度的乘数。");
+    add("ORMTextureRemapBias","ORM 通道偏移","Vector",Vector(0,0,0,0),"表面",
+        "依次设置遮蔽、粗糙度和金属度乘以增益后的偏移量。");
+    add("TransmissionTexture","透射遮罩","Texture",Json::Value(),"透射",
+        "以 Linear 颜色空间导入。R 通道控制透射遮罩。");
+    add("TransmissionStrength","透射强度","Range",0.0,"透射");
+    add("TransmissionTint","透射颜色","Color",Vector(1,1,1,1),"透射");
     return schema;
 }
 inline Json::Value BuiltinSchema(const Json::Value& document) {

@@ -69,15 +69,29 @@ macOS Editor 的 Cocoa 帧泵通过 SDL 接收嵌入式视口的 drawable 就绪
 
 Runtime 为使用兼容网格分段、材质和管线的骨骼网格合并内置不透明绘制，并在方向光和聚光灯的阴影通道中合批。每个实例独立读取自己的骨骼矩阵。GPU 常驻缓冲保存实例变换、姿态寻址和骨骼矩阵，Runtime 批量上传变化的范围。网格加载时生成供内置着色器使用的索引和骨骼包围盒数据，颜色和阴影分别按各自的顶点输入复用等价顶点。场景裁剪使用当前姿态的保守包围盒。
 
-普通角色使用 Animator 播放 Clip 或 Controller。同一骨架的装备可以通过 `SetAnimatorObjectID` 绑定到同一个 Animator，并使用 `IMeshComponent::SetMesh` 和 `IMeshRendererComponent::SetMaterials` 换装。自定义动画求值器可以调用 `ISkinnedMeshRendererComponent::SetSkinPose`，传入网格局部空间、按网格骨骼顺序排列的矩阵，矩阵须已乘以各自的逆绑定矩阵，最多 128 根骨骼。Runtime 拷贝数据，覆盖仅在运行期间生效，传空 span 恢复 Animator 绑定。随 GameLogic ABI 升至 12，宿主和项目动态库须使用匹配的 SDK 重新构建。[Runtime API](../GameSproutRuntime/RuntimeApi.txt)
+普通角色使用 Animator 播放 Clip 或 Controller。同一骨架的装备可以通过 `SetAnimatorObjectID` 绑定到同一个 Animator，并使用 `IMeshComponent::SetMesh` 和 `IMeshRendererComponent::SetMaterials` 换装。自定义动画求值器可以调用 `ISkinnedMeshRendererComponent::SetSkinPose`，传入网格局部空间、按网格骨骼顺序排列且已乘以逆绑定矩阵的数据。绘制时验证矩阵数与网格骨骼数匹配。Runtime 拷贝数据，覆盖仅在运行期间生效，传空 span 恢复 Animator 绑定。宿主和项目动态库须使用匹配的 SDK。[Runtime API](../GameSproutRuntime/RuntimeApi.txt)
 
 内置不透明材质可通过 `EnableGPUInstancing` 控制颜色实例化，`RenderView::EnableGPUInstancing` 控制视口实例化。`RenderStatistics` 中，`SkinnedInstancedDrawCalls` 和 `SkinnedInstancedInstances` 统计颜色通道中使用实例化的绘制和实例数，`InstanceSkinPaletteUploadBytes` 统计这一帧上传的骨骼矩阵和寻址数据。Editor 通过公开接口读这些数据，GRHI 负责执行已录制的上传和绘制。
 
-千骑压测使用通用渲染路径。Runtime 按网格布局、材质、实例变化比例和阴影覆盖选择实现。多数实例移动时整批替换 GPU 变换缓冲，少量变化时只上传变更区间。内置蒙皮可创建紧凑顶点流，以 `UInt8x4` 表达已有 128 骨骼上限内的骨骼索引，浮点位置、法线、纹理坐标和权重保持原精度。紧凑缓冲分配失败时回退到原始流。原始网格数据仍供自定义着色器使用。每种网格新增的紧凑流和索引流会增加加载工作与驻留缓冲，骑兵示例中典型顶点步长 100 → 52 字节指绘制读取的步长。
+千骑压测使用通用渲染路径。Runtime 按网格布局、材质、实例变化比例和阴影覆盖选择实现。多数实例移动时整批替换 GPU 变换缓冲，少量变化时只上传变更区间。内置蒙皮的单实例 Uniform 可容纳 128 根骨骼。超过这个容量时，颜色和实时阴影绘制使用顶点存储缓冲读取姿态，关闭实例合批时仍可单独绘制。容量取决于网格数据和缓冲区限制。
+
+最多 256 根骨骼的网格可以用 `UInt8x4` 紧凑顶点流存储骨骼索引。更多骨骼或者紧凑缓冲分配失败时使用原始顶点流。浮点位置、法线、纹理坐标和权重保持原精度。原始网格数据仍供自定义着色器使用。每种网格新增的紧凑流和索引流会增加加载工作与驻留缓冲，骑兵示例中典型顶点步长 100 → 52 字节指绘制读取的步长。
 
 内置不透明蒙皮在材质分段内调整三角形顺序以改善顶点缓存复用，透明保留原有顺序。一个材质段内完全重叠且深度相同的不透明三角形，在 `LessEqual` 深度测试下可能因提交顺序变化而改变覆盖结果。启用静态缓存的方向光可按当前视口缩小动态阴影提交范围，边界计入法线偏移和 PCF 滤波。平面反射借用阴影图或视口启用导航近似时，回到完整覆盖。
 
-GRHI 追加 `UInt8x4` 并保留旧格式编号。新版 Runtime 和 GRHI 需配套部署，应用包中的 SDL 也要与 GRHI 匹配。紧凑缓冲分配失败可用原始流，紧凑格式的管线创建失败目前会报告渲染错误。Metal、DX12、Vulkan 均有对应格式映射，本轮运行回归在 macOS Metal 完成。Windows、Linux 和移动设备上的同场景兼容还需实机验证。详见 [原生 Game 压测记录](NinjaBuild.md#2026-11-25--mountandblade-骑兵压测)。
+GRHI 追加 `UInt8x4` 并保留旧格式编号。新版 Runtime 和 GRHI 需配套部署，应用包中的 SDL 也要与 GRHI 匹配。紧凑格式的管线创建失败会报告渲染错误。Metal、DX12、Vulkan 均有对应格式映射。2026-11-25 的压测运行于 macOS Metal，范围见 [原生 Game 压测记录](NinjaBuild.md#2026-11-25--mountandblade-骑兵压测)。
+
+### Runtime 内部渲染准备
+
+Runtime 按对象、父级矩阵和资源修订更新渲染快照。符合条件的纯平移可复用法线矩阵。属性通知依据对象的订阅状态登记，节点事件按固定批次派发。监听关系在回调期间发生变化时，派发通过监听 ID 重新确认接收者。
+
+蒙皮工作线程读取稳定的网格与姿态数据，按批计算内置姿态覆盖的保守包围盒和视锥结果，也可预打包待上传的骨骼矩阵。批次并行结束后，渲染调用线程应用结果、处理精确包围盒回退、确定上传区间并提交图形命令。资源查询、Animator 求值和自定义组件读取也在调用线程上完成。线程选择和性能对照见 [Runtime 蒙皮并行](NinjaBuild.md#runtime-蒙皮并行)。
+
+### 内置 Lit 表面贴图
+
+内置 Lit 材质可选 `ORMTexture`。按 Linear 导入，R、G、B 分别表示遮蔽、感知粗糙度和金属度。材质可设置独立 UV 缩放偏移和 RGB 通道增益、偏移。旧材质可继续使用标量金属度与粗糙度。
+
+`TransmissionTexture` 以 Linear 导入，R 通道为透射遮罩，可结合 `TransmissionStrength` 和线性 `TransmissionTint` 计算薄片在方向光下的逆光透射。只有强度且无贴图时使用全白遮罩。这是方向光下的透射近似。资产导入和资源准备层处理材质字段与依赖，Runtime 校验贴图色彩空间并绑定内置着色器变体，GRHI 按纹理、采样器和 Uniform 描述执行命令。
 
 ## 更新与退出
 

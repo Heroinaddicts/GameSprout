@@ -115,6 +115,37 @@ bool PreparedResources::ResourceProvider::LoadMaterial(const GameSproutRuntime::
         const auto& transform=normalized["NormalTextureST"];
         if(!MaterialDefinition::VectorValue(transform))return fail();
         data.NormalTextureST={transform[0].asFloat(),transform[1].asFloat(),transform[2].asFloat(),transform[3].asFloat()};
+        const auto addFloat4=[&](std::string name) {
+            const auto& value=normalized[name];
+            if(!MaterialDefinition::VectorValue(value))return false;
+            GameSproutRuntime::MaterialPropertyData property;
+            property.Name=std::move(name);
+            property.Type=GameSproutRuntime::ShaderValueType::Float4;
+            for(Json::ArrayIndex index=0;index<4;++index)property.Numbers[index]=value[index].asFloat();
+            data.Properties.push_back(std::move(property));
+            return true;
+        };
+        for(const char* name:{"ORMTexture","TransmissionTexture"}) {
+            const auto& value=normalized[name];
+            if(value.isNull())continue;
+            GameSproutRuntime::MaterialTextureData texture;
+            texture.Name=name;
+            if(!ReferenceValue(value,texture.Texture)||!addFloat4(texture.Name+"ST"))return fail();
+            AddDependency(reference,texture.Texture);
+            data.Textures.push_back(std::move(texture));
+        }
+        if(!normalized["ORMTexture"].isNull()&&
+            (!addFloat4("ORMTextureRemapScale")||!addFloat4("ORMTextureRemapBias")))return fail();
+        float transmissionStrength=0;
+        if(!readNumber("TransmissionStrength",transmissionStrength))return fail();
+        if(transmissionStrength>0) {
+            GameSproutRuntime::MaterialPropertyData property;
+            property.Name="TransmissionStrength";
+            property.Type=GameSproutRuntime::ShaderValueType::Float;
+            property.Numbers[0]=transmissionStrength;
+            data.Properties.push_back(std::move(property));
+            if(!addFloat4("TransmissionTint"))return fail();
+        }
     }else if(body.isMember("Shader")&&body["Shader"]!="GameSprout/Preview")return fail();
     output = std::move(data);
     return true;
