@@ -1,5 +1,6 @@
 #include "CommandBufferSDL.h"
 #include "Resource/BufferSDL.h"
+#include "../../Tools/FrameTiming.h"
 #include <cstring>
 
 namespace GRHI {
@@ -36,8 +37,12 @@ void RenderPassSDL::Encode(SDL_GPURenderPass* pass) const {
     for(const auto& operation:_Operations)std::visit(replay,operation);
 }
 bool CommandBufferSDL::Encode() {
+    GAMESPROUT_FRAME_SCOPE(GRHI, "encode/total");
+    GAMESPROUT_FRAME_COUNT(GRHI, "encode/upload_bytes", _UploadSize);
+    GAMESPROUT_FRAME_COUNT(GRHI, "encode/render_passes", Passes.size());
     SDL_GPUTransferBuffer* transfer=nullptr;
     if(!_Uploads.empty()) {
+        GAMESPROUT_FRAME_SCOPE(GRHI, "encode/stage_uploads");
         transfer=Owner->UploadTransfer(static_cast<uint32_t>(_UploadSize));
         if(!transfer)return Fail(SDL_GetError());
         void* mapped=SDL_MapGPUTransferBuffer(Owner->Native(),transfer,true);
@@ -46,9 +51,11 @@ bool CommandBufferSDL::Encode() {
         SDL_UnmapGPUTransferBuffer(Owner->Native(),transfer);
     }
 
+    GAMESPROUT_FRAME_SCOPE(GRHI, "encode/record_commands");
     auto nextUpload=_Uploads.begin();
     const auto encodeUploads=[&](size_t beforePass) {
         if(nextUpload==_Uploads.end() || nextUpload->BeforePass!=beforePass)return true;
+        GAMESPROUT_FRAME_SCOPE(GRHI, "encode/record_uploads");
         auto* copy=SDL_BeginGPUCopyPass(Native);
         if(!copy)return Fail(SDL_GetError());
         do {

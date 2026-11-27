@@ -50,6 +50,7 @@ add_library(GameSproutRuntime::GameSproutRuntime ALIAS GameSproutRuntime)
 # This entry defines the public API target. The real library alias above keeps
 # it from creating an imported binary target inside the implementation project.
 include("${CMAKE_CURRENT_SOURCE_DIR}/GameSproutRuntime.cmake")
+GameSproutEnableTracy(GameSproutRuntime)
 target_link_libraries(GameSproutRuntime PUBLIC
     GameSproutRuntime::GameSproutRuntimeApi
 )
@@ -127,6 +128,7 @@ if(GAMESPROUT_RUNTIME_BUILD_TESTS)
 endif()
 
 # Keep standalone Runtime SDK outputs self-contained for shell and GPU tests.
+GameSproutStageTracy(GameSproutRuntime)
 if(NOT GAMESPROUT_RUNTIME_STATIC AND NOT GAMESPROUT_GRHI_STATIC)
     get_target_property(runtime_backend_dependencies GRHI::GRHI GRHI_RUNTIME_DEPENDENCIES)
     add_custom_command(TARGET GameSproutRuntime POST_BUILD

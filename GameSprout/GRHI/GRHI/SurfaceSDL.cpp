@@ -1,6 +1,7 @@
 #include "SurfaceSDL.h"
 #include "CommandBufferSDL.h"
 #include "Renderer/TextureRendererSDL.h"
+#include "../../Tools/FrameTiming.h"
 #if defined(SDL_PLATFORM_MACOS)
 #include "SurfaceCocoa.h"
 #endif
@@ -97,6 +98,8 @@ AcquireFrameResult SurfaceSDL::TryAcquireFrame(ICommandBuffer* value, SurfaceFra
     return AcquireFrame(value,frame,false);
 }
 AcquireFrameResult SurfaceSDL::AcquireFrame(ICommandBuffer* value, SurfaceFrame& frame, bool waitForFrame) {
+    GAMESPROUT_FRAME_SCOPE(GRHI, "surface/acquire");
+    GAMESPROUT_FRAME_COUNT(GRHI, "surface/wait_requested", waitForFrame);
     frame = {};
     _Device->ClearError();
     auto* command = _Device->GetCommand(value);
@@ -114,6 +117,7 @@ AcquireFrameResult SurfaceSDL::AcquireFrame(ICommandBuffer* value, SurfaceFrame&
         }
         if (!drawableAvailable) {
             SDL_ResetGPUMetalDrawable(_Window);
+            GAMESPROUT_FRAME_COUNT(GRHI, "surface/unavailable", 1);
             return AcquireFrameResult::Unavailable;
         }
     }
@@ -126,15 +130,20 @@ AcquireFrameResult SurfaceSDL::AcquireFrame(ICommandBuffer* value, SurfaceFrame&
     catch (...) { command->Surfaces.erase(this); throw; }
     SDL_GPUTexture* texture = nullptr;
     uint32_t width = 0, height = 0;
-    const bool acquired = waitForFrame
-        ? SDL_WaitAndAcquireGPUSwapchainTexture(command->Native, _Window, &texture, &width, &height)
-        : SDL_AcquireGPUSwapchainTexture(command->Native, _Window, &texture, &width, &height);
+    bool acquired;
+    {
+        GAMESPROUT_FRAME_SCOPE(GRHI, "surface/sdl_acquire");
+        acquired = waitForFrame
+            ? SDL_WaitAndAcquireGPUSwapchainTexture(command->Native, _Window, &texture, &width, &height)
+            : SDL_AcquireGPUSwapchainTexture(command->Native, _Window, &texture, &width, &height);
+    }
     if (!acquired) {
         _Device->RemoveTarget(token); command->Surfaces.erase(this);
         command->Fail(SDL_GetError()); return AcquireFrameResult::Failed;
     }
     if (!texture) {
         _Device->RemoveTarget(token); command->Surfaces.erase(this);
+        GAMESPROUT_FRAME_COUNT(GRHI, "surface/unavailable", 1);
         return AcquireFrameResult::Unavailable;
     }
     // Existing registry entry can be filled without further allocation.

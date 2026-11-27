@@ -1,4 +1,5 @@
 #include "GameViewport.h"
+#include "../../Tools/FrameTiming.h"
 #include <QEvent>
 #include <QGuiApplication>
 #include <QPaintEngine>
@@ -275,6 +276,7 @@ void GameViewport::RenderGame(GameSproutRuntime::IScene* scene,bool continuous,b
     view.DrawScene=diagnostic.empty();
     if (Headless()) {Status(diagnostic.empty()?"离屏环境：Game 使用 Main Camera，与 Scene 共用动画姿态。":diagnostic);return;}
     if (!EnsureRendering()) return;
+    GAMESPROUT_FRAME_SCOPE(GameView, "view/game");
     _Rendering=true;
     struct Scope{bool& Flag;~Scope(){Flag=false;}} scope{_Rendering};
     if (!_Renderer->Render(view)) {_AnimatedMaterials=false;Status(_Renderer->GetLastError());return;}
@@ -284,6 +286,7 @@ void GameViewport::RenderGame(GameSproutRuntime::IScene* scene,bool continuous,b
         RequestRender();
         return;
     }
+    GAMESPROUT_FRAME_MARK_NAMED("Game View");
     if(_TransformPreviewID&&!_TransformPreviewActive) {
         // Keep the final edited pose in the preview layer for one presented frame.
         // The follow-up frame returns to the authored shadow policy even when paused.

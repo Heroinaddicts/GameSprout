@@ -130,6 +130,8 @@ add_library(GRHI::GRHI ALIAS GRHI)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/GRHI.cmake")
 target_link_libraries(GRHI PUBLIC GRHI::GRHIApi PRIVATE "${GAMESPROUT_GRHI_SDL_TARGET}")
+include("${CMAKE_CURRENT_LIST_DIR}/../Tools/GameSproutTracy.cmake")
+GameSproutEnableTracy(GRHI)
 if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     target_link_libraries(GRHI PRIVATE "-framework Cocoa" "-framework QuartzCore")
     set_target_properties(GRHI PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON OBJCXX_EXTENSIONS OFF)
@@ -194,6 +196,7 @@ if(NOT GAMESPROUT_GRHI_STATIC)
         VERBATIM
     )
 endif()
+GameSproutStageTracy(GRHI)
 
 # All paths are relative to the GRHI project root, never grouped by extension.
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${grhi_files})

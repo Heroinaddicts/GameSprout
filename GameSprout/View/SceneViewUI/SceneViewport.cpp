@@ -1,4 +1,5 @@
 #include "SceneViewport.h"
+#include "../../Tools/FrameTiming.h"
 #include "SceneViewportEditing.h"
 #include "SceneToolRouter.h"
 #include <QGuiApplication>
@@ -219,6 +220,7 @@ void SceneViewport::RenderScene(GameSproutRuntime::IScene* scene,bool grid,float
     view.DebugDraw=&debug;
     if(!_UIDebugDraw.Triangles.empty())view.UIScreenDebugDraw=&_UIDebugDraw;
     // Runtime Renderer 从 SurfaceFrame 实际像素尺寸算投影，包含 resize / Retina DPI。
+    GAMESPROUT_FRAME_SCOPE(SceneView, "view/scene");
     if(!_Renderer->Render(view)){
         _AnimatedMaterials=false;_PresentedCamera={};_PresentedUIPreviewObjectID=0;SetStatus(_Renderer->GetLastError(),true);return;
     }
@@ -229,6 +231,7 @@ void SceneViewport::RenderScene(GameSproutRuntime::IScene* scene,bool grid,float
         RequestRender();
         return;
     }
+    GAMESPROUT_FRAME_MARK_NAMED("Scene View");
     _ReleasedTransformPreviewID=0;
     emit FrameSubmitted();
     _Renderer->GetRenderedCamera(_PresentedCamera);

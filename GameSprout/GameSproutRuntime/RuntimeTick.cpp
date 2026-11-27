@@ -3,12 +3,14 @@
 #include "Scene.h"
 #include "Components/AnimatorComponent.h"
 #include "Components/ScriptComponent.h"
+#include "../Tools/FrameTiming.h"
 #include <algorithm>
 #include <cmath>
 #include <exception>
 
 namespace GameSproutRuntime {
 std::vector<Runtime::FrameComponent> Runtime::SnapshotFrameComponents(bool fixedOnly) const {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/snapshot");
     // Capture only registered work. Static scene nodes never enter a frame walk.
     // Identities, rather than borrowed pointers, survive phase-boundary commits.
     std::set<std::uint64_t> objects;
@@ -107,35 +109,72 @@ void Runtime::AdvanceFrameInternal(float deltaSeconds,std::uint32_t fixedStepCou
                                    float alpha,bool collapseHistory) {
     if(_ShuttingDown||IsExecuting()||_ConstructionDepth||!std::isfinite(deltaSeconds)||deltaSeconds<0||
        !std::isfinite(fixedDeltaSeconds)||fixedDeltaSeconds<0||(fixedStepCount&&fixedDeltaSeconds<=0))return;
+    GAMESPROUT_FRAME_MARK();
+    GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/frame");
     struct UpdatingScope {bool& Updating;explicit UpdatingScope(bool& updating):Updating(updating){Updating=true;}~UpdatingScope(){Updating=false;}} updating(_Updating);
     AdvanceShaderClock(deltaSeconds);
     std::string error;
-    InitializePendingComponents(error,deltaSeconds>0||fixedStepCount>0);
-    auto batch=SnapshotFrameComponents(false);
-    DispatchUIPointer();
-    TickGameModulePhase(EarlyTick,deltaSeconds);
-    TickComponentPhase(batch,EarlyTick,deltaSeconds);
-    for(std::uint32_t step=0;step<fixedStepCount&&!_ConstructionDepth;++step) {
-        TickGameModulePhase(FixedTick,fixedDeltaSeconds);
-        TickComponentPhase(batch,FixedTick,fixedDeltaSeconds);
-        if(!_ConstructionDepth)StepPhysics(fixedDeltaSeconds);
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/initialization");
+        InitializePendingComponents(error,deltaSeconds>0||fixedStepCount>0);
     }
-    PresentPhysicsTransforms(alpha,collapseHistory);
-    TickGameModulePhase(UpdateTick,deltaSeconds);
-    TickComponentPhase(batch,UpdateTick,deltaSeconds);
-    TickAnimationPhase(batch,deltaSeconds);
+    auto batch=SnapshotFrameComponents(false);
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/early");
+        DispatchUIPointer();
+        TickGameModulePhase(EarlyTick,deltaSeconds);
+        TickComponentPhase(batch,EarlyTick,deltaSeconds);
+    }
+    std::uint32_t step=0;
+    for(;step<fixedStepCount&&!_ConstructionDepth;++step) {
+        {
+            GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/fixed_callbacks");
+            TickGameModulePhase(FixedTick,fixedDeltaSeconds);
+            TickComponentPhase(batch,FixedTick,fixedDeltaSeconds);
+        }
+        if(!_ConstructionDepth) {
+            GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/physics");
+            StepPhysics(fixedDeltaSeconds);
+        }
+    }
+    GAMESPROUT_FRAME_COUNT(Runtime, "simulation/fixed_steps", step);
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/physics_presentation");
+        PresentPhysicsTransforms(alpha,collapseHistory);
+    }
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/update");
+        TickGameModulePhase(UpdateTick,deltaSeconds);
+        TickComponentPhase(batch,UpdateTick,deltaSeconds);
+    }
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/animation");
+        TickAnimationPhase(batch,deltaSeconds);
+    }
     // Root motion and animation notifications finish before follow-camera and
     // other LateUpdate consumers observe this frame's final animated pose.
-    DispatchAnimationEvents();
-    TickGameModulePhase(LateTick,deltaSeconds);
-    TickComponentPhase(batch,LateTick,deltaSeconds);
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/events");
+        DispatchAnimationEvents();
+    }
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/late");
+        TickGameModulePhase(LateTick,deltaSeconds);
+        TickComponentPhase(batch,LateTick,deltaSeconds);
+    }
     // Additions made by any phase may initialize now, but are outside the frozen
     // batch and cannot receive just the latter half of their first frame.
-    InitializePendingComponents(error,deltaSeconds>0||fixedStepCount>0);
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/initialization");
+        InitializePendingComponents(error,deltaSeconds>0||fixedStepCount>0);
+    }
     // Late callbacks and tail initialization can Play/Seek too. Deliver one
     // further fixed batch before the host renders; never drain recursively.
-    DispatchAnimationEvents();
-    FinishTickNotifications();
+    {
+        GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/events");
+        DispatchAnimationEvents();
+        FinishTickNotifications();
+    }
 }
 void Runtime::Update(float deltaSeconds) {AdvanceFrame(deltaSeconds,0,0);}
 void Runtime::FixedUpdate(float fixedDeltaSeconds) {

@@ -56,6 +56,22 @@ cmake --build --preset ninja-debug
 
 显式路径只进入本地构建缓存，不写进公共预设。源文件自动发现、按目录显示工程树以及既有最终产物的 Bin 输出规则保持原有约定。新的目录隔离的是中间文件，不会把最终动态库改成另一套输出路径。
 
+## Tracy 性能采集
+
+Windows、macOS 和 Linux 桌面构建可在现有 Kit 的 CMake 配置中设置 `GAMESPROUT_ENABLE_TRACY=ON`。聚合工程设置一次即可。分别构建共享 GRHI、Runtime 和 Editor 时，三者使用同一 Kit 并都打开此选项。默认关闭，启用时使用固定版本的 Tracy 0.15.0，采集器按需连接本机。构建产物会附带 `Tracy-LICENSE.txt`。
+
+启动 Editor 并运行 MountAndBlade。等千骑场景就绪后，在终端用同版本的工具采集和导出。
+
+```sh
+tracy-capture -a 127.0.0.1 -s 15 -o mountandblade.tracy
+tracy-csvexport -F mountandblade.tracy
+tracy-csvexport mountandblade.tracy
+```
+
+默认帧轨道记录连续两次 Runtime 帧之间的间隔。`Game View` 和 `Scene View` 在各自成功提交画面时标记，实际出屏间隔沿用平台采集方式。已有 CPU 区间和渲染计数分别出现在 Tracy 的 Zones 和 Plots 中。Windows 仍可通过 `GAMESPROUT_FRAME_TIMING` 同步输出原有 CSV 以供对照。
+
+实时查询可用同版本的 Tracy MCP 服务。运行 `live_connect` 时指定 `127.0.0.1:8086`，用 `eval` 查询帧、区间及计数，用 `save_trace` 保存追踪。MCP、Tracy 界面和 `tracy-capture` 一次只能有一个连接到同一进程。MCP 的 Python 依赖独立于 GameSprout。参见 [Tracy MCP 构建和运行说明](https://raw.githubusercontent.com/wolfpld/tracy/v0.15.0/manual/tracy.tex#L2712)。
+
 ## 工程范围
 
 GameSproutEditor 已经统一构建其 Module 和 View 插件，日常构建 Editor 时无需再单独重复构建 Module、View。它们的预设保留给独立插件开发使用。

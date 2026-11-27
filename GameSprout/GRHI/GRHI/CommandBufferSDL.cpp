@@ -1,5 +1,6 @@
 #include "CommandBufferSDL.h"
 #include "Resource/BufferSDL.h"
+#include "../../Tools/FrameTiming.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -33,6 +34,7 @@ ICommandBuffer* DeviceSDL::AcquireCommandBuffer() {
     catch(...) {SDL_CancelGPUCommandBuffer(native);delete command;throw;}
 }
 bool DeviceSDL::Submit(ICommandBuffer* value) {
+    GAMESPROUT_FRAME_SCOPE(GRHI, "submit/total");
     ClearError();
     auto* command=GetCommand(value);
     if(!command || !command->OnThread())return Fail("Unknown command or wrong submitting thread.");
@@ -41,12 +43,23 @@ bool DeviceSDL::Submit(ICommandBuffer* value) {
         command->EndRenderPass(command->Active);
     }
     // No native render/draw calls are encoded until the entire CPU recording has passed validation.
-    if(command->Error.empty() && command->Validate())command->Encode();
+    bool validated;
+    {
+        GAMESPROUT_FRAME_SCOPE(GRHI, "submit/validate");
+        validated=command->Error.empty() && command->Validate();
+    }
+    if(validated)command->Encode();
     const std::string validation=command->Error;
     // SDL cannot cancel a borrowed swapchain image. Invalid recordings submit only the empty
     // acquisition command (or any already valid native passes if the backend itself failed).
-    const bool success=!validation.empty() && command->FrameTokens.empty()
-        ? SDL_CancelGPUCommandBuffer(command->Native):SDL_SubmitGPUCommandBuffer(command->Native);
+    bool success;
+    if(!validation.empty() && command->FrameTokens.empty()) {
+        success=SDL_CancelGPUCommandBuffer(command->Native);
+    } else {
+        // DXGI Present runs on the calling thread inside SDL's D3D12 submit.
+        GAMESPROUT_FRAME_SCOPE(GRHI, "submit/sdl_submit_including_present");
+        success=SDL_SubmitGPUCommandBuffer(command->Native);
+    }
     const std::string error=success?std::string{}:std::string(SDL_GetError());
     command->Native=nullptr;_Commands.erase(command);delete command;
     if(!validation.empty())return Fail(validation);

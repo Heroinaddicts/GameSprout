@@ -1,5 +1,7 @@
 include_guard(GLOBAL)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../Tools/GameSproutTracy.cmake")
+
 # Public SDK only: expose Api/ and an independently built library. Consumers
 # must not add the Runtime implementation as a subdirectory to access its API.
 if(NOT TARGET GameSproutRuntime::GameSproutRuntimeApi)
@@ -47,6 +49,12 @@ function(GameSproutRuntimeDeploy target)
     get_target_property(grhi_is_imported GRHI::GRHI IMPORTED)
     if(grhi_is_imported)
         list(APPEND deploy_dependencies ${backend_dependencies})
+    endif()
+    if(GAMESPROUT_ENABLE_TRACY)
+        GameSproutRequireTracyClient()
+        get_target_property(tracy_license Tracy::TracyClient GAMESPROUT_TRACY_LICENSE)
+        list(APPEND backend_dependencies "$<TARGET_FILE:Tracy::TracyClient>" "${tracy_license}")
+        list(APPEND deploy_dependencies "$<TARGET_FILE:Tracy::TracyClient>" "${tracy_license}")
     endif()
     # The in-tree GRHI stages SDL when its own target finishes building.
     add_custom_target(${target}DeployRuntime

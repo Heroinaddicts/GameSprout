@@ -45,6 +45,8 @@ target_link_libraries(SceneViewUI PRIVATE
     Foundation::FoundationApi
     GameSproutRuntime::GameSproutRuntimeApi
 )
+# The editor deploys the shared client next to the shell, two levels above Logic/View.
+GameSproutEnableTracy(SceneViewUI "../..")
 target_include_directories(SceneViewUI PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/../Interface"
