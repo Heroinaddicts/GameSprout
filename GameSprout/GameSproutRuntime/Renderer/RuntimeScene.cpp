@@ -1,10 +1,11 @@
 #include "RuntimeRenderer.h"
 #include "Components/MeshRendererComponent.h"
+#include "GameObject.h"
 #include "GameSproutRuntime.h"
-#include "RuntimeMath.h"
+#include "RuntimeRenderResourceCache.h"
 #include "Scene.h"
+#include "../../Tools/FrameTiming.h"
 #include <algorithm>
-#include <cmath>
 #include <cstring>
 #include <limits>
 
@@ -13,28 +14,27 @@ namespace {
 constexpr auto InvalidTransformIndex=std::numeric_limits<std::size_t>::max();
 }
 
-bool Renderer::SetDrawTransform(DrawObject& object,const Mat4& model) {
-    Mat4 inverse;
-    if(!RuntimeMath::IsFinite(model)||!RuntimeMath::TryInverseAffine(model,inverse))return false;
-    object.Model=model;
+void Renderer::SetDrawTransform(DrawObject& object,const RenderObjectTransform& transform) {
+    object.Model=transform.Model;
+    object.Normal=transform.Normal;
+    object.Negative=transform.Negative;
     object.LocalLightGeneration=0;
     object.ReflectionProbeGeneration=0;
     object.CullBoxKnown=false;
-    for(std::size_t row=0;row<3;++row)
-        for(std::size_t column=0;column<3;++column)object.Normal(row,column)=inverse(column,row);
-    const double determinant=double(model(0,0))*(double(model(1,1))*model(2,2)-double(model(1,2))*model(2,1))-
-        double(model(0,1))*(double(model(1,0))*model(2,2)-double(model(1,2))*model(2,0))+
-        double(model(0,2))*(double(model(1,0))*model(2,1)-double(model(1,1))*model(2,0));
-    object.Negative=determinant<0;
-    return true;
 }
 
 bool Renderer::UpdateDrawTransform(DrawObject& draw,const Mat4& model,const RenderFrustum::Frustum& frustum) {
     if(!std::memcmp(draw.Model.Data,model.Data,sizeof(model.Data)))return true;
+    return UpdateDrawTransform(draw,RenderObjectTransform::FromModel(model),frustum);
+}
+
+bool Renderer::UpdateDrawTransform(DrawObject& draw,const RenderObjectTransform& transform,const RenderFrustum::Frustum& frustum) {
+    if(!transform.Valid)return false;
+    if(!std::memcmp(draw.Model.Data,transform.Model.Data,sizeof(transform.Model.Data)))return true;
     const bool hadCullBox=_PreparedKnown&&!draw.Skinned&&draw.CullBoxKnown;
     const bool wasInFrustum=hadCullBox&&frustum.Intersects(draw.CullBox);
     const bool wasNegative=draw.Negative;
-    if(!SetDrawTransform(draw,model))return false;
+    SetDrawTransform(draw,transform);
     if(draw.Negative!=wasNegative)_OpaqueDrawOrderKnown=false;
     if(!_InstanceTransformsDirty)_ChangedInstanceTransforms.push_back(draw.InstanceIndex);
     if(hadCullBox) {
@@ -43,10 +43,18 @@ bool Renderer::UpdateDrawTransform(DrawObject& draw,const Mat4& model,const Rend
     }
     // Prepared draws borrow this object. Its packets survive a movement that
     // keeps winding, frustum membership and the built-in material path.
-    if(_PreparedKnown&&(draw.Negative!=wasNegative||(hadCullBox&&frustum.Intersects(draw.CullBox)!=wasInFrustum)||
-        std::any_of(draw.MaterialCache.begin(),draw.MaterialCache.end(),[](const Material* material){
-            return material&&!material->Data.Shader.Guid.empty();
-        })))_PreparedKnown=false;
+    if(_PreparedKnown) {
+        if(draw.Negative!=wasNegative||(hadCullBox&&frustum.Intersects(draw.CullBox)!=wasInFrustum)) {
+            _PreparedKnown=false;
+        } else {
+            const auto* materials=draw.MaterialCache.data();
+            for(std::size_t i=0;i<draw.MaterialCache.size();++i)
+                if(materials[i]&&!materials[i]->Data.Shader.Guid.empty()) {
+                    _PreparedKnown=false;
+                    break;
+                }
+        }
+    }
     return true;
 }
 
@@ -55,6 +63,7 @@ bool Renderer::UpdateDrawMesh(DrawObject& draw,const IGameObject& node) {
     if(!mesh)return false;
     if(draw.Mesh==mesh->GetMesh())return true;
     draw.Mesh=mesh->GetMesh();
+    if(draw.Skinned)_SkinPaletteLayoutDirty=true;
     draw.Geometry=nullptr;
     draw.BoundsInitialized=false;
     draw.CullBoxKnown=false;
@@ -82,10 +91,14 @@ bool Renderer::UpdateDrawMaterials(DrawObject& draw,const IGameObject& node) {
     return true;
 }
 
-bool Renderer::UpdateSceneObjects(IScene& scene,const std::vector<RenderObjectChange>& changes,std::vector<DrawObject>& objects) {
-    std::vector<IGameObject*> pending;
-    std::unordered_set<std::uint64_t> visited;
+bool Renderer::UpdateSceneObjects(const Scene& scene,const std::vector<RenderObjectChange>& changes,std::vector<DrawObject>& objects) {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/extract_update_journal");
+    GAMESPROUT_FRAME_COUNT(Runtime, "render/scene_change_entries", changes.size());
+    std::vector<SceneTransformBranch*> pending;
+    const auto revision=scene.GetRenderRevision();
     const RenderFrustum::Frustum preparedFrustum(_PreparedViewProjection);
+    const bool shareTransforms=_ResourceCache.Leases>1||_Runtime._RenderResourceCaches.size()>1;
+    auto* draws=objects.data();
     for(const auto& change:changes) {
         const auto id=change.ObjectID;
         if(change.Kind!=RenderObjectChangeKind::Transform) {
@@ -93,51 +106,84 @@ bool Renderer::UpdateSceneObjects(IScene& scene,const std::vector<RenderObjectCh
             if(found==_SceneObjectIndices.end()||found->second==InvalidTransformIndex)continue;
             const auto* node=_Runtime.QueryGameObject(id);
             if(!node||node->GetScene()!=&scene)return false;
-            auto& draw=objects[found->second];
+            auto& draw=draws[found->second];
             if(change.Kind==RenderObjectChangeKind::Mesh?!UpdateDrawMesh(draw,*node):!UpdateDrawMaterials(draw,*node))return false;
+            // Resource lookups may invalidate the scene cache before the next change.
+            if(!scene.HasSameRenderStructure(revision))return false;
             continue;
         }
-        if(visited.contains(id))continue;
-        auto* root=_Runtime.QueryGameObject(id);
-        if(!root||root->GetScene()!=&scene)return false;
-        pending.push_back(root);
+        const auto rootBranch=_SceneTransformBranches.find(id);
+        if(rootBranch==_SceneTransformBranches.end()||rootBranch->second.VisitedRevision==revision)continue;
+        // Extract verified that the scene structure is unchanged. Commands
+        // queued during rendering cannot release a node until Render returns.
+        const auto* root=rootBranch->second.Node;
+        if(!_Runtime.IsInScene(root))return false;
+        pending.push_back(&rootBranch->second);
         while(!pending.empty()) {
-            auto* node=pending.back();pending.pop_back();
-            const auto objectID=node->GetInstanceID();
-            if(!visited.insert(objectID).second)continue;
-            const auto found=_SceneObjectIndices.find(objectID);
-            if(found!=_SceneObjectIndices.end()) {
+            auto* branch=pending.back();pending.pop_back();
+            const auto* node=branch->Node;
+            branch->VisitedRevision=revision;
+            if(branch->DrawIndex) {
                 // Crossing the singular-transform boundary changes extraction
                 // membership and diagnostics. Rebuild only for that case.
-                if(found->second==InvalidTransformIndex)return false;
-                if(!UpdateDrawTransform(objects[found->second],node->GetTransform()->GetPresentationWorldMatrix(),preparedFrustum))return false;
+                if(*branch->DrawIndex==InvalidTransformIndex)return false;
+                auto& draw=draws[*branch->DrawIndex];
+                if(shareTransforms) {
+                    auto*& shared=branch->SharedTransform;
+                    if(!shared)shared=scene.BindRenderObjectTransform(*node);
+                    else if(shared->Revision!=scene.GetRenderRevision()&&!scene.RefreshRenderObjectTransform(*shared,*node))return false;
+                    if(!shared||!UpdateDrawTransform(draw,shared->Value,preparedFrustum))return false;
+                } else if(!UpdateDrawTransform(draw,node->Object->GetTransform()->GetPresentationWorldMatrix(),preparedFrustum))return false;
             }
-            for(std::size_t index=0;index<node->GetChildCount();++index)pending.push_back(node->GetChild(index));
+            for(auto* child=branch->FirstChild;child;child=child->NextSibling)
+                if(child->VisitedRevision!=revision)pending.push_back(child);
         }
     }
     return true;
 }
 
-bool Renderer::RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects,bool meshChanges,bool materialChanges) {
+bool Renderer::RefreshDrawObjects(const Scene& scene,std::vector<DrawObject>& objects,bool meshChanges,bool materialChanges) {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/extract_refresh_draws");
     // A burst of animation may outgrow the bounded journal without changing
     // membership. Read only previously extracted renderables and keep their
     // resources, skin data and batch slots attached to the existing objects.
     const RenderFrustum::Frustum preparedFrustum(_PreparedViewProjection);
+    const bool shareTransforms=_ResourceCache.Leases>1||_Runtime._RenderResourceCaches.size()>1;
     for(auto& draw:objects) {
-        auto* node=_Runtime.QueryGameObject(draw.ObjectID);
-        if(!node||node->GetScene()!=&scene||
-           (meshChanges&&!UpdateDrawMesh(draw,*node))||(materialChanges&&!UpdateDrawMaterials(draw,*node))||
-           !UpdateDrawTransform(draw,node->GetTransform()->GetPresentationWorldMatrix(),preparedFrustum))return false;
+        const GameObjectState* node=nullptr;
+        if(!shareTransforms||meshChanges||materialChanges) {
+            node=_Runtime.Find(draw.ObjectID);
+            if(!_Runtime.IsInScene(node)||node->SceneOwner!=&scene||(meshChanges&&!UpdateDrawMesh(draw,*node->Object))||
+               (materialChanges&&!UpdateDrawMaterials(draw,*node->Object)))return false;
+        }
+        if(shareTransforms) {
+            const auto* transform=scene.GetRenderObjectTransform(draw.ObjectID,node);
+            if(!transform||!UpdateDrawTransform(draw,*transform,preparedFrustum))return false;
+        } else if(!UpdateDrawTransform(draw,node->Object->GetTransform()->GetPresentationWorldMatrix(),preparedFrustum))return false;
     }
     if(_SceneObjectIndices.size()!=objects.size()) {
         for(const auto& [id,index]:_SceneObjectIndices)if(index==InvalidTransformIndex) {
-            const auto* node=_Runtime.QueryGameObject(id);
-            if(!node||node->GetScene()!=&scene)return false;
-            const Mat4 model=node->GetTransform()->GetPresentationWorldMatrix();
-            Mat4 inverse;
-            if(RuntimeMath::IsFinite(model)&&RuntimeMath::TryInverseAffine(model,inverse))return false;
+            const auto* transform=scene.GetRenderObjectTransform(id);
+            if(!transform||transform->Valid)return false;
         }
     }
+    return true;
+}
+
+bool Renderer::RefreshSceneBindings(const Scene& scene) {
+    if(_ObjectAuthoringBatch==_Runtime._NextAuthoringBatch)return true;
+    // A command batch can release a cached node or component. Rebind by ID
+    // before using pointers again. UI-only and unrelated edits keep the draw snapshot.
+    for(auto& [id,branch]:_SceneTransformBranches) {
+        const auto* node=_Runtime.Find(id);
+        if(!node||node->SceneOwner!=&scene)return false;
+        branch.Node=node;
+    }
+    for(auto& skin:_SkinnedDraws) {
+        skin.SnapshotSkin=nullptr;
+        skin.SnapshotMesh=nullptr;
+    }
+    _ObjectAuthoringBatch=_Runtime._NextAuthoringBatch;
     return true;
 }
 
@@ -147,12 +193,13 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
     const auto revision=scene.GetRenderRevision();
     const auto mask=view.Camera.Projection.CullingMask;
     if(_ObjectSnapshotKnown&&_ObjectSceneID==sceneID&&_ObjectCullingMask==mask&&
-       _ObjectRequiredStaticFlags==view.RequiredStaticFlags&&scene.HasSameRenderStructure(_ObjectSceneRevision)) {
+       _ObjectRequiredStaticFlags==view.RequiredStaticFlags&&scene.HasSameRenderStructure(_ObjectSceneRevision)&&
+       RefreshSceneBindings(scene)) {
         std::vector<RenderObjectChange> changes;
         if(_ObjectSceneRevision==revision||
            (scene.GetRenderObjectChanges(_ObjectSceneRevision,changes)
-                ? UpdateSceneObjects(*view.Scene,changes,objects)
-                : RefreshDrawObjects(*view.Scene,objects,scene.HasRenderMeshChanges(_ObjectSceneRevision),
+                ? UpdateSceneObjects(scene,changes,objects)
+                : RefreshDrawObjects(scene,objects,scene.HasRenderMeshChanges(_ObjectSceneRevision),
                     scene.HasRenderMaterialChanges(_ObjectSceneRevision)))) {
             _ObjectSceneRevision=revision;
             _Statistics.SkippedObjects+=_ExtractionSkipped;
@@ -160,21 +207,28 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
             return true;
         }
     }
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/extract_rebuild");
     _ObjectSnapshotKnown=false;
     _PreparedKnown=false;
     _OpaqueDrawOrderKnown=false;
     _InstanceTransformsDirty=true;
     _ChangedInstanceTransforms.clear();
     _SkinnedDraws.clear();
+    _SkinPaletteLayoutDirty=true;
     objects.clear();
     _SceneObjectIndices.clear();
+    _SceneTransformBranches.clear();
     const auto skippedBefore=_Statistics.SkippedObjects;
     const auto diagnosticBefore=_Error.size();
+    // A lone renderer already owns the previous transform and can compare it
+    // directly. Only pay for the scene lookup when another renderer can reuse it.
+    const bool shareTransforms=_ResourceCache.Leases>1||_Runtime._RenderResourceCaches.size()>1;
     ++_Statistics.SceneSnapshotRebuilds;
-    std::vector<IGameObject*> pending{view.Scene};
+    std::vector<const GameObjectState*> pending{&scene.State()};
     while(!pending.empty()) {
-        auto* object=pending.back();pending.pop_back();
-        for(std::size_t index=object->GetChildCount();index>0;--index) pending.push_back(object->GetChild(index-1));
+        const auto* node=pending.back();pending.pop_back();
+        auto* object=node->Object;
+        for(std::size_t index=node->Children.size();index>0;--index)pending.push_back(node->Children[index-1]);
         auto* renderer=object->GetComponent<IMeshRendererComponent>();
         if(!renderer) continue;
         if((object->GetStaticFlags()&view.RequiredStaticFlags)!=view.RequiredStaticFlags)continue;
@@ -188,10 +242,32 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
         data.Skinned=object->GetComponent<ISkinnedMeshRendererComponent>()!=nullptr;
         data.StaticShadowCaster=!data.Skinned&&
             (object->GetStaticFlags()&StaticFlags::ShadowCasterStatic)!=StaticFlags::None;
-        if(!SetDrawTransform(data,object->GetTransform()->GetPresentationWorldMatrix())) {
+        auto* sharedTransform=shareTransforms?scene.BindRenderObjectTransform(*node):nullptr;
+        const auto transform=sharedTransform?sharedTransform->Value:[&] {
+            const auto* component=object->GetTransform();
+            return component?RenderObjectTransform::FromModel(component->GetPresentationWorldMatrix()):RenderObjectTransform{};
+        }();
+        auto [branchEntry,added]=_SceneTransformBranches.try_emplace(node->ID);
+        auto* branch=&branchEntry->second;
+        branch->Node=node;
+        branch->SharedTransform=sharedTransform;
+        branch->DrawIndex=transform.Valid?objects.size():InvalidTransformIndex;
+        // Retain just the paths to eligible draws, including singular ones.
+        // Map element addresses survive rehashes as the snapshot is built.
+        for(auto* parent=node->Parent;added&&parent;parent=parent->Parent) {
+            auto [parentEntry,parentAdded]=_SceneTransformBranches.try_emplace(parent->ID);
+            auto* parentBranch=&parentEntry->second;
+            parentBranch->Node=parent;
+            branch->NextSibling=parentBranch->FirstChild;
+            parentBranch->FirstChild=branch;
+            branch=parentBranch;
+            added=parentAdded;
+        }
+        if(!transform.Valid) {
             _SceneObjectIndices.emplace(data.ObjectID,InvalidTransformIndex);
             ++_Statistics.SkippedObjects;Diagnostic("Skipped singular/nonfinite mesh transform: "+data.Name);continue;
         }
+        SetDrawTransform(data,transform);
         data.Mesh=mesh->GetMesh();
         if(objects.size()>=std::numeric_limits<std::uint32_t>::max())
             return Fail("Scene exceeds the renderer instance index range");
@@ -207,6 +283,7 @@ bool Renderer::Extract(const RenderView& view,std::vector<DrawObject>& objects) 
         objects.push_back(std::move(data));
     }
     _ObjectSceneID=sceneID;_ObjectSceneRevision=revision;_ObjectCullingMask=mask;
+    _ObjectAuthoringBatch=_Runtime._NextAuthoringBatch;
     _ObjectRequiredStaticFlags=view.RequiredStaticFlags;
     _ExtractionSkipped=_Statistics.SkippedObjects-skippedBefore;
     _ExtractionDiagnostic=_Error.substr(diagnosticBefore);

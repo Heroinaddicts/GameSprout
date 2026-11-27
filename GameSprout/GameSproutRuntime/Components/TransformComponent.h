@@ -3,6 +3,7 @@
 #include <memory>
 
 namespace GameSproutRuntime {
+class GameObjectState;
 class Runtime;
 class TransformComponent final : public BuiltinComponent<ITransformComponent> {
 public:
@@ -40,10 +41,13 @@ public:
     static bool GetCurrentWorldRotation(const IGameObject&,Mat4& output,bool presentation);
 
 private:
+    static constexpr char TypeName[]="GameSproutRuntime.Transform";
     bool IsSceneRoot() const;
     void PrepareAuthoringChange();
     void InvalidateLocalMatrix();
-    Runtime* _Runtime=nullptr;
+    void NotifyAuthoringChange();
+    const Mat4& ResolveBuiltinWorldMatrix() const;
+    GameObjectState* _OwnerState=nullptr;
     mutable bool _LocalMatrixKnown=false;
     mutable Mat4 _LocalMatrixCache,_WorldMatrixCache;
     mutable std::uint64_t _WorldMatrixEpoch=0;
@@ -67,5 +71,6 @@ private:
     bool _HasPresentationPhysicsWorld=false;
     std::uint64_t _AuthoringRevision=0;
     friend class Runtime;
+    friend class Scene;
 };
 }

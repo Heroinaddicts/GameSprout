@@ -83,7 +83,7 @@ bool Renderer::ExtractPlanarObjects(const RenderView& view,const Renderer& sourc
     const auto mask=view.Camera.Projection.CullingMask;
     if(!_ObjectSnapshotKnown||_ObjectSceneID!=scene.GetInstanceID()||_ObjectCullingMask!=mask||
        _ObjectRequiredStaticFlags!=view.RequiredStaticFlags||!scene.HasSameRenderStructure(_ObjectSceneRevision)||
-       _SceneObjectIndices.size()!=_SceneObjects.size())return Extract(view,_SceneObjects);
+       _SceneObjectIndices.size()!=_SceneObjects.size()||!RefreshSceneBindings(scene))return Extract(view,_SceneObjects);
     if(_ObjectSceneRevision!=revision) {
         if(revision-_ObjectSceneRevision<_SceneObjects.size())return Extract(view,_SceneObjects);
         // The reflected layer mask is a subset of the main camera's mask.
@@ -106,7 +106,8 @@ bool Renderer::ExtractPlanarObjects(const RenderView& view,const Renderer& sourc
                 if(!node||(changedMesh&&!UpdateDrawMesh(draw,*node))||
                    (changedMaterials&&!UpdateDrawMaterials(draw,*node)))return Extract(view,_SceneObjects);
             }
-            if(!UpdateDrawTransform(draw,current.Model,frustum))return Extract(view,_SceneObjects);
+            const RenderObjectTransform transform{current.Model,current.Normal,true,current.Negative};
+            if(!UpdateDrawTransform(draw,transform,frustum))return Extract(view,_SceneObjects);
         }
         _ObjectSceneRevision=revision;
     }

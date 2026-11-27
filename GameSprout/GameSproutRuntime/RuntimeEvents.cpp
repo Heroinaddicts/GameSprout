@@ -1,6 +1,7 @@
 #include "GameSproutRuntime.h"
 #include "GameObject.h"
 #include "Scene.h"
+#include "Components/TransformComponent.h"
 #include <algorithm>
 #include <limits>
 #include <string_view>
@@ -43,6 +44,19 @@ bool AffectsWorldSnapshot(const GameObjectState& object, SceneNodeEventType type
         return true;
     }
 }
+}
+
+void Runtime::NotifyTransformChange(GameObjectState& object) {
+    if(object.Initializing||!IsInScene(&object))return;
+    // The setter dirties the physics transform before publishing this event.
+    // Only collider and rigid body edits require a physics structure update.
+    auto& scene=*object.SceneOwner;
+    const auto* screenCanvas=_UICanvasObjects.empty()?nullptr:FindUIScreenCanvasRoot(*object.Object);
+    if(screenCanvas&&screenCanvas!=object.Object)scene.InvalidateUI();
+    if(!screenCanvas||SubtreeHasWorldRenderer(object)||AffectsAnimationBindings(object,true))
+        scene.InvalidateRenderSnapshot(object.ID);
+    else scene.InvalidateVisual();
+    RecordNodeChange(object,SceneNodeEventType::ComponentChanged,nullptr,0,true);
 }
 
 void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char* component,std::uint64_t oldParent,
@@ -97,8 +111,13 @@ void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char*
                 object.SceneOwner->InvalidateUI();
         }
     }
+    RecordNodeChange(object,type,component,oldParent);
+}
+
+void Runtime::RecordNodeChange(GameObjectState& object,SceneNodeEventType type,const char* component,
+    std::uint64_t oldParent,bool builtinTransform) {
     const auto authoringBatch=_ConstructionDepth?_ConstructionAuthoringBatch:_CommandAuthoringBatch;
-    object.SceneOwner->RecordAuthoringChange(object.ID,type,component,authoringBatch);
+    object.SceneOwner->RecordAuthoringChange(object.ID,type,component,authoringBatch,builtinTransform);
     MarkObjectPropertiesChanged(object.ID,RuntimePropertyChange::Authored);
     // 通知失败不能破坏已提交的对象/组件状态，事件本身不借用节点或组件指针。
     try {
@@ -109,9 +128,9 @@ void Runtime::Notify(GameObjectState& object,SceneNodeEventType type,const char*
         event.ParentID=object.Parent?object.Parent->ID:0;
         event.OldParentID=oldParent;
         event.Name=object.Name;
-        event.ComponentType=component;
+        if(component)event.ComponentType=component;
         if(type==SceneNodeEventType::OperationFailed) event.Error="Deferred operation no longer satisfies hierarchy/transform constraints";
-        _Events.push_back({++_EventSequence,std::move(event)});
+        _Events.push_back({++_EventSequence,std::move(event),builtinTransform});
     } catch (...) {}
 }
 bool Runtime::RegisterListener(IRuntimeListener* listener) {
@@ -134,10 +153,19 @@ void Runtime::DispatchEvents() {
         nodeListeners.reserve(_Listeners.size());
         for(const auto& entry:_Listeners)nodeListeners.push_back(entry.first);
     }
-    for(const auto& record:batch) {
+    // Keep the fixed built-in component name out of each queued record. The
+    // dispatched value still carries an owned string for callers that copy it.
+    std::string transformType;
+    for(auto& record:batch) {
         if(std::any_of(_ParkedScenes.begin(),_ParkedScenes.end(),[&](const auto* scene) {
             return scene->GetInstanceID()==record.Event.SceneID;
         }))continue;
+        if(record.BuiltinTransform) {
+            try {
+                if(transformType.empty())transformType=TransformComponent::TypeName;
+            } catch (...) {continue;}
+            record.Event.ComponentType.swap(transformType);
+        }
         RuntimeOperation operation(*this);
         // A registration made by this batch starts after its newest sequence.
         // Still resolve each ID because earlier callbacks may unregister it.
@@ -146,6 +174,7 @@ void Runtime::DispatchEvents() {
             if(found==_Listeners.end() || record.Sequence<=found->second.AfterSequence) continue;
             try {found->second.Pointer->OnSceneNodeEvent(record.Event);} catch (...) {}
         }
+        if(record.BuiltinTransform)record.Event.ComponentType.swap(transformType);
     }
     // Snapshot identities before calling listeners; callbacks may unsubscribe or
     // request deferred destruction. Clear first so newly invalidated poses wait

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <optional>
 #include <vector>
 
 namespace {
@@ -22,34 +23,41 @@ bool UnitRotation(GameSproutRuntime::Quaternion value,GameSproutRuntime::Quatern
 
 namespace GameSproutRuntime {
 TransformComponent::TransformComponent(IGameObject* owner)
-    : BuiltinComponent<ITransformComponent>(owner, "GameSproutRuntime.Transform") {
-    if(auto* access=dynamic_cast<ObjectAccess*>(owner))_Runtime=&access->State().Owner;
+    : BuiltinComponent<ITransformComponent>(owner, TypeName) {
+    if(auto* access=dynamic_cast<ObjectAccess*>(owner))_OwnerState=&access->State();
 }
 TransformComponent::~TransformComponent() {
-    if(_Runtime&&_HasPresentationPhysicsWorld)_Runtime->TrackPresentationOverride(false);
+    if(_OwnerState&&_HasPresentationPhysicsWorld)_OwnerState->Owner.TrackPresentationOverride(false);
 }
 
 void TransformComponent::InvalidateLocalMatrix() {
     _LocalMatrixKnown=false;
     _WorldMatrixChangeEpoch=0;
-    if (_Runtime) {
-        _Runtime->InvalidateTransforms();
-        _Runtime->InvalidatePhysicsTransform(_GameObject);
+    if (_OwnerState) {
+        _OwnerState->Owner.InvalidateTransforms();
+        _OwnerState->Owner.InvalidatePhysicsTransform(*_OwnerState);
     }
 }
 
 bool TransformComponent::IsSceneRoot() const {
-    return _GameObject && static_cast<IGameObject*>(_GameObject->GetScene()) == _GameObject;
+    if(_OwnerState&&!_OwnerState->IsSceneRoot())return false;
+    return _GameObject&&static_cast<IGameObject*>(_GameObject->GetScene())==_GameObject;
+}
+
+void TransformComponent::NotifyAuthoringChange() {
+    if(_OwnerState)
+        _OwnerState->Owner.NotifyTransformChange(*_OwnerState);
 }
 
 void TransformComponent::SetLocalPosition(Vector3 value) {
-    if (IsSceneRoot() || !RuntimeMath::IsFinite(value) ||
-        (value.X == GetLocalPosition().X && value.Y == GetLocalPosition().Y && value.Z == GetLocalPosition().Z)) return;
+    if (IsSceneRoot() || !RuntimeMath::IsFinite(value)) return;
+    const auto current=GetLocalPosition();
+    if(value.X==current.X&&value.Y==current.Y&&value.Z==current.Z)return;
     PrepareAuthoringChange();
     _Position = value;
     InvalidateLocalMatrix();
     ++_AuthoringRevision;
-    NotifyComponentChanged(_GameObject, this);
+    NotifyAuthoringChange();
 }
 
 bool TransformComponent::SetLocalRotation(Quaternion value) {
@@ -62,7 +70,7 @@ bool TransformComponent::SetLocalRotation(Quaternion value) {
     _Rotation = unit;
     InvalidateLocalMatrix();
     ++_AuthoringRevision;
-    NotifyComponentChanged(_GameObject, this);
+    NotifyAuthoringChange();
     return true;
 }
 
@@ -73,7 +81,7 @@ void TransformComponent::SetLocalScale(Vector3 value) {
     _Scale = value;
     InvalidateLocalMatrix();
     ++_AuthoringRevision;
-    NotifyComponentChanged(_GameObject, this);
+    NotifyAuthoringChange();
 }
 
 Mat4 TransformComponent::GetLocalMatrix() const {
@@ -132,18 +140,21 @@ bool TransformComponent::SetEvaluatedPose(std::uint64_t animatorID,const Mat4& m
 void TransformComponent::ClearEvaluatedPose(std::uint64_t animatorID) {if(_PoseOwner==animatorID){_PoseOwner=0;InvalidateLocalMatrix();NotifyRuntimePropertiesChanged(_GameObject);}}
 
 Mat4 TransformComponent::GetWorldMatrix() const {
-    if(!_Runtime) {
+    if(!_OwnerState) {
         Mat4 world=GetLocalMatrix();
         for(IGameObject* parent=_GameObject->Parent();parent;parent=parent->Parent())
             if(auto* transform=parent->GetTransform())world=transform->GetLocalMatrix()*world;
         return world;
     }
-    const auto epoch=_Runtime->GetTransformEpoch();
+    return ResolveBuiltinWorldMatrix();
+}
+const Mat4& TransformComponent::ResolveBuiltinWorldMatrix() const {
+    const auto epoch=_OwnerState->Owner.GetTransformEpoch();
     if(_WorldMatrixEpoch==epoch)return _WorldMatrixCache;
     // A new epoch asks for verification. Only a local change or a changed
     // parent matrix requires recomputing the cached result.
     std::array<const TransformComponent*,16> chain;
-    std::vector<const TransformComponent*> deepChain;
+    std::optional<std::vector<const TransformComponent*>> deepChain;
     std::size_t count=0;
     const TransformComponent* current=this;
     Mat4 world;
@@ -155,19 +166,23 @@ Mat4 TransformComponent::GetWorldMatrix() const {
             break;
         }
         if(count<chain.size())chain[count]=current;
-        else deepChain.push_back(current);
+        else {
+            if(!deepChain)deepChain.emplace();
+            deepChain->push_back(current);
+        }
         ++count;
-        auto* parent=current->_GameObject->Parent();
-        auto* parentTransform=parent?parent->GetTransform():nullptr;
-        current=dynamic_cast<const TransformComponent*>(parentTransform);
-        if(parentTransform&&!current) {
-            world=parentTransform->GetWorldMatrix();
-            parentChange=epoch;
+        const auto* parent=current->_OwnerState->Parent;
+        current=parent?parent->BuiltinTransform:nullptr;
+        if(parent&&!current) {
+            if(const auto* transform=parent->Object->GetTransform()) {
+                world=transform->GetWorldMatrix();
+                parentChange=epoch;
+            }
         }
     }
     while(count>0) {
         --count;
-        const auto* item=count<chain.size()?chain[count]:deepChain[count-chain.size()];
+        const auto* item=count<chain.size()?chain[count]:(*deepChain)[count-chain.size()];
         if(!item->_WorldMatrixChangeEpoch||item->_ParentMatrixChangeEpoch!=parentChange) {
             item->_WorldMatrixCache=world*item->GetLocalMatrix();
             item->_WorldMatrixChangeEpoch=epoch;
@@ -181,19 +196,23 @@ Mat4 TransformComponent::GetWorldMatrix() const {
 }
 Mat4 TransformComponent::GetPresentationWorldMatrix() const {
     if(_HasPresentationPhysicsWorld)return _PhysicsPresentation->World;
-    if(!_Runtime||!_Runtime->HasPresentationOverrides())return GetWorldMatrix();
+    if(!_OwnerState||!_OwnerState->Owner.HasPresentationOverrides())return GetWorldMatrix();
     // Only a branch below an opted-in body needs a separate matrix. Reuse
     // the usual world cache for unrelated branches and independent bodies.
     auto* node=this;
     while(node&&!node->_HasPresentationPhysicsWorld) {
         if(node->_HasPhysicsPose)return GetWorldMatrix();
-        auto* parent=node->_GameObject->Parent();
-        node=parent?dynamic_cast<const TransformComponent*>(parent->GetTransform()):nullptr;
+        const auto* parent=node->_OwnerState->Parent;
+        node=parent?parent->BuiltinTransform:nullptr;
+        if(parent&&!node)
+            node=dynamic_cast<const TransformComponent*>(parent->Object->GetTransform());
     }
     if(!node)return GetWorldMatrix();
     Mat4 local;
-    for(auto* child=_GameObject;child!=node->_GameObject;child=child->Parent())
-        local=child->GetTransform()->GetLocalMatrix()*local;
+    for(const auto* child=_OwnerState;child!=node->_OwnerState;child=child->Parent) {
+        const auto* native=child->BuiltinTransform;
+        local=(native?native->GetLocalMatrix():child->Object->GetTransform()->GetLocalMatrix())*local;
+    }
     return node->_PhysicsPresentation->World*local;
 }
 
@@ -211,11 +230,11 @@ bool TransformComponent::SetLocalMatrix(const Mat4& value) {
     SetPresentationPhysicsPose(nullptr);
     InvalidateLocalMatrix();
     ++_AuthoringRevision;
-    NotifyComponentChanged(_GameObject, this);
+    NotifyAuthoringChange();
     return true;
 }
 void TransformComponent::PrepareAuthoringChange() {
-    SetPresentationPhysicsPose(nullptr);
+    if(_HasPresentationPhysicsWorld)SetPresentationPhysicsPose(nullptr);
     if(!_HasPhysicsPose)return;
     _Position=_PhysicsPosition;
     _Rotation=_PhysicsRotation;
@@ -245,7 +264,7 @@ void TransformComponent::SetPresentationPhysicsPose(const Mat4* world,Quaternion
         if(!_PhysicsPresentation)_PhysicsPresentation=std::make_unique<PresentationPhysicsPose>();
         *_PhysicsPresentation={*world,rotation};
     }
-    if(_Runtime&&_HasPresentationPhysicsWorld!=available)_Runtime->TrackPresentationOverride(available);
+    if(_OwnerState&&_HasPresentationPhysicsWorld!=available)_OwnerState->Owner.TrackPresentationOverride(available);
     _HasPresentationPhysicsWorld=available;
     NotifyRuntimePropertiesChanged(_GameObject,false);
 }

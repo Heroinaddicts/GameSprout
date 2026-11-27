@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 
 static void Check(bool condition,const std::string& message) {if(!condition) throw std::runtime_error(message);}
@@ -16,6 +17,7 @@ class SkinProvider final : public GameSproutRuntime::IRuntimeResourceProvider {
 public:
     std::uint64_t Revision=1;
     std::uint32_t BoneCount=2;
+    float VertexOffsetX=0;
     bool Color=false,UV=false,BadIndex=false,BadWeight=false,DiagonalNormal=false,MixedWeights=false;
     int MeshLoads=0;
     std::uint64_t GetRevision() const override {return Revision;}
@@ -25,7 +27,7 @@ public:
         data.BoneIndicesOffset=24+(Color?16:0)+(UV?8:0);data.BoneWeightsOffset=data.BoneIndicesOffset+16;
         const float positions[3][3]={{-.14f,-.14f,0},{.14f,-.14f,0},{0,.14f,0}};
         for(const auto& position:positions) {
-            for(float value:position) Float(data.Bytes,value);
+            Float(data.Bytes,position[0]+VertexOffsetX);Float(data.Bytes,position[1]);Float(data.Bytes,position[2]);
             Float(data.Bytes,DiagonalNormal?1:0);Float(data.Bytes,DiagonalNormal?1:0);Float(data.Bytes,DiagonalNormal?0:1);
             if(Color) for(int component=0;component<4;++component) Float(data.Bytes,1);
             if(UV) {Float(data.Bytes,.5f);Float(data.Bytes,.5f);}
@@ -36,7 +38,7 @@ public:
         data.IndexOffset=data.Bytes.size();data.IndexCount=3;
         for(std::uint32_t index=0;index<3;++index) UInt(data.Bytes,index);
         for(std::uint32_t index=0;index<BoneCount;++index) data.Bones.push_back({index==1?"Bone":"Unused"+std::to_string(index),{}});
-        data.Sections={{0,3,0}};data.LocalBounds={{0,0,0},{.14f,.14f,0}};return true;
+        data.Sections={{0,3,0}};data.LocalBounds={{VertexOffsetX,0,0},{.14f,.14f,0}};return true;
     }
     bool LoadTexture(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::TextureRenderData&,std::string&) override {return false;}
     bool LoadMaterial(const GameSproutRuntime::ResourceReference&,GameSproutRuntime::MaterialRenderData& data,std::string&) override {data={};return true;}
@@ -98,6 +100,61 @@ int main(int argc,char** argv) {
         const auto* meshComponent=first.Mesh->GetComponent<GameSproutRuntime::IMeshComponent>();
         const auto singleJoint=meshComponent->GetLocalBounds();
         Check(singleJoint.Min().X>.15f && singleJoint.Max().X<.45f,"A zero-weight joint expanded the rendered bounds");
+        {
+            std::unique_ptr<GameSproutRuntime::IRuntimeViewport> sibling(runtime->CreateOffscreenRenderer(256,256,&provider,error));
+            Check(sibling!=nullptr,error);
+            auto* skin=first.Mesh->GetComponent<GameSproutRuntime::ISkinnedMeshRendererComponent>();
+            GameSproutRuntime::Mat4 palette[2];
+            const auto renderPixels=[&](GameSproutRuntime::IRuntimeViewport& viewport) {
+                if(!viewport.Render(view))throw std::runtime_error(viewport.GetLastError());
+                Check(viewport.ReadPixels(pixels,error),error);
+            };
+
+            palette[1](0,3)=2.f;
+            Check(skin->SetSkinPose(palette),"Cannot set the offscreen override pose");
+            renderPixels(*renderer);
+            Check(Pixel(pixels,-.2f)<5 && Pixel(pixels,.5f)>100,"First viewport retained the Animator pose");
+            renderPixels(*sibling);
+            Check(Pixel(pixels,-.2f)<5 && Pixel(pixels,.5f)>100,"Second viewport retained the Animator pose");
+
+            // Change the override without advancing the Runtime and render in reverse order.
+            palette[1](0,3)=.55f;
+            Check(skin->SetSkinPose(palette),"Cannot change the override pose in the same frame");
+            renderPixels(*sibling);
+            Check(Pixel(pixels,.05f)>100,"Second viewport retained the old override bounds");
+            renderPixels(*renderer);
+            Check(Pixel(pixels,.05f)>100,"First viewport retained the old override bounds");
+
+            Check(first.Mesh->RemoveComponent<GameSproutRuntime::ISkinnedMeshRendererComponent>(),"Cannot remove a cached direct skin binding");
+            skin=first.Mesh->AddComponent<GameSproutRuntime::ISkinnedMeshRendererComponent>();
+            Check(skin && skin->SetAnimatorObjectID(first.Root->GetInstanceID()),"Cannot replace the cached skin binding");
+            palette[1](0,3)=.7f;
+            Check(skin->SetSkinPose(palette),"Cannot set the replacement skin override");
+            renderPixels(*renderer);
+            Check(Pixel(pixels,.24f)>100 && Pixel(pixels,.05f)<5,"First viewport used a removed skin binding");
+            renderPixels(*sibling);
+            Check(Pixel(pixels,.24f)>100 && Pixel(pixels,.05f)<5,"Second viewport used a removed skin binding");
+
+            palette[1](0,3)=2.f;
+            Check(skin->SetSkinPose(palette),"Cannot restore the offscreen override pose");
+            Check(renderer->Render(view) && sibling->Render(view),"Cannot render both viewports before a mesh reload");
+            Check(provider.MeshLoads==loads,"An additional viewport or pose reloaded a prepared mesh");
+
+            // Keep the pose and bone count unchanged while reimporting the mesh into view.
+            provider.VertexOffsetX=-1.6f;++provider.Revision;
+            renderPixels(*sibling);
+            Check(Pixel(pixels,-.1f)>100,"Second viewport retained bounds from before the mesh reload");
+            renderPixels(*renderer);
+            Check(Pixel(pixels,-.1f)>100,"First viewport retained bounds from before the mesh reload");
+            Check(provider.MeshLoads==loads+1,"Both viewports did not share the reloaded prepared mesh");
+
+            provider.VertexOffsetX=0;++provider.Revision;
+            Check(skin->SetSkinPose({}),"Cannot clear the override pose");
+            renderPixels(*renderer);
+            Check(Pixel(pixels,-.2f)>100,"Clearing the override did not restore the Animator pose");
+            renderPixels(*sibling);
+            Check(Pixel(pixels,-.2f)>100,"Clearing the override did not restore the second viewport's Animator pose");
+        }
         provider.MixedWeights=true;++provider.Revision;
         first.Bone->GetTransform()->SetLocalPosition({10,0,0});
         first.UnusedBone->GetTransform()->SetLocalPosition({10,0,0});
@@ -127,7 +184,7 @@ int main(int argc,char** argv) {
         provider.BadIndex=false;provider.BadWeight=true;++provider.Revision;
         Check(renderer->Render(view) && renderer->GetStatistics().DrawCalls==0 && !renderer->GetLastError().empty(),"Invalid skin weights reached GPU");
         delete renderer;delete runtime;
-        std::cout<<"PASS actual GPU skinning, shared instances, picking/bounds/outline, variants and invalid palettes\n";return 0;
+        std::cout<<"PASS actual GPU skinning, shared instances and viewport pose bounds, picking/bounds/outline, variants and invalid palettes\n";return 0;
     } catch(const std::exception& error) {
         std::cerr<<error.what()<<'\n';delete renderer;delete runtime;return 1;
     }

@@ -2,6 +2,7 @@
 #include "Scene.h"
 #include "Components/ComponentFactory.h"
 #include "Components/ScriptComponent.h"
+#include "Components/TransformComponent.h"
 #include <algorithm>
 #include <limits>
 
@@ -12,7 +13,11 @@ GameObjectState::~GameObjectState() { ReleaseComponents(); }
 IScene* GameObjectState::GetScene() const { return Owner.IsInScene(this)?SceneOwner:nullptr; }
 bool GameObjectState::IsSceneRoot() const {return Object==SceneOwner;}
 
-bool GameObjectState::InitializeTransform() { return AddComponent(typeid(ITransformComponent)) != nullptr; }
+bool GameObjectState::InitializeTransform() {
+    auto* transform=AddComponent(typeid(ITransformComponent));
+    BuiltinTransform=dynamic_cast<TransformComponent*>(transform);
+    return transform!=nullptr;
+}
 void GameObjectState::ReleaseComponents() noexcept {
     Destroying = true;
     while (!Components.empty()) {
@@ -22,6 +27,7 @@ void GameObjectState::ReleaseComponents() noexcept {
         if(auto* script=dynamic_cast<IScriptComponent*>(component))Owner.UnregisterScriptIdentity(ID,script->GetScriptInstanceID());
         try {Owner.InvalidateScriptComponentReferences(component);}catch(...) {}
         Components.pop_back();
+        if(Components.empty())BuiltinTransform=nullptr;
         try { component->OnRelease(&Owner); } catch (...) {}
         delete component;
     }
@@ -110,9 +116,13 @@ bool GameObjectState::SetComponentIndex(IComponent* component,std::size_t index)
     return true;
 }
 IComponent* GameObjectState::GetComponent(const std::type_info& type) const {
-    for (const auto& component:Components) {
+    const auto* entries=Components.data();
+    const auto count=Components.size();
+    const bool collider=type==typeid(IColliderComponent);
+    for(std::size_t i=0;i<count;++i) {
+        const auto& component=entries[i];
         if (component.Pointer->GetComponentType()==type ||
-            (type==typeid(IColliderComponent) && dynamic_cast<IColliderComponent*>(component.Pointer))) return component.Pointer;
+            (collider && dynamic_cast<IColliderComponent*>(component.Pointer))) return component.Pointer;
     }
     if(const auto* registration=Owner.FindScriptType(type))
         for(const auto& component:Components) {

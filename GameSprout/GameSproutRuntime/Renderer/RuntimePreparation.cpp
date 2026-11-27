@@ -1,31 +1,66 @@
 #include "RuntimeRenderer.h"
 #include "GameSproutRuntime.h"
 #include "Components/MeshComponent.h"
+#include "Components/SkinnedMeshRendererComponent.h"
+#include "Scene.h"
+#include "../../Tools/FrameTiming.h"
 #include <algorithm>
 #include <cstring>
 #include <limits>
 #include <numeric>
 
 namespace GameSproutRuntime {
-void Renderer::RefreshSkinPoses(const RenderFrustum::Frustum& frustum) {
+void Renderer::RefreshSkinPoses(const Scene& scene,const RenderFrustum::Frustum& frustum) {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/skin_pose_and_bounds");
+    const bool matchingScene=_ObjectSnapshotKnown&&_ObjectSceneID==scene.GetInstanceID();
     for(auto& skin:_SkinnedDraws) {
         auto& object=_SceneObjects[skin.ObjectIndex];
         if(!object.Geometry)object.Geometry=Mesh(object.Mesh);
         auto* mesh=object.Geometry;
-        auto* node=_Runtime.QueryGameObject(object.ObjectID);
-        std::uint64_t overrideRevision=0;
-        const auto palette=mesh&&node?SkinMatrices(*node,*mesh,_SkinScratch,overrideRevision):std::nullopt;
+        // Check after resource-provider calls. A command batch can retire an
+        // object even when it removes the last world renderer before destruction.
+        // The enclosing RuntimeOperation defers frees while this pass is running.
+        const bool matchingStructure=matchingScene&&_ObjectAuthoringBatch==_Runtime._NextAuthoringBatch&&
+            scene.HasSameRenderStructure(_ObjectSceneRevision);
+        if(!matchingStructure) {
+            skin.SnapshotSkin=nullptr;
+            skin.SnapshotMesh=nullptr;
+        }
+        auto* snapshotSkin=skin.SnapshotSkin;
+        if(snapshotSkin&&snapshotSkin->_SkinPose.empty())snapshotSkin=nullptr;
+        auto* node=snapshotSkin?snapshotSkin->_OwnerState->Object:_Runtime.QueryGameObject(object.ObjectID);
+        SkinnedMeshRendererComponent* overrideSkin=nullptr;
+        const auto palette=mesh&&node?SkinMatrices(*node,*mesh,_SkinScratch,&overrideSkin,snapshotSkin):std::nullopt;
+        const auto overrideRevision=overrideSkin?overrideSkin->_SkinPoseRevision:0;
+        const auto previousBoneCount=object.SkinMatrices.size();
         bool ready=palette.has_value();
-        auto* component=node?dynamic_cast<MeshComponent*>(node->GetComponent<IMeshComponent>()):nullptr;
+        auto* component=snapshotSkin?skin.SnapshotMesh:
+            (node?dynamic_cast<MeshComponent*>(node->GetComponent<IMeshComponent>()):nullptr);
+        if(!snapshotSkin&&matchingStructure&&overrideSkin&&component) {
+            // Only a validated built-in override takes this path. Custom and
+            // animator-provided palettes keep their existing component lookups.
+            skin.SnapshotSkin=overrideSkin;
+            skin.SnapshotMesh=component;
+        }
         if(ready) {
-            const bool samePose=object.SkinPoseReady&&object.SkinMatrices.size()==palette->size()&&
-                (overrideRevision?skin.OverrideRevision==overrideRevision:
+            const bool samePose=object.SkinPoseReady&&previousBoneCount==palette->size()&&
+                (overrideSkin?skin.OverrideRevision!=0&&skin.OverrideRevision==overrideRevision:
                     (palette->empty()||!std::memcmp(palette->data(),object.SkinMatrices.data(),palette->size_bytes())));
             if(!samePose) {
-                ready=SkinPoseBounds(*mesh,*palette,skin.LocalBounds);
+                if(overrideSkin&&mesh->SkinBoundsIdentity&&overrideSkin->_SkinBoundsMeshIdentity==mesh->SkinBoundsIdentity) {
+                    skin.LocalBounds=overrideSkin->_SkinPoseBounds;
+                } else {
+                    ready=SkinPoseBounds(*mesh,*palette,skin.LocalBounds);
+                    if(ready&&overrideSkin) {
+                        overrideSkin->_SkinBoundsMeshIdentity=mesh->SkinBoundsIdentity;
+                        overrideSkin->_SkinPoseBounds=skin.LocalBounds;
+                    }
+                }
                 if(ready) {
-                    if(overrideRevision)object.SkinMatrices.assign(palette->begin(),palette->end());
-                    else object.SkinMatrices.swap(_SkinScratch);
+                    if(overrideSkin) {
+                        object.SkinMatrices.resize(palette->size());
+                        std::copy_n(palette->data(),palette->size(),object.SkinMatrices.data());
+                    } else object.SkinMatrices.swap(_SkinScratch);
                     object.SkinUploadDirty=true;
                     object.CullBoxKnown=false;
                 }
@@ -38,7 +73,9 @@ void Renderer::RefreshSkinPoses(const RenderFrustum::Frustum& frustum) {
         }
         object.SkinPoseReady=ready;
         skin.OverrideRevision=overrideRevision;
-        if(!ready) {object.SkinMatrices.clear();object.CullBoxKnown=false;continue;}
+        if(!ready) {object.SkinMatrices.clear();object.CullBoxKnown=false;}
+        if(previousBoneCount!=object.SkinMatrices.size())_SkinPaletteLayoutDirty=true;
+        if(!ready)continue;
         // Bounds are derived from the current skin palette, including vertices
         // that move across the frustum independently of their object transform.
         // The shadow passes still read every caster's palette and pose bounds.
@@ -57,7 +94,7 @@ void Renderer::PrepareDraws(const RenderView& view,const Mat4& viewProjection) {
     // The color list can be kept as long as the sampled poses stay on the
     // same side of the view frustum. Planar captures have their own frustum.
     const RenderFrustum::Frustum frustum(viewProjection);
-    RefreshSkinPoses(frustum);
+    RefreshSkinPoses(static_cast<const Scene&>(*view.Scene),frustum);
     const auto& position=view.Camera.Position;
     const auto& current=view.Camera.Projection;const auto& previous=_PreparedCamera.Projection;
     if(_PreparedKnown&&

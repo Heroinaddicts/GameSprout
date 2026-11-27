@@ -1,4 +1,5 @@
 #include "RuntimeRenderer.h"
+#include "../../Tools/FrameTiming.h"
 #include <algorithm>
 #include <limits>
 
@@ -93,7 +94,6 @@ void Renderer::ClearInstanceBuffers() {
     _SkinPaletteOffsetsBuffer=nullptr;
     _SkinPaletteBuffer=nullptr;
     _SkinPaletteOffsets.clear();
-    _SkinPaletteOffsetScratch.clear();
     _SkinPaletteMatrices.clear();
     _InstanceTransforms.clear();
     _ChangedInstanceTransforms.clear();
@@ -108,6 +108,7 @@ void Renderer::ClearInstanceBuffers() {
 
 void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,bool enabled,
     std::vector<InstanceDraw>& batches,std::vector<std::uint32_t>& indices) const {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/instance_batches");
     batches.clear();
     for(std::size_t begin=0;begin<draws.size();) {
         const auto& draw=draws[begin];
@@ -133,6 +134,7 @@ void Renderer::PrepareInstanceBatches(const std::vector<PreparedDraw>& draws,boo
 }
 
 bool Renderer::UploadResidentInstances(GRHI::ICommandBuffer& command) {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/instance_transform_upload");
     if(_SceneObjects.empty())return true;
     const auto requiredBytes=_SceneObjects.size()*sizeof(InstanceVertex);
     auto& changes=_ChangedInstanceTransforms;
@@ -177,6 +179,7 @@ bool Renderer::UploadResidentInstances(GRHI::ICommandBuffer& command) {
 }
 
 bool Renderer::UploadInstanceStream(GRHI::ICommandBuffer& command,InstanceStream& stream) {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/instance_visibility_upload");
     if(stream.Indices.empty()||stream.Indices==stream.Uploaded)return true;
     const auto bytes=stream.Indices.size()*sizeof(std::uint32_t);
     if(!ReserveInstanceBuffer(_Device,stream.Buffer,bytes,GRHI::BufferUsage::Vertex))
@@ -190,24 +193,27 @@ bool Renderer::UploadInstanceStream(GRHI::ICommandBuffer& command,InstanceStream
 }
 
 bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/skin_palette_upload");
     if(_SkinnedDraws.empty())return true;
-    _SkinPaletteOffsetScratch.assign(_SceneObjects.size(),0);
-    constexpr auto maxMatrices=std::numeric_limits<std::uint32_t>::max()/sizeof(InstanceBoneMatrix);
-    std::uint32_t matrixCount=0;
-    for(const auto& skinned:_SkinnedDraws) {
-        const auto& object=_SceneObjects[skinned.ObjectIndex];
-        if(!object.SkinPoseReady)continue;
-        if(object.SkinMatrices.size()>maxMatrices-matrixCount)
-            return Fail("Skinned instance palette exceeds the storage buffer limit");
-        _SkinPaletteOffsetScratch[object.InstanceIndex]=matrixCount;
-        matrixCount+=static_cast<std::uint32_t>(object.SkinMatrices.size());
-    }
-    if(!matrixCount)return true;
-    const bool layoutChanged=_SkinPaletteLayoutDirty||_SkinPaletteOffsetScratch!=_SkinPaletteOffsets||
-        matrixCount!=_SkinPaletteMatrices.size();
+    const bool layoutChanged=_SkinPaletteLayoutDirty;
     if(layoutChanged) {
-        _SkinPaletteOffsets.swap(_SkinPaletteOffsetScratch);
+        // Pose changes keep a drawable's bone count and offset in the resident palette.
+        _SkinPaletteOffsets.assign(_SceneObjects.size(),0);
+        constexpr auto maxMatrices=std::numeric_limits<std::uint32_t>::max()/sizeof(InstanceBoneMatrix);
+        std::uint32_t matrixCount=0;
+        for(const auto& skinned:_SkinnedDraws) {
+            const auto& object=_SceneObjects[skinned.ObjectIndex];
+            if(!object.SkinPoseReady)continue;
+            if(object.SkinMatrices.size()>maxMatrices-matrixCount)
+                return Fail("Skinned instance palette exceeds the storage buffer limit");
+            _SkinPaletteOffsets[object.InstanceIndex]=matrixCount;
+            matrixCount+=static_cast<std::uint32_t>(object.SkinMatrices.size());
+        }
         _SkinPaletteMatrices.resize(matrixCount);
+    }
+    if(_SkinPaletteMatrices.empty()) {
+        _SkinPaletteLayoutDirty=false;
+        return true;
     }
     // Matrices for each drawable have stable offsets until scene membership or its mesh changes.
     // Merge adjacent dirty spans. For many separate spans, one full upload is cheaper.
@@ -216,18 +222,22 @@ bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
     std::array<Span,maxSpans> spans;
     std::size_t spanCount=0;
     bool fullUpload=layoutChanged;
+    auto* objects=_SceneObjects.data();
+    const auto* offsets=_SkinPaletteOffsets.data();
     for(const auto& skinned:_SkinnedDraws) {
-        auto& object=_SceneObjects[skinned.ObjectIndex];
+        auto& object=objects[skinned.ObjectIndex];
         if(!object.SkinPoseReady||(!layoutChanged&&!object.SkinUploadDirty))continue;
-        const auto begin=_SkinPaletteOffsets[object.InstanceIndex];
-        const auto end=begin+static_cast<std::uint32_t>(object.SkinMatrices.size());
+        const auto begin=offsets[object.InstanceIndex];
+        const auto count=static_cast<std::uint32_t>(object.SkinMatrices.size());
+        const auto end=begin+count;
         // Instanced skinning uses xyz of the transformed position and the
         // linear part for normals. Preserve all of those coefficients.
-        std::transform(object.SkinMatrices.begin(),object.SkinMatrices.end(),_SkinPaletteMatrices.begin()+begin,
-            [](const Mat4& matrix) {
-                const auto& m=matrix.Data;
-                return InstanceBoneMatrix{{m[0],m[4],m[8],m[12]},{m[1],m[5],m[9],m[13]},{m[2],m[6],m[10],m[14]}};
-            });
+        auto* packed=_SkinPaletteMatrices.data()+begin;
+        const auto* matrices=object.SkinMatrices.data();
+        for(std::uint32_t i=0;i<count;++i) {
+            const auto& m=matrices[i].Data;
+            packed[i]={{m[0],m[4],m[8],m[12]},{m[1],m[5],m[9],m[13]},{m[2],m[6],m[10],m[14]}};
+        }
         object.SkinUploadDirty=false;
         if(fullUpload)continue;
         if(spanCount&&spans[spanCount-1].End==begin)spans[spanCount-1].End=end;
@@ -235,6 +245,8 @@ bool Renderer::UploadSkinPalettes(GRHI::ICommandBuffer& command) {
         else spans[spanCount++]={begin,end};
     }
     if(!fullUpload&&!spanCount)return true;
+    // Repack and retry the full palette if this upload cannot be recorded.
+    _SkinPaletteLayoutDirty=true;
     const auto offsetBytes=_SkinPaletteOffsets.size()*sizeof(std::uint32_t);
     const auto matrixBytes=_SkinPaletteMatrices.size()*sizeof(InstanceBoneMatrix);
     if(!ReserveInstanceBuffer(_Device,_SkinPaletteOffsetsBuffer,offsetBytes,GRHI::BufferUsage::VertexStorage)||

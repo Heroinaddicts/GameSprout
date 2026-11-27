@@ -2,6 +2,8 @@
 #include "GameSproutRuntime.h"
 
 namespace GameSproutRuntime {
+class TransformComponent;
+
 class GameObjectState {
 public:
     struct ComponentEntry {
@@ -51,6 +53,7 @@ public:
     GameObjectState* Parent = nullptr;
     std::vector<GameObjectState*> Children;
     std::vector<ComponentEntry> Components;
+    TransformComponent* BuiltinTransform = nullptr;
     std::uint64_t NextComponentSerial = 0;
     std::uint64_t NextScriptID = 0;
     bool Active = true;
@@ -110,7 +113,12 @@ public:
     void SetActive(bool active) override { _State.SetActive(active); }
     bool IsActiveSelf() const override { return _State.Active; }
     bool IsActiveInHierarchy() const override { return _State.IsActiveInHierarchy(); }
-    ITransformComponent* GetTransform() const override { return static_cast<ITransformComponent*>(_State.GetComponent(typeid(ITransformComponent))); }
+    ITransformComponent* GetTransform() const override {
+        // Initialization installs the intrinsic Transform first. It stays first
+        // through component edits and is released last during object teardown.
+        return _State.Components.empty()?nullptr:
+            static_cast<ITransformComponent*>(_State.Components.data()->Pointer);
+    }
     std::size_t GetComponentCount() const override { return _State.Components.size(); }
     IComponent* GetComponentAt(std::size_t index) const override { return index < _State.Components.size() ? _State.Components[index].Pointer : nullptr; }
     void ForeachComponent(const IGameObject::fForeachComponentCallback& callback) const override { _State.ForeachComponent(callback); }

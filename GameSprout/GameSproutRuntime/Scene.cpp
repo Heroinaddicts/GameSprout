@@ -1,12 +1,85 @@
 #include "Scene.h"
+#include "Components/TransformComponent.h"
+#include "RuntimeMath.h"
 #include <algorithm>
+#include <cstring>
 
 namespace GameSproutRuntime {
-void Scene::RecordAuthoringChange(std::uint64_t objectID,SceneNodeEventType type,const char* component,std::uint64_t batch) {
+RenderObjectTransform RenderObjectTransform::FromModel(const Mat4& model) {
+    RenderObjectTransform result;
+    result.Model=model;
+    Mat4 inverse;
+    if(!RuntimeMath::TryInverseAffine(model,inverse))return result;
+    for(std::size_t row=0;row<3;++row)
+        for(std::size_t column=0;column<3;++column)result.Normal(row,column)=inverse(column,row);
+    const double determinant=double(model(0,0))*(double(model(1,1))*model(2,2)-double(model(1,2))*model(2,1))-
+        double(model(0,1))*(double(model(1,0))*model(2,2)-double(model(1,2))*model(2,0))+
+        double(model(0,2))*(double(model(1,0))*model(2,1)-double(model(1,1))*model(2,0));
+    result.Valid=true;
+    result.Negative=determinant<0;
+    return result;
+}
+
+CachedRenderObjectTransform* Scene::BindRenderObjectTransform(const GameObjectState& node) const {
+    auto& cached=_RenderObjectTransforms.try_emplace(node.ID).first->second;
+    if(cached.Revision!=_RenderRevision&&!RefreshRenderObjectTransform(cached,node))return nullptr;
+    return &cached;
+}
+
+bool Scene::RefreshRenderObjectTransform(CachedRenderObjectTransform& cached,const GameObjectState& node) const {
+    const auto revision=_RenderRevision;
+    const auto refresh=[&](const Mat4& model) {
+        if(!cached.Revision||std::memcmp(cached.Value.Model.Data,model.Data,sizeof(model.Data)))
+            cached.Value=RenderObjectTransform::FromModel(model);
+    };
+    if(const auto* transform=node.BuiltinTransform) {
+        if(node.Owner.HasPresentationOverrides())refresh(transform->GetPresentationWorldMatrix());
+        else refresh(transform->ResolveBuiltinWorldMatrix());
+    }else if(const auto* transform=node.Object->GetTransform()) {
+        const auto model=transform->GetPresentationWorldMatrix();
+        // A virtual transform getter can invalidate the slot before it returns.
+        if(!HasSameRenderStructure(revision))return false;
+        refresh(model);
+    }else cached.Value={};
+    cached.Revision=revision;
+    return true;
+}
+
+const RenderObjectTransform* Scene::GetRenderObjectTransform(std::uint64_t objectID,const GameObjectState* knownNode) const {
+    const auto found=_RenderObjectTransforms.find(objectID);
+    if(found!=_RenderObjectTransforms.end()&&found->second.Revision==_RenderRevision)return &found->second.Value;
+    if(!knownNode) {
+        auto& runtime=State().Owner;
+        knownNode=runtime.Find(objectID);
+        if(!runtime.IsInScene(knownNode)||knownNode->SceneOwner!=this)return nullptr;
+    }
+    if(found==_RenderObjectTransforms.end()) {
+        const auto* cached=BindRenderObjectTransform(*knownNode);
+        return cached?&cached->Value:nullptr;
+    }
+    auto& cached=found->second;
+    return RefreshRenderObjectTransform(cached,*knownNode)?&cached.Value:nullptr;
+}
+
+bool Scene::GetAuthoringChanges(std::uint64_t after,std::vector<SceneAuthoringChange>& changes) const {
+    changes.clear();
+    if(after>_AuthoringRevision||_AuthoringRevision-after>_AuthoringChanges.size())return false;
+    const auto start=_AuthoringChanges.size()-static_cast<std::size_t>(_AuthoringRevision-after);
+    changes.reserve(_AuthoringChanges.size()-start);
+    for(auto index=start;index<_AuthoringChanges.size();++index) {
+        const auto& record=_AuthoringChanges[index];
+        changes.push_back(record.Change);
+        if(record.BuiltinTransform)changes.back().ComponentType=TransformComponent::TypeName;
+    }
+    return true;
+}
+
+void Scene::RecordAuthoringChange(std::uint64_t objectID,SceneNodeEventType type,const char* component,
+    std::uint64_t batch,bool builtinTransform) {
     if(type==SceneNodeEventType::OperationFailed)return;
     ++_AuthoringRevision;
     try {
-        _AuthoringChanges.push_back({{objectID,type,component?component:""},batch});
+        _AuthoringChanges.push_back({{objectID,type,component?component:""},batch,builtinTransform});
         constexpr std::size_t historyWindow=2048;
         if(_AuthoringChanges.size()<=historyWindow)return;
         // Keep the entire structural edit that overlaps the recent history.
@@ -24,6 +97,7 @@ void Scene::InvalidateRenderSnapshot(std::uint64_t objectID,RenderObjectChangeKi
     if(!objectID) {
         _RenderStructureRevision=_RenderRevision;
         _RenderObjectChanges.clear();
+        _RenderObjectTransforms.clear();
         return;
     }
     if(kind==RenderObjectChangeKind::Mesh)_RenderMeshRevision=_RenderRevision;

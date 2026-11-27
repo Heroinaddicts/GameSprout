@@ -15,7 +15,12 @@
 namespace GameSproutRuntime {
 class Runtime;
 class RenderResourceCache;
+class MeshComponent;
+class SkinnedMeshRendererComponent;
+class Scene;
 struct RenderObjectChange;
+struct RenderObjectTransform;
+struct CachedRenderObjectTransform;
 namespace RuntimeShadowMath { struct CascadeSet; struct ReceiverFootprint; }
 namespace RenderEnvironment { struct Uniform; }
 class Renderer final : public IRuntimeViewport {
@@ -48,6 +53,7 @@ private:
     struct MeshGPU {
         std::uint64_t ResourceRevision=0;
         std::uint64_t SortRank=0;
+        std::uint64_t SkinBoundsIdentity=0;
         struct SkinVertex { std::uint32_t Bones[4]{}; float Weights[4]{}; };
         struct SkinInfluenceBounds {
             std::size_t Joint=0;
@@ -179,7 +185,13 @@ private:
         std::size_t ReflectionProbeIndex=0;
         std::array<std::uint32_t,MaxLocalLights> LocalLightIndices{};
     };
-    struct SkinnedDrawState {std::size_t ObjectIndex;Bounds LocalBounds;std::uint64_t OverrideRevision=0;};
+    struct SkinnedDrawState {
+        std::size_t ObjectIndex;
+        Bounds LocalBounds;
+        std::uint64_t OverrideRevision=0;
+        SkinnedMeshRendererComponent* SnapshotSkin=nullptr;
+        MeshComponent* SnapshotMesh=nullptr;
+    };
     struct DrawUniform {Mat4 Model,ViewProjection,Normal;Color BaseColor;Vector4 TextureST{1,1,0,0};};
     struct FrameUniform {Vector4 Time,CameraPosition,MainLightDirection,MainLightColor;};
     static_assert(sizeof(FrameUniform)==64);
@@ -378,14 +390,16 @@ private:
     void ClearUIDraws();
     bool Initialize();
     bool Extract(const RenderView& view,std::vector<DrawObject>& objects);
-    bool UpdateSceneObjects(IScene& scene,const std::vector<RenderObjectChange>& changes,std::vector<DrawObject>& objects);
-    bool RefreshDrawObjects(IScene& scene,std::vector<DrawObject>& objects,bool meshChanges,bool materialChanges);
+    bool UpdateSceneObjects(const Scene& scene,const std::vector<RenderObjectChange>& changes,std::vector<DrawObject>& objects);
+    bool RefreshDrawObjects(const Scene& scene,std::vector<DrawObject>& objects,bool meshChanges,bool materialChanges);
     bool UpdateDrawTransform(DrawObject& object,const Mat4& model,const RenderFrustum::Frustum& frustum);
+    bool UpdateDrawTransform(DrawObject& object,const RenderObjectTransform& transform,const RenderFrustum::Frustum& frustum);
     bool UpdateDrawMesh(DrawObject& object,const IGameObject& node);
     bool UpdateDrawMaterials(DrawObject& object,const IGameObject& node);
-    static bool SetDrawTransform(DrawObject& object,const Mat4& model);
+    static void SetDrawTransform(DrawObject& object,const RenderObjectTransform& transform);
+    bool RefreshSceneBindings(const Scene& scene);
     void PrepareDraws(const RenderView&,const Mat4& viewProjection);
-    void RefreshSkinPoses(const RenderFrustum::Frustum& frustum);
+    void RefreshSkinPoses(const Scene& scene,const RenderFrustum::Frustum& frustum);
     MeshGPU* Mesh(const ResourceReference& reference);
     ColliderMeshWire* ColliderMesh(IColliderComponent& collider,const ResourceReference& reference,bool convex,const Mat4& relative);
     TextureGPU* Texture(const ResourceReference& reference,bool* pending=nullptr);
@@ -425,7 +439,8 @@ private:
     bool BeginQuery(IScene* scene);
     bool QueryObject(IScene* scene,std::uint64_t objectID,IGameObject*& object,MeshGPU*& mesh,Mat4& model);
     std::optional<std::span<const Mat4>> SkinMatrices(IGameObject& object,const MeshGPU& mesh,
-        std::vector<Mat4>& scratch,std::uint64_t& overrideRevision);
+        std::vector<Mat4>& scratch,SkinnedMeshRendererComponent** overrideSkin=nullptr,
+        SkinnedMeshRendererComponent* snapshotSkin=nullptr);
     bool SkinPoseBounds(const MeshGPU& mesh,std::span<const Mat4> matrices,Bounds& bounds);
     bool PosedPositions(IGameObject& object,const MeshGPU& mesh,std::vector<Vector3>& positions);
     bool PosedPositions(const MeshGPU& mesh,std::span<const Mat4> matrices,std::vector<Vector3>& positions);
@@ -458,6 +473,15 @@ private:
     std::map<PipelineKey,GRHI::IGraphicsPipeline*>& _Pipelines;
     std::vector<DrawObject> _SceneObjects;
     std::unordered_map<std::uint64_t,std::size_t> _SceneObjectIndices;
+    struct SceneTransformBranch {
+        const GameObjectState* Node=nullptr;
+        SceneTransformBranch* FirstChild=nullptr;
+        SceneTransformBranch* NextSibling=nullptr;
+        CachedRenderObjectTransform* SharedTransform=nullptr;
+        std::optional<std::size_t> DrawIndex;
+        std::uint64_t VisitedRevision=0;
+    };
+    std::unordered_map<std::uint64_t,SceneTransformBranch> _SceneTransformBranches;
     std::vector<DirectionalLight> _SceneLights;
     std::vector<LocalLight> _LocalLights;
     std::vector<bool> _VisibleLocalShadowReceivers;
@@ -483,7 +507,7 @@ private:
     std::uint32_t _PreparedVisible=0,_PreparedSkipped=0;
     std::string _PreparedDiagnostic;
     std::size_t _SortedMeshCount=0,_SortedMaterialCount=0;
-    std::uint64_t _ObjectSceneID=0,_ObjectSceneRevision=0,_LightSceneID=0,_LightSceneRevision=0;
+    std::uint64_t _ObjectSceneID=0,_ObjectSceneRevision=0,_ObjectAuthoringBatch=0,_LightSceneID=0,_LightSceneRevision=0;
     std::uint32_t _ObjectCullingMask=0,_ExtractionSkipped=0;
     bool _ObjectSnapshotKnown=false,_LightSnapshotKnown=false;
     std::string _ExtractionDiagnostic,_LightDiagnostic;
@@ -528,7 +552,7 @@ private:
     GRHI::IBuffer* _InstanceTransformsBuffer=nullptr;
     GRHI::IBuffer* _SkinPaletteOffsetsBuffer=nullptr;
     GRHI::IBuffer* _SkinPaletteBuffer=nullptr;
-    std::vector<std::uint32_t> _SkinPaletteOffsets,_SkinPaletteOffsetScratch;
+    std::vector<std::uint32_t> _SkinPaletteOffsets;
     struct InstanceBoneMatrix {
         float Row0[4],Row1[4],Row2[4];
     };

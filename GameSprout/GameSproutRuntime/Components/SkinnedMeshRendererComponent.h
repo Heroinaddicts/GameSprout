@@ -1,5 +1,6 @@
 #pragma once
 #include "BuiltinComponent.h"
+#include "Api/Math/Bounds.h"
 namespace GameSproutRuntime {
 class GameObjectState;
 
@@ -18,5 +19,7 @@ private:
     std::uint64_t _AnimatorID=0;
     std::vector<Mat4> _SkinPose;
     std::uint64_t _SkinPoseRevision=0;
+    std::uint64_t _SkinBoundsMeshIdentity=0;
+    Bounds _SkinPoseBounds;
 };
 }

@@ -25,12 +25,9 @@ bool CookMeshCollision(const MeshCollisionBakeInput &input, CookedMeshCollisionD
 MeshCollisionCooker Runtime::GetMeshCollisionCooker() const {
     return {&CookMeshCollision,GPhysics::MeshArtifactFormat()};
 }
-void Runtime::InvalidatePhysicsTransform(IGameObject* object) {
-    if (!_PhysicsSystem)
-        return;
-    const auto* state = Find(object);
-    if (state && state->SceneOwner)
-        _PhysicsSystem->InvalidateTransform(state->SceneOwner->GetInstanceID(), state->ID);
+void Runtime::InvalidatePhysicsTransform(const GameObjectState& object) {
+    if (_PhysicsSystem && object.SceneOwner)
+        _PhysicsSystem->InvalidateTransform(object.SceneOwner->GetInstanceID(), object.ID);
 }
 void Runtime::NotifyPhysicsChange(const GameObjectState& object, SceneNodeEventType type, const char* component) {
     if (!_PhysicsSystem || !object.SceneOwner)

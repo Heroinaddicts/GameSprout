@@ -257,6 +257,20 @@ int main(int argc,char** argv){
         pixels=Pixels(*viewport,view);Equivalent(Pixels(*secondViewport,view),pixels,"Independent viewport instance ownership leaked");
         Check(secondViewport->GetStatistics().InstanceBufferUploads==2,"Second viewport reused a foreign GPU instance buffer");
         Pixels(*viewport,view);Check(viewport->GetStatistics().InstanceBufferUploads==0,"Other viewport invalidated resident instances");
+        auto* sharedTransform=nodes.front()->GetTransform();
+        sharedTransform->SetLocalPosition({0,9,0});
+        const auto crossViewportMove=Pixels(*secondViewport,view);
+        Check(crossViewportMove!=pixels&&secondViewport->GetStatistics().InstanceTransformUploadBytes==128,
+            "A same-frame transform edit did not reach the second viewport");
+        Equivalent(Pixels(*viewport,view),crossViewportMove,"The first viewport did not see the same transform revision");
+        sharedTransform->SetLocalScale({0,1,1});
+        const auto singular=Pixels(*viewport,view);
+        Check(singular!=crossViewportMove&&viewport->GetStatistics().InstancedInstances==98,
+            "A singular transform remained eligible for instancing");
+        Equivalent(Pixels(*secondViewport,view),singular,"A singular transform was stale in the second viewport");
+        sharedTransform->SetLocalScale({1,1,1});
+        Equivalent(Pixels(*secondViewport,view),crossViewportMove,"Restoring an invertible transform did not restore the draw");
+        Equivalent(Pixels(*viewport,view),crossViewportMove,"The first viewport did not recover the invertible transform");
         delete secondViewport;secondViewport=nullptr;
         provider.Materials[100].EnableGPUInstancing=false;++provider.Revision;
         Pixels(*viewport,view);Check(viewport->GetStatistics().DrawCalls==99&&viewport->GetStatistics().InstancedDrawCalls==0,

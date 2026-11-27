@@ -15,6 +15,7 @@
 namespace GameSproutRuntime {
 class GameObjectState;
 class Scene;
+class TransformComponent;
 class AnimatorComponent;
 class ScriptComponent;
 class ButtonComponent;
@@ -213,10 +214,13 @@ public:
     bool IsConstructing() const { return _ConstructionDepth!=0; }
     bool PreparePhysics(std::string& error);
     void ResetPhysics(bool releaseSystem = false);
-    void InvalidatePhysicsTransform(IGameObject* object);
+    void InvalidatePhysicsTransform(const GameObjectState& object);
     void ResetPhysicsPresentation(std::uint64_t scene, const GameObjectState* subtree=nullptr);
 
 private:
+    void NotifyTransformChange(GameObjectState& object);
+    void RecordNodeChange(GameObjectState& object,SceneNodeEventType type,const char* component,
+        std::uint64_t oldParent,bool builtinTransform=false);
     void AdvanceFrameInternal(float deltaSeconds,std::uint32_t fixedStepCount,float fixedDeltaSeconds,
                               float alpha,bool collapseHistory);
     void PresentPhysicsTransforms(float alpha,bool collapseHistory);
@@ -233,7 +237,11 @@ private:
         IComponent* Component = nullptr;
         std::uint64_t Serial = 0;
     };
-    struct EventRecord { std::uint64_t Sequence; SceneNodeEvent Event; };
+    struct EventRecord {
+        std::uint64_t Sequence;
+        SceneNodeEvent Event;
+        bool BuiltinTransform=false;
+    };
     struct InitializationRecord { std::uint64_t ObjectID; std::uint64_t Serial; };
     struct Listener { IRuntimeListener* Pointer; std::uint64_t AfterSequence; std::uint64_t AfterAnimationSequence=0; };
     struct AnimationRecord {
@@ -397,7 +405,10 @@ private:
     GRHI::GRHIApi* _RenderApi=nullptr;
     GRHI::IDevice* _RenderDevice=nullptr;
     std::map<IRuntimeResourceProvider*,RenderResourceCache*> _RenderResourceCaches;
+    std::uint64_t _LastSkinBoundsMeshIdentity=0;
     friend class RenderResourceLease;
+    friend class Renderer;
+    friend class TransformComponent;
     RuntimePhysicsSystem* _PhysicsSystem=nullptr;
     ScriptComponent* _InvokingScript=nullptr;
     std::string _LastPhysicsError;

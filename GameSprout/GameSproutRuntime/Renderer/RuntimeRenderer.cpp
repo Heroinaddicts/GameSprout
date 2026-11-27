@@ -6,6 +6,7 @@
 #include "RuntimeMath.h"
 #include "RuntimeFrustum.h"
 #include "RuntimeEnvironment.h"
+#include "../../Tools/FrameTiming.h"
 #include <exception>
 #include <algorithm>
 
@@ -35,6 +36,7 @@ struct DebugBufferScope {
 }
 namespace GameSproutRuntime {
 bool Renderer::Render(const RenderView& view) {
+    GAMESPROUT_FRAME_SCOPE(Runtime, "render/view");
     _HasRenderedCamera=false;_RenderedCamera={};_LinearCaptureReady=false;
     if(_Rendering || _Runtime.IsExecuting() || _Runtime.IsShuttingDown() || _Runtime.IsConstructing()) return Fail("Runtime Renderer cannot run inside a Runtime callback, construction or another Render");
     _Error.clear();_Statistics={};_ShadowRecorded=false;_SpotShadowRecorded=false;_PlanarParameters={};
@@ -96,7 +98,10 @@ bool Renderer::Render(const RenderView& view) {
         }
         std::vector<DebugBatch> debugBatches;
         if(view.DrawScene && !PrepareDebug(view.DebugDraw,debugBatches)) return false;
-        if(view.DrawScene && !Extract(view,_SceneObjects)) return false;
+        if(view.DrawScene) {
+            GAMESPROUT_FRAME_SCOPE(Runtime, "render/extract_scene");
+            if(!Extract(view,_SceneObjects))return false;
+        }
         auto& lights=_SceneLights;
         if(view.DrawScene&&!ExtractLights(view.Scene,lights))return false;
         _ShaderFrame={};
@@ -112,16 +117,29 @@ bool Renderer::Render(const RenderView& view) {
             else if(sky&&settings->ReflectionIntensity>0)reflections=sky;
         }
         if(view.DrawScene) {
+            GAMESPROUT_FRAME_SCOPE(Runtime, "render/prepare_scene");
             _IndirectLightingAtlas=nullptr;
             if(view.EnableBakedIndirectLighting)PrepareIndirectLighting(*settings,environment);
             BeginTexturePrefetchFrame(view.EnableTexturePrefetch);
-            PrepareDraws(view,viewProjection);
+            {
+                GAMESPROUT_FRAME_SCOPE(Runtime, "render/prepare_draws");
+                PrepareDraws(view,viewProjection);
+            }
             PrepareLocalLights();
             PrepareReflectionProbes(view,*settings);
-            if(!PrepareColorInstances(*command.Command,view))return false;
-            if(!RenderShadows(*command.Command,view,float(width)/height))return false;
-            if(!RenderSpotShadows(*command.Command,view,viewProjection))return false;
-            if(!RenderPlanarReflection(*command.Command,view,width,height,environment,sky,reflections))return false;
+            {
+                GAMESPROUT_FRAME_SCOPE(Runtime, "render/prepare_instances");
+                if(!PrepareColorInstances(*command.Command,view))return false;
+            }
+            {
+                GAMESPROUT_FRAME_SCOPE(Runtime, "render/record_shadows");
+                if(!RenderShadows(*command.Command,view,float(width)/height))return false;
+                if(!RenderSpotShadows(*command.Command,view,viewProjection))return false;
+            }
+            {
+                GAMESPROUT_FRAME_SCOPE(Runtime, "render/record_planar");
+                if(!RenderPlanarReflection(*command.Command,view,width,height,environment,sky,reflections))return false;
+            }
             EndTexturePrefetchFrame();
             for(auto* buffer:{_InstanceTransformsBuffer,_SkinPaletteOffsetsBuffer,_SkinPaletteBuffer,_ColorInstances.Buffer,_StaticShadowInstances.Buffer,
                 _DynamicShadowInstances.Buffer,_SpotShadowInstances.Buffer})
@@ -145,7 +163,10 @@ bool Renderer::Render(const RenderView& view) {
         _Statistics.Width=width;_Statistics.Height=height;
         if(view.DrawScene&&!DrawSky(*command.Pass,view,sceneFormat,float(width)/float(height),lights,sky))return false;
         if(view.DrawScene && view.DrawGrid && !DrawGrid(*command.Pass,viewProjection,sceneFormat)) return false;
-        if(view.DrawScene&&!DrawPrepared(*command.Pass,_PreparedDraws,view,viewProjection,sceneFormat,lights,environment,reflections))return false;
+        if(view.DrawScene) {
+            GAMESPROUT_FRAME_SCOPE(Runtime, "render/record_scene_draws");
+            if(!DrawPrepared(*command.Pass,_PreparedDraws,view,viewProjection,sceneFormat,lights,environment,reflections))return false;
+        }
         const auto depthFormat=depth?depth->GetFormat():GRHI::TextureFormat::Unknown;
         if(hdr) {
             command.Command->EndRenderPass(command.Pass);command.Pass=nullptr;
@@ -164,6 +185,13 @@ bool Renderer::Render(const RenderView& view) {
         command.Command->EndRenderPass(command.Pass);command.Pass=nullptr;
         auto* submitted=command.Command;command.Command=nullptr;
         if(!_Device.Submit(submitted)) return Fail(DeviceError("Submit Runtime view"));
+        GAMESPROUT_FRAME_COUNT(Runtime, "render/width_px", width);
+        GAMESPROUT_FRAME_COUNT(Runtime, "render/height_px", height);
+        GAMESPROUT_FRAME_COUNT(Runtime, "render/draw_calls", _Statistics.DrawCalls);
+        GAMESPROUT_FRAME_COUNT(Runtime, "render/triangles", _Statistics.Triangles);
+        GAMESPROUT_FRAME_COUNT(Runtime, "render/skin_upload_bytes", _Statistics.InstanceSkinPaletteUploadBytes);
+        GAMESPROUT_FRAME_COUNT(Runtime, "render/transform_upload_bytes", _Statistics.InstanceTransformUploadBytes);
+        GAMESPROUT_FRAME_COUNT(Runtime, "render/planar_draw_calls", _Statistics.PlanarReflectionDrawCalls);
         _InstanceFrameSubmitted=true;
         if(_PlanarCapture&&_PlanarParameters.X>0)_PlanarCapture->_InstanceFrameSubmitted=true;
         _LinearCaptureReady=view.CaptureLinearColor;

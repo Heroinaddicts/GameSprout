@@ -1,5 +1,6 @@
 #include "RuntimeRenderer.h"
 #include "RuntimeRenderResourceCache.h"
+#include "GameSproutRuntime.h"
 #include "RuntimeTextureUpload.h"
 #include "../Api/Internal/PreparedTextureLayout.h"
 #include "RuntimeMath.h"
@@ -426,6 +427,9 @@ Renderer::MeshGPU* Renderer::Mesh(const ResourceReference& reference) {
                         &entry.SkinOrderedColorIndices);
                     entry.SkinDepthIndices=CreateSkinIndexBuffer(_Device,entry.Data,entry.Indices,true);
                     PreparePackedSkinVertexStream(entry);
+                    // A component can outlive a resource cache or render through another provider.
+                    if(_Runtime._LastSkinBoundsMeshIdentity<std::numeric_limits<std::uint64_t>::max())
+                        entry.SkinBoundsIdentity=++_Runtime._LastSkinBoundsMeshIdentity;
                 }
             }
         } catch(const std::exception& exception) {entry.Error=exception.what();}

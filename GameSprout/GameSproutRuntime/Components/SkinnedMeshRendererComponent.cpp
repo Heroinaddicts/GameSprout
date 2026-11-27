@@ -32,6 +32,7 @@ bool SkinnedMeshRendererComponent::SetSkinPose(std::span<const Mat4> matrices) {
         [](const Mat4& matrix){return RuntimeMath::IsFinite(matrix);}))return false;
     _SkinPose.assign(matrices.begin(),matrices.end());
     ++_SkinPoseRevision;
+    _SkinBoundsMeshIdentity=0;
     if(auto* scene=_OwnerState->SceneOwner)scene->InvalidateSkinPose();
     return true;
 }

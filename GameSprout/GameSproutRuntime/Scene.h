@@ -1,6 +1,7 @@
 #pragma once
 #include "GameObject.h"
 #include <deque>
+#include <unordered_map>
 
 namespace GameSproutRuntime {
 enum class RenderObjectChangeKind { Transform, Mesh, Materials };
@@ -8,6 +9,18 @@ struct RenderObjectChange {
     std::uint64_t ObjectID;
     std::uint64_t Revision;
     RenderObjectChangeKind Kind;
+};
+struct RenderObjectTransform {
+    Mat4 Model;
+    Mat4 Normal;
+    bool Valid=false;
+    bool Negative=false;
+
+    static RenderObjectTransform FromModel(const Mat4& model);
+};
+struct CachedRenderObjectTransform {
+    RenderObjectTransform Value;
+    std::uint64_t Revision=0;
 };
 
 class Scene final : public GameObjectBase<IScene> {
@@ -39,15 +52,7 @@ public:
     bool GetRenderObjectChanges(std::uint64_t after,std::vector<RenderObjectChange>& changes) const;
     bool TakeVisualInvalidation() {const bool pending=_VisualPending;_VisualPending=false;return pending;}
     std::uint64_t GetAuthoringRevision() const override {return _AuthoringRevision;}
-    bool GetAuthoringChanges(std::uint64_t after,std::vector<SceneAuthoringChange>& changes) const override {
-        changes.clear();
-        if(after>_AuthoringRevision||_AuthoringRevision-after>_AuthoringChanges.size())return false;
-        const auto start=_AuthoringChanges.size()-static_cast<std::size_t>(_AuthoringRevision-after);
-        changes.reserve(_AuthoringChanges.size()-start);
-        for(auto index=start;index<_AuthoringChanges.size();++index)changes.push_back(_AuthoringChanges[index].Change);
-        return true;
-    }
-    void RecordAuthoringChange(std::uint64_t objectID,SceneNodeEventType type,const char* component,std::uint64_t batch);
+    bool GetAuthoringChanges(std::uint64_t after,std::vector<SceneAuthoringChange>& changes) const override;
     void ClearMainCameraForNode(std::uint64_t id);
     bool BindObjectIdentity(IGameObject* object,std::uint64_t fileID,std::string& error) override {
         auto* node=State().Owner.Find(object);
@@ -66,6 +71,13 @@ public:
     }
 private:
     friend class Runtime;
+    friend class Renderer;
+    void RecordAuthoringChange(std::uint64_t objectID,SceneNodeEventType type,const char* component,
+        std::uint64_t batch,bool builtinTransform);
+    // Entries outlive renderer lookups until the scene's structure revision changes.
+    CachedRenderObjectTransform* BindRenderObjectTransform(const GameObjectState& node) const;
+    bool RefreshRenderObjectTransform(CachedRenderObjectTransform& cached,const GameObjectState& node) const;
+    const RenderObjectTransform* GetRenderObjectTransform(std::uint64_t objectID,const GameObjectState* knownNode=nullptr) const;
     std::uint64_t _MainCameraID = 0;
     bool _SimulationEnabled = true;
     bool _ParkedForPlay = false;
@@ -78,8 +90,13 @@ private:
     std::uint64_t _DiscardedRenderObjectRevision=1;
     std::uint64_t _UIRevision=1;
     std::deque<RenderObjectChange> _RenderObjectChanges;
+    mutable std::unordered_map<std::uint64_t,CachedRenderObjectTransform> _RenderObjectTransforms;
     std::uint64_t _AuthoringRevision=1;
-    struct AuthoringRecord {SceneAuthoringChange Change;std::uint64_t Batch;};
+    struct AuthoringRecord {
+        SceneAuthoringChange Change;
+        std::uint64_t Batch;
+        bool BuiltinTransform;
+    };
     std::deque<AuthoringRecord> _AuthoringChanges;
     bool _VisualPending=false;
 };

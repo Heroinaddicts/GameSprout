@@ -116,8 +116,9 @@ public: unsigned Calls=0;
 class VisualEvents final:public IRuntimeListener {
 public:
     unsigned Nodes=0,Visuals=0;
+    SceneNodeEvent LastNode;
     Runtime* Owner=nullptr;bool Unsubscribe=false;
-    void OnSceneNodeEvent(const SceneNodeEvent&)override{++Nodes;}
+    void OnSceneNodeEvent(const SceneNodeEvent& event)override{++Nodes;LastNode=event;}
     void OnSceneVisualChanged(std::uint64_t)override{++Visuals;if(Unsubscribe)Owner->UnregisterListener(this);}
 };
 void VisualAuthoringBoundary(Runtime& runtime) {
@@ -132,10 +133,14 @@ void VisualAuthoringBoundary(Runtime& runtime) {
     Check(listener.Visuals==1&&listener.Nodes==0,"Evaluated poses were not coalesced to one visual-only scene event");
     runtime.ProcessPendingEvents();Check(listener.Visuals==1,"Idle event dispatch repeated a visual event");
     transform->SetLocalPosition({4,0,0});std::vector<SceneAuthoringChange> changes;
-    Check(scene->GetAuthoringRevision()>revision&&scene->GetAuthoringChanges(revision,changes)&&changes.size()==1,
+    Check(scene->GetAuthoringRevision()>revision&&scene->GetAuthoringChanges(revision,changes)&&changes.size()==1&&
+          changes[0].ComponentType=="GameSproutRuntime.Transform",
           "Direct setter authored revision waited for event dispatch");
     listener.Unsubscribe=true;runtime.ProcessPendingEvents();
     Check(listener.Nodes==1&&listener.Visuals==2,"Authored/visual delivery or visual self-unsubscribe failed");
+    Check(listener.LastNode.Type==SceneNodeEventType::ComponentChanged&&listener.LastNode.ObjectID==object->GetInstanceID()&&
+          listener.LastNode.Name=="Posed node"&&listener.LastNode.ComponentType=="GameSproutRuntime.Transform",
+          "Queued transform notification lost its public payload");
     transform->SetLocalPosition({5,0,0});runtime.ProcessPendingEvents();
     Check(listener.Nodes==1&&listener.Visuals==2,"Visual self-unsubscribe retained the listener");
     Check(runtime.DestroyScene(scene),"Cannot clean visual fixture");

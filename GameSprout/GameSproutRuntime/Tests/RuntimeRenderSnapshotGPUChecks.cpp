@@ -244,6 +244,16 @@ int main(int argc,char** argv){
         parent->GetTransform()->SetLocalPosition({.65f,0,0});
         stats=Render(*second,view);Check(!stats.SceneSnapshotRebuilds&&Pixel(*second,.65f)[2]>20,"First reader lost incremental transforms");
         stats=Render(*viewport,view);Check(!stats.SceneSnapshotRebuilds&&Pixel(*viewport,.65f)[2]>20,"One viewport consumed another viewport's transform changes");
+        parent->SetActive(false);
+        Check(Render(*second,view).DrawCalls==0&&Render(*viewport,view).DrawCalls==0,
+            "Shared transform slots survived a structural invalidation");
+        parent->SetActive(true);
+        Check(Render(*viewport,view).DrawCalls==1&&Render(*second,view).DrawCalls==1,
+            "Viewport failed to rebind its transform slots");
+        parent->GetTransform()->SetLocalPosition({.35f,0,0});
+        Check(!Render(*viewport,view).SceneSnapshotRebuilds&&Pixel(*viewport,.35f)[2]>20&&
+            !Render(*second,view).SceneSnapshotRebuilds&&Pixel(*second,.35f)[2]>20,
+            "Incremental transforms failed after two viewports rebound their slots");
         parent->GetTransform()->SetLocalPosition({0,0,0});
         delete second;second=nullptr;
 

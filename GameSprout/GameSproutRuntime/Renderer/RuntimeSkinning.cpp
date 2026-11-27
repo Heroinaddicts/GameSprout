@@ -8,10 +8,11 @@
 
 namespace GameSproutRuntime {
 std::optional<std::span<const Mat4>> Renderer::SkinMatrices(IGameObject& object,const MeshGPU& mesh,
-    std::vector<Mat4>& matrices,std::uint64_t& overrideRevision) {
+    std::vector<Mat4>& matrices,SkinnedMeshRendererComponent** overrideSkin,
+    SkinnedMeshRendererComponent* snapshotSkin) {
     matrices.clear();
-    overrideRevision=0;
-    auto* skin=object.GetComponent<ISkinnedMeshRendererComponent>();
+    if(overrideSkin)*overrideSkin=nullptr;
+    auto* skin=snapshotSkin?snapshotSkin:object.GetComponent<ISkinnedMeshRendererComponent>();
     if(!skin) return std::span<const Mat4>{};
     if(mesh.Data.Bones.empty() || mesh.Data.BoneIndicesOffset<0 || mesh.Data.BoneWeightsOffset<0 ||
        mesh.Skin.size()!=mesh.Positions.size()) {
@@ -20,15 +21,14 @@ std::optional<std::span<const Mat4>> Renderer::SkinMatrices(IGameObject& object,
     if(mesh.Data.Bones.size()>MaxSkinBones) {
         Diagnostic("Skinned mesh exceeds the 128-bone palette limit: "+object.GetName());return std::nullopt;
     }
-    const auto* builtin=dynamic_cast<const SkinnedMeshRendererComponent*>(skin);
+    auto* builtin=snapshotSkin?snapshotSkin:dynamic_cast<SkinnedMeshRendererComponent*>(skin);
     if(builtin&&!builtin->_SkinPose.empty()&&_Runtime.IsInScene(builtin->_OwnerState)) {
         if(builtin->_SkinPose.size()!=mesh.Data.Bones.size()) {
             Diagnostic("Cannot bind skinned mesh '"+object.GetName()+"': Runtime skin pose does not match the mesh bone count");
             return std::nullopt;
         }
-        // The component owns and validates the override. Borrow it only
-        // during preparation or picking, and cache the revision with the copy.
-        overrideRevision=builtin->_SkinPoseRevision;
+        // Borrow the component and its validated override only for this call site.
+        if(overrideSkin)*overrideSkin=builtin;
         return std::span<const Mat4>(builtin->_SkinPose);
     }
     std::string error;
@@ -61,14 +61,17 @@ bool Renderer::SkinPoseBounds(const MeshGPU& mesh,std::span<const Mat4> matrices
     // Geometry validation prepared the source boxes once. SkinMatrices has
     // already validated the palette, and only the first three rows affect the
     // positions written by linear skinning.
-    for(const auto& source:mesh.JointBounds) {
-        const auto& matrix=matrices[source.Joint].Data;
+    const auto* jointBounds=mesh.JointBounds.data();
+    const auto* palette=matrices.data();
+    for(std::size_t joint=0;joint<mesh.JointBounds.size();++joint) {
+        const auto& source=jointBounds[joint];
+        const auto& matrix=palette[source.Joint].Data;
         for(std::size_t axis=0;axis<3;++axis) {
             const double x=matrix[axis],y=matrix[axis+4],z=matrix[axis+8],translation=matrix[axis+12];
+            const double ax=std::fabs(x),ay=std::fabs(y),az=std::fabs(z);
             const double center=translation+x*source.Center[0]+y*source.Center[1]+z*source.Center[2];
-            const double radius=std::fabs(x*source.Extent[0])+std::fabs(y*source.Extent[1])+std::fabs(z*source.Extent[2]);
-            const double arithmeticMagnitude=std::fabs(translation)+std::fabs(x)*source.Magnitude[0]+
-                std::fabs(y)*source.Magnitude[1]+std::fabs(z)*source.Magnitude[2];
+            const double radius=ax*source.Extent[0]+ay*source.Extent[1]+az*source.Extent[2];
+            const double arithmeticMagnitude=std::fabs(translation)+ax*source.Magnitude[0]+ay*source.Magnitude[1]+az*source.Magnitude[2];
             if(const auto low=center-radius;low<minimum[axis])minimum[axis]=low;
             if(const auto high=center+radius;high>maximum[axis])maximum[axis]=high;
             if(arithmeticMagnitude>magnitude[axis])magnitude[axis]=arithmeticMagnitude;
@@ -112,8 +115,7 @@ bool Renderer::SkinPoseBounds(const MeshGPU& mesh,std::span<const Mat4> matrices
 bool Renderer::PosedPositions(IGameObject& object,const MeshGPU& mesh,std::vector<Vector3>& positions) {
     positions.clear();
     std::vector<Mat4> matrices;
-    std::uint64_t overrideRevision=0;
-    const auto palette=SkinMatrices(object,mesh,matrices,overrideRevision);
+    const auto palette=SkinMatrices(object,mesh,matrices);
     return palette&&PosedPositions(mesh,*palette,positions);
 }
 
