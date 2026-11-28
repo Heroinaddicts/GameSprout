@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "6b4e5fc7c3974277b66cbf631d860372",
+  "ImporterType": "Material",
+  "Path": "Environment/Materials/CastleLightningContact.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Castle Lightning Contact"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CastleLightning.h"
 #include "RuntimeScriptModule.h"
 #include "RuntimeWeatherApi.h"
 #include <array>
@@ -19,12 +20,12 @@ private:
     void InstallCurves(GameSproutRuntime::IGameSproutRuntime& runtime, GameSproutRuntime::IScene& scene);
     void SetStormOverlay(GameSproutRuntime::IGameSproutRuntime& runtime, GameSproutRuntime::IScene& scene,
                          std::size_t index, float amount);
-    void Strike(GameSproutRuntime::IGameSproutRuntime& runtime, GameSproutRuntime::IScene& scene) const;
 
     bool _Registered = false;
     std::uint64_t _SceneID = 0;
     std::array<std::uint64_t, 2> _OverlayIDs{};
     GameSproutRuntime::WeatherSettings _InitialWeather;
+    CastleLightning _Lightning;
     double _Elapsed = 0;
     std::size_t _Phase = 0;
     std::size_t _NextStrike = 0;

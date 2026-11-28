@@ -196,28 +196,6 @@ void CastleEnvironment::SetStormOverlay(IGameSproutRuntime& runtime, IScene& sce
     if (!overlay->IsActiveSelf()) overlay->SetActive(true);
 }
 
-void CastleEnvironment::Strike(IGameSproutRuntime& runtime, IScene& scene) const {
-    auto* camera = scene.GetMainCamera();
-    if (!camera) return;
-    const auto world = camera->GetGameObject()->GetTransform()->GetWorldMatrix();
-    const auto origin = world * Vector4{0, 0, 0, 1};
-    const auto direction = world * Vector4{0, 0, 1, 0};
-    const float length = std::hypot(direction.X, direction.Z);
-    const auto forward = length > 1e-4f ? Vector3{direction.X / length, 0, direction.Z / length} : Vector3{0, 0, 1};
-    const Vector3 right{forward.Z, 0, -forward.X};
-    constexpr std::array offsets{-7.f, 10.f, -2.f};
-    const auto endpoint = Vector3{origin.X, origin.Y - 5.f, origin.Z} + forward * 55.f + right * offsets[_NextStrike];
-
-    EnvironmentEvent event;
-    event.Type = EnvironmentLightningEventType;
-    event.Payload = {
-        {"", "Position", endpoint}, {"", "Height", 33.f}, {"", "Intensity", 12.f},
-        {"", "Radius", 115.f}, {"", "DurationSeconds", .50f},
-        {"", "SeedLow16", static_cast<float>(1451 + 133 * _NextStrike)}
-    };
-    QueryEnvironmentRuntime(runtime)->EmitEnvironmentEvent(scene, event);
-}
-
 void CastleEnvironment::LateUpdate(IGameSproutRuntime* runtime, float deltaSeconds) {
     if (!_SceneID || deltaSeconds <= 0) return;
     auto* scene = dynamic_cast<IScene*>(runtime->QueryGameObject(_SceneID));
@@ -247,9 +225,10 @@ void CastleEnvironment::LateUpdate(IGameSproutRuntime* runtime, float deltaSecon
     const auto rain = strength(RainPhase);
     SetStormOverlay(*runtime, *scene, 0, rain);
     SetStormOverlay(*runtime, *scene, 1, strength(WindPhase));
+    _Lightning.Update(*runtime, deltaSeconds);
     if (_Phase == LightningPhase && _NextStrike < StrikeTimes.size() &&
         inPhase >= StrikeTimes[_NextStrike]) {
-        Strike(*runtime, *scene);
+        _Lightning.Strike(*runtime, *scene, static_cast<unsigned>(_NextStrike));
         ++_NextStrike;
     }
 }
@@ -260,6 +239,7 @@ void CastleEnvironment::Release(IGameSproutRuntime* runtime) {
     if (scene) {
         for (const auto id : _OverlayIDs)
             if (auto* overlay = id ? runtime->QueryGameObject(id) : nullptr) scene->DestroyGameObject(overlay);
+        _Lightning.Release(*runtime, *scene);
         EnvironmentSettings composition;
         if (environment->GetEnvironmentSettings(*scene, composition)) {
             std::erase_if(composition.Curves, [](const auto& curve) { return curve.Id.starts_with(CurvePrefix); });

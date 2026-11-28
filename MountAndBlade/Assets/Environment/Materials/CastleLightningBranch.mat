@@ -1,0 +1,8 @@
+{
+  "Version": 1,
+  "Name": "Castle Lightning Branch",
+  "Shader": {"Guid": "680ba0e7c306495eab2384917a0bac84", "LocalID": 1},
+  "SortingPriority": 11,
+  "GroundContact": 0,
+  "ArcTint": [0.49, 0.72, 1.0, 1.0]
+}

@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "680ba0e7c306495eab2384917a0bac84",
+  "ImporterType": "Shader",
+  "Path": "Environment/Shaders/CastleLightning.shader",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 6,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "CastleLightning"
+    }
+  ]
+}

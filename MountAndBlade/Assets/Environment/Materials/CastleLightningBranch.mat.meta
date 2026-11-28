@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "fe35fefdb6bb42c2955b8615e7e7fa75",
+  "ImporterType": "Material",
+  "Path": "Environment/Materials/CastleLightningBranch.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Castle Lightning Branch"
+    }
+  ]
+}

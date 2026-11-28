@@ -1,0 +1,8 @@
+{
+  "Version": 1,
+  "Name": "Castle Lightning Contact",
+  "Shader": {"Guid": "680ba0e7c306495eab2384917a0bac84", "LocalID": 1},
+  "SortingPriority": 11,
+  "GroundContact": 1,
+  "ArcTint": [0.58, 0.78, 1.0, 1.0]
+}
