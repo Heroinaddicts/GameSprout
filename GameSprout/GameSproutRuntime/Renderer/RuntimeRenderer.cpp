@@ -111,10 +111,13 @@ bool Renderer::Render(const RenderView& view) {
         const auto* settings=view.DrawScene?&view.Scene->GetEnvironmentLighting():nullptr;
         const auto* sky=settings?Environment(settings->SkyEnvironment):nullptr;
         const EnvironmentGPU* reflections=nullptr;
+        _Weather.Enabled=false;
         if(settings) {
             if(!RenderEnvironment::Prepare(*settings,environment,sky?&sky->DiffuseSH:nullptr,sky?sky->SpecularMaxLOD:0))
                 Diagnostic("Scene environment radiance is invalid or exceeds finite shader precision; environment lighting disabled for this frame");
             else if(sky&&settings->ReflectionIntensity>0)reflections=sky;
+            _Runtime.GetWeatherState(*view.Scene,_Weather);
+            if(_Weather.Enabled)PrepareWeatherEnvironment(environment);
         }
         if(view.DrawScene) {
             GAMESPROUT_FRAME_SCOPE(Runtime, "render/prepare_scene");
@@ -166,6 +169,7 @@ bool Renderer::Render(const RenderView& view) {
         if(view.DrawScene) {
             GAMESPROUT_FRAME_SCOPE(Runtime, "render/record_scene_draws");
             if(!DrawPrepared(*command.Pass,_PreparedDraws,view,viewProjection,sceneFormat,lights,environment,reflections))return false;
+            if(!DrawWeatherLightning(*command.Pass,view,viewProjection,sceneFormat))return false;
         }
         const auto depthFormat=depth?depth->GetFormat():GRHI::TextureFormat::Unknown;
         if(hdr) {

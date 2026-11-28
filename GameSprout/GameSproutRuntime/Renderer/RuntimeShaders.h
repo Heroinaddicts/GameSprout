@@ -8,7 +8,8 @@ enum class PreviewShader {MeshVertex,MeshNoUVVertex,MeshNoColorVertex,MeshNoUVNo
     HDRResolveVertex,HDRResolveFragment,LitSpatialFragment,
     InstancedSkinnedMeshVertex,InstancedSkinnedMeshNoUVVertex,InstancedSkinnedMeshNoColorVertex,
     InstancedSkinnedMeshNoUVNoColorVertex,InstancedSkinnedShadowVertex,
-    LitMappedFragment,LitMappedEnvironmentFragment,LitMappedSpatialFragment,UIVertex,UIFragment};
+    LitMappedFragment,LitMappedEnvironmentFragment,LitMappedSpatialFragment,
+    WeatherSkyFragment,WeatherCubemapSkyFragment,WeatherLightningVertex,WeatherLightningFragment,UIVertex,UIFragment};
 inline constexpr unsigned CachedPreviewShaderCount=static_cast<unsigned>(PreviewShader::UIVertex);
 GRHI::IShader* CreatePreviewShader(GRHI::IDevice& device,PreviewShader shader);
 }

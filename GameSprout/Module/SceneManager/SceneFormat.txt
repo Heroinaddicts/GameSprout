@@ -112,6 +112,13 @@ SHCoefficients 是 9 个有符号 RGB 三元组，已经包含漫反射卷积及
 环境随完整 Scene/Play 作者快照保存和恢复；Prefab 及普通子树不携带场景环境。
 LightingAuthoring 通过 ObjectEditing 对场景根执行可撤销事务；Play 写临时运行世界，不保存源 .scene。
 Module 订阅 Scene/Play/Runtime 环境事件并推送值快照，View 不通过帧轮询更新环境控件。
+顶层 Weather 可省略，旧场景沿用原天空与光照。Weather 保存 Enabled、TimeOfDayHours、
+DayLengthSeconds、Preset 和 Lightning。Preset 包含两层云各自的 Coverage、Density、Scale、
+WindDirectionDegrees、WindSpeed，以及星空、云颜色、雾和环境光倍率。Lightning 保存落点、
+电弧高度、峰值亮度、持续时间、照明半径、颜色和形状种子。
+天气字段随完整 Scene 和增量 Play 作者快照保存。实时昼夜时间、天气过渡和正在播放的雷闪属于运行状态。
+窗口 → 场景天气支持编辑和临时预览。应用设置提交一条可撤销事务，预览不写入场景。
+天气预设文件的扩展名为 .weather，根对象保存 Version=1 和 Weather。导入将预设值应用到当前场景。
 编辑器应用组合层创建并销毁 Runtime，经 EditorApi 的 const _Runtime 指针统一注入；Module 和 View 只借用。
 RuntimeHost 仅管理资源提供者连接、时钟和唯一每帧 Update，不创建或 delete Runtime。
 SceneManager 管理 .scene 文档、活动场景、稳定文件 ID、保存基线和场景编辑事务，不拥有 Runtime、GPU 或动画时钟。

@@ -187,6 +187,7 @@ bool Renderer::RenderPlanarReflection(GRHI::ICommandBuffer& command,const Render
     capture.Diagnostic(_LightDiagnostic);
     capture._ShaderFrame=_ShaderFrame;
     capture._ShaderFrame.CameraPosition={reflected.Camera.Position.X,reflected.Camera.Position.Y,reflected.Camera.Position.Z,1};
+    capture._Weather=_Weather;
     capture.PrepareDraws(reflected,reflectedViewProjection);
     capture.PrepareLocalLights();
     capture.PrepareReflectionProbes(reflected,settings);
@@ -201,7 +202,9 @@ bool Renderer::RenderPlanarReflection(GRHI::ICommandBuffer& command,const Render
     if(!scope.Pass)return Fail(DeviceError("Begin planar reflection pass"));
     if(!capture.DrawSky(*scope.Pass,reflected,format,aspect,capture._SceneLights,sky)||
        !capture.DrawPrepared(*scope.Pass,capture._PreparedDraws,reflected,reflectedViewProjection,format,
-            capture._SceneLights,environment,reflections))return Fail("Planar reflection: "+capture._Error);
+            capture._SceneLights,environment,reflections)||
+       !capture.DrawWeatherLightning(*scope.Pass,reflected,reflectedViewProjection,format))
+        return Fail("Planar reflection: "+capture._Error);
     _Statistics.PlanarReflectionDrawCalls=capture._Statistics.DrawCalls;
     _Statistics.PlanarReflectionWidth=desiredWidth;_Statistics.PlanarReflectionHeight=desiredHeight;
     _Statistics.RequiresContinuousRendering|=capture._Statistics.RequiresContinuousRendering;

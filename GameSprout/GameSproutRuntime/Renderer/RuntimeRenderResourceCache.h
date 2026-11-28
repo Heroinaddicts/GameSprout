@@ -33,6 +33,9 @@ public:
     std::map<std::tuple<PreviewShader,GRHI::TextureFormat,GRHI::TextureFormat>,GRHI::IGraphicsPipeline*> FullscreenPipelines;
     std::unique_ptr<GRHI::ISampler> EnvironmentSampler;
     std::unique_ptr<GRHI::ITexture> BlackEnvironment;
+    std::unique_ptr<GRHI::ITexture> WeatherCloudTexture;
+    std::unique_ptr<GRHI::ISampler> WeatherCloudSampler;
+    std::map<GRHI::TextureFormat,std::unique_ptr<GRHI::IGraphicsPipeline>> WeatherBoltPipelines;
     std::uint64_t EnvironmentGeneration=1;
     GRHI::ITexture* White=nullptr;
     GRHI::ISampler* DefaultSampler=nullptr;

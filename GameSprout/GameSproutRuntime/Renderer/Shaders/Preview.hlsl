@@ -294,9 +294,13 @@ cbuffer EnvironmentUniform : register(b1, space3)
     float4 ProbePosition;
     float4 IndirectInfo;
     IndirectVolume IndirectVolumes[8];
+    float4 WeatherLighting; // Diffuse and prefiltered reflection radiance scales.
+    float4 WeatherFlashPosition; // XYZ local flash centre; W radius.
+    float4 WeatherFlashRadiance;
 };
 #include "IndirectLighting.hlsl"
 #include "Atmosphere.hlsl"
+#include "Weather.hlsl"
 #include "ToneMapping.hlsl"
 // Canonical light clip -> top-first atlas UV. This block is independent from
 // scene ambient diffuse; shadows only attenuate the selected direct light.
@@ -544,7 +548,7 @@ float3 ReflectedEnvironment(float3 world, float3 normal, float3 view, float nDot
     float4 fit = roughness * float4(-1.0, -0.0275, -0.572, 0.022) + float4(1.0, 0.0425, 1.04, -0.04);
     float a = min(fit.x * fit.x, exp2(-9.28 * nDotV)) * fit.x + fit.y;
     float2 scaleBias = float2(-1.04, 1.04) * a + fit.zw;
-    return radiance * max(f0 * scaleBias.x + scaleBias.y, 0.0);
+    return radiance * WeatherLighting.y * max(f0 * scaleBias.x + scaleBias.y, 0.0);
 }
 void AccumulateDirectLight(float3 light, float3 radiance, float shadow, float stylizedScale, float nDotL, float3 normal,
     float3 view, float nDotV, float alphaSquared, float3 f0, float3 diffuse,
@@ -617,6 +621,7 @@ float4 EvaluateLit(MeshOutput input, bool useReflections, bool useSpatialLightin
     // irradiance remains independent of the viewing camera.
     float3 irradiance = DiffuseEnvironment(normal);
     if (useSpatialLighting) irradiance = DiffuseIndirectLighting(input.WorldPosition, normal, irradiance);
+    irradiance *= WeatherLighting.x;
     float3 ambient = irradiance * diffuse * occlusion;
     color += ambient;
     float3 stylizedDirect = 0.0;
@@ -667,6 +672,16 @@ float4 EvaluateLit(MeshOutput input, bool useReflections, bool useSpatialLightin
         float shadow = shadowSlot >= 0 ? SpotShadow(shadowSlot, input.WorldPosition, geometricNormal) : 1.0;
         AccumulateDirectLight(light, LocalLightRadiances[index].rgb * attenuation, shadow, saturate(attenuation), nDotL, normal, view, nDotV,
             alphaSquared, f0, diffuse, color, stylizedDirect, stylizedIllumination);
+    }
+    if (WeatherFlashRadiance.w > 0.5)
+    {
+        float3 delta = WeatherFlashPosition.xyz - input.WorldPosition;
+        float3 flashDirection = SafeDirection(delta, normal);
+        float fade = saturate(1.0 - dot(delta, delta) / (WeatherFlashPosition.w * WeatherFlashPosition.w));
+        float facing = saturate(dot(normal, flashDirection));
+        if (fade > 0.0 && facing > 0.0)
+            AccumulateDirectLight(flashDirection, WeatherFlashRadiance.rgb * (fade * fade), 1.0, fade, facing,
+                normal, view, nDotV, alphaSquared, f0, diffuse, color, stylizedDirect, stylizedIllumination);
     }
     if (StyleParameters.x > 0.0)
     {

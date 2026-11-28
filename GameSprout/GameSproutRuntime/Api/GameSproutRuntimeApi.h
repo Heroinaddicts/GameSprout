@@ -472,7 +472,7 @@ namespace GameSproutRuntime {
         ComponentAdded, ComponentRemoved, ComponentChanged, OperationFailed, MainCameraChanged,
         TagChanged, LayerChanged, StaticFlagsChanged,
         SiblingOrderChanged, // ParentID/OldParentID 相同，仅兄弟顺序改变。
-        EnvironmentLightingChanged
+        EnvironmentLightingChanged, WeatherSettingsChanged
     };
     struct SceneNodeEvent {
         SceneNodeEventType Type = SceneNodeEventType::Create;

@@ -38,6 +38,7 @@ RenderResourceCache::~RenderResourceCache() {
     ClearPreparedResources();
     for(auto& entry:Pipelines)delete entry.second;
     for(auto& entry:FullscreenPipelines)delete entry.second;
+    WeatherBoltPipelines.clear();
     for(auto* shader:Shaders)delete shader;
     delete White;delete DefaultSampler;delete Grid;
 }

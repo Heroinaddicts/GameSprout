@@ -1,6 +1,7 @@
 #include "GameSproutRuntimeExport.h"
 #include "SceneDocument.h"
 #include "PrefabDocument.h"
+#include "RuntimeWeatherApi.h"
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -135,7 +136,40 @@ int main(int argc,char** argv) {
         Check(runtime->InstantiatePrefabData(scene,data,nullptr,mappings,error),error);
         Check(scene->GetEnvironmentLighting().Mode==settings.Mode&&scene->GetEnvironmentLighting().Intensity==2.5f,
             "Prefab instantiation overwrote its destination environment");
+
+        auto* weather=GameSproutRuntime::QueryWeatherRuntime(*runtime);
+        Check(weather,"Runtime weather interface unavailable");
+        GameSproutRuntime::WeatherSettings weatherSettings;
+        Check(weather->GetWeatherSettings(*omitted,weatherSettings)&&!weatherSettings.Enabled&&
+            !document.isMember("Weather"),"Old scenes must retain the default weather state");
+        weatherSettings.Enabled=true;
+        weatherSettings.TimeOfDayHours=22.5f;
+        weatherSettings.DayLengthSeconds=150;
+        weatherSettings.Preset.Clouds[0].Coverage=.45f;
+        weatherSettings.Preset.Clouds[1].WindDirectionDegrees=115;
+        weatherSettings.Preset.StarDensity=.82f;
+        weatherSettings.Lightning.Position={4,3,-2};
+        weatherSettings.Lightning.Seed=std::numeric_limits<std::uint32_t>::max();
+        Check(weather->SetWeatherSettings(*loaded,weatherSettings),"Cannot configure scene weather");
+        Check(weather->SetTimeOfDay(*loaded,8),"Cannot preview independent scene time");
+        auto preview=weatherSettings.Preset;preview.Clouds[0].Coverage=1;
+        Check(weather->TransitionWeather(*loaded,preview,0),"Cannot preview independent weather preset");
+        Json::Value weatherDocument,properties;
+        Check(SceneDocument::Serialize(*loaded,loadedIDs,weatherDocument,error),error);
+        Check(SceneDocument::SerializeProperties(*loaded,loadedIDs,properties,error)&&
+            SceneDocument::ValidateProperties(properties,true,error)&&properties["Weather"]==weatherDocument["Weather"],
+            "Incremental scene snapshot lost authored weather: "+error);
+        GameSproutRuntime::IScene* weatherScene=nullptr;
+        Check(SceneDocument::Instantiate(weatherDocument,*runtime,weatherScene,error),error);
+        GameSproutRuntime::WeatherSettings roundTrip;
+        Check(weather->GetWeatherSettings(*weatherScene,roundTrip)&&roundTrip==weatherSettings,
+            "Scene failed to round trip authored weather or persisted transient preview state");
+        bad=weatherDocument;bad["Weather"]["Preset"]["Clouds"][1]["Density"]=2;reject(bad);
+        bad=weatherDocument;bad["Weather"]["Lightning"]["Seed"]=Json::UInt64(1ull<<32);reject(bad);
+        prefab["Weather"]=weatherDocument["Weather"];
+        Check(!PrefabDocument::Validate(prefab,error),"Prefab accepted scene weather");
+        Check(runtime->DestroyScene(weatherScene),"Cannot release weather fixture");
         Check(runtime->DestroyScene(omitted)&&runtime->DestroyScene(loaded)&&runtime->DestroyScene(other)&&runtime->DestroyScene(scene),"Cannot release environment fixtures");
-        delete runtime;std::cout<<"PASS environment scene isolation, atomic validation/events, Scene persistence and Prefab exclusion\n";return 0;
+        delete runtime;std::cout<<"PASS environment and weather scene isolation, validation, persistence and Prefab exclusion\n";return 0;
     }catch(const std::exception& error){std::cerr<<"FAIL "<<error.what()<<'\n';delete runtime;return 1;}
 }

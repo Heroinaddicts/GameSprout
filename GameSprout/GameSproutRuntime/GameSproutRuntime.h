@@ -1,12 +1,14 @@
 #pragma once
 #include "Api/GameSproutRuntimeApi.h"
 #include "Api/RuntimePropertyObserver.h"
+#include "Api/RuntimeWeatherApi.h"
 #include "Animation/AnimationResources.h"
 #include "Renderer/RuntimeRenderWorkers.h"
 #include "GRHIApi.h"
 #include <deque>
 #include <chrono>
 #include <map>
+#include <memory>
 #include <set>
 #include <thread>
 #include <typeindex>
@@ -24,7 +26,7 @@ class RuntimePhysicsSystem;
 class RenderResourceCache;
 class RenderResourceLease;
 
-class Runtime final : public IGameSproutRuntime {
+class Runtime final : public IGameSproutRuntime, public IWeatherRuntime {
 public:
     Runtime() = default;
     ~Runtime() override;
@@ -39,6 +41,15 @@ public:
     bool RestoreAuthoringScenes(std::string&) override;
     std::size_t GetSceneCount() const override { return _Scenes.size(); }
     IScene* GetScene(std::size_t index) const override;
+    bool GetWeatherSettings(const IScene&,WeatherSettings&) const override;
+    bool SetWeatherSettings(IScene&,const WeatherSettings&) override;
+    bool GetWeatherState(const IScene&,WeatherState&) const override;
+    bool SetTimeOfDay(IScene&,float hours) override;
+    bool TransitionWeather(IScene&,const WeatherPreset&,float durationSeconds) override;
+    bool TriggerLightning(IScene&,const WeatherLightning&) override;
+    std::uint64_t SubscribeLightning(LightningCallback) override;
+    void UnsubscribeLightning(std::uint64_t) override;
+    bool AdvanceWeatherPreview(IScene&,float deltaSeconds) override;
     IGameObject* QueryGameObject(std::uint64_t id) const override;
     bool RegisterObjectPropertyObserver(std::uint64_t,IRuntimePropertyObserver*) override;
     void UnregisterObjectPropertyObserver(std::uint64_t,IRuntimePropertyObserver*) override;
@@ -299,11 +310,26 @@ private:
     void TickGameModulePhase(std::uint8_t phase,float deltaSeconds);
     void NotifyGameModuleError(const std::string& module,const char* phase,const char* error) noexcept;
     void FinishTickNotifications();
+    Scene* FindWeatherScene(const IScene&) const;
+    static void AdvanceSceneWeather(Scene&,float deltaSeconds);
+    void AdvanceWeather(float deltaSeconds);
+    void DispatchWeatherEvents();
     void StepPhysics(float deltaSeconds);
     bool InitializePendingComponents(std::string& error,bool allowScripts);
     void NotifyInitializationError(GameObjectState&,IComponent&,const std::string&);
     std::vector<Scene*> _Scenes;
     std::vector<Scene*> _ParkedScenes;
+    struct LightningListener {
+        std::shared_ptr<LightningCallback> Callback;
+        std::uint64_t AfterSequence;
+    };
+    struct LightningRecord {
+        std::uint64_t SceneID;
+        WeatherLightningEvent Event;
+    };
+    std::map<std::uint64_t,LightningListener> _LightningListeners;
+    std::deque<LightningRecord> _LightningEvents;
+    std::uint64_t _NextLightningListener=0,_LightningSequence=0;
     std::map<std::uint64_t,GameObjectState*> _Nodes;
     struct TickCounts {std::size_t Variable=0,Fixed=0,Early=0,Late=0;};
     std::map<std::uint64_t,TickCounts> _TickObjects;

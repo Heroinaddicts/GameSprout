@@ -57,9 +57,7 @@ void Runtime::ProcessPendingEvents() {
         // entry never invokes component Update/FixedUpdate, including Animator.
         {RuntimeOperation operation(*this);}
         DispatchAnimationEvents();
-        DispatchEvents();
-        RefreshObservedScriptProperties();
-        DispatchObjectPropertyChanges();
+        FinishTickNotifications();
     } catch(...) {_Updating=false;throw;}
     _Updating=false;
 }

@@ -4,6 +4,7 @@
 #include "ScenePhysicsDocument.h"
 #include "SceneLightingDocument.h"
 #include "SceneEnvironmentLightingDocument.h"
+#include "SceneWeatherDocument.h"
 #include "SceneRendererShadows.h"
 #include "SceneCanvasScaleNames.h"
 #include "RuntimeUIApi.h"
@@ -58,6 +59,13 @@ Json::Value Components(GameSproutRuntime::IGameObject& object, const SceneDocume
     }
     return result;
 }
+
+void SerializeWeather(const GameSproutRuntime::IScene& scene,Json::Value& document) {
+    if(const auto* weather=GameSproutRuntime::QueryWeatherScene(scene)) {
+        const auto settings=weather->GetAuthoredWeatherSettings();
+        if(settings!=GameSproutRuntime::WeatherSettings{})document["Weather"]=SceneWeatherDocument::Serialize(settings);
+    }
+}
 }
 
 namespace SceneDocument {
@@ -95,6 +103,7 @@ bool SerializeProperties(GameSproutRuntime::IGameObject& object,const ObjectIDs&
             data["RootStaticFlags"]=Json::UInt(static_cast<std::uint32_t>(scene->GetStaticFlags()));
             data["RootComponents"]=Components(*scene,ids);data["NextObjectID"]=Json::UInt64(ids.Next);
             data["MainCameraID"]=Json::UInt64(0);data["EnvironmentLighting"]=SceneEnvironmentLightingDocument::Serialize(scene->GetEnvironmentLighting());
+            SerializeWeather(*scene,data);
             if(auto* camera=scene->GetMainCamera()) {
                 auto* owner=camera->GetGameObject();
                 if(owner==scene)data["RootMainCamera"]=true;
@@ -251,6 +260,7 @@ bool Serialize(GameSproutRuntime::IScene& scene,ObjectIDs& ids,Json::Value& outp
         document["RootComponents"]=Components(scene,next);document["NextObjectID"]=Json::UInt64(next.Next);
         document["MainCameraID"]=Json::UInt64(0);document["Objects"]=Json::Value(Json::arrayValue);
         document["EnvironmentLighting"]=SceneEnvironmentLightingDocument::Serialize(scene.GetEnvironmentLighting());
+        SerializeWeather(scene,document);
         for (const auto& entry:ordered) {
             auto* object=entry.Object;auto* parent=object->Parent();
             if (!parent) throw std::runtime_error("Detached Runtime object has no scene parent");

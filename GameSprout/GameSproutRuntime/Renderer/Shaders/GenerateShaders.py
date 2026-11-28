@@ -33,6 +33,8 @@ def main():
                              ("InstancedMeshNoColorVertex", "vertex"), ("InstancedMeshNoUVNoColorVertex", "vertex"), ("ShadowFragment", "fragment"),
                              ("SkyVertex", "vertex"), ("SkyFragment", "fragment"),
                              ("CubemapSkyFragment", "fragment"),
+                             ("WeatherSkyFragment", "fragment"), ("WeatherCubemapSkyFragment", "fragment"),
+                             ("WeatherLightningVertex", "vertex"), ("WeatherLightningFragment", "fragment"),
                              ("HDRResolveVertex", "vertex"), ("HDRResolveFragment", "fragment"),
                              ("UIVertex", "vertex"), ("UIFragment", "fragment"),
                              ("ShadowVertex", "vertex"), ("InstancedShadowVertex", "vertex"),

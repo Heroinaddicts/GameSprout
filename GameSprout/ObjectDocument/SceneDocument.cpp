@@ -4,6 +4,7 @@
 #include "ScenePhysicsDocument.h"
 #include "SceneLightingDocument.h"
 #include "SceneEnvironmentLightingDocument.h"
+#include "SceneWeatherDocument.h"
 #include "SceneRendererShadows.h"
 #include "SceneCanvasScaleNames.h"
 #include "PrefabDocument.h"
@@ -368,6 +369,7 @@ struct Node {
 };
 struct Plan {
     GameSproutRuntime::EnvironmentLightingSettings EnvironmentLighting;
+    std::optional<GameSproutRuntime::WeatherSettings> Weather;
     std::string Name;
     bool RootActive=true;
     std::uint8_t RootLayer=0;
@@ -494,12 +496,13 @@ void PublishComponentIdentities(GameSproutRuntime::IScene& scene,const SceneDocu
     if(!runtime.SetSceneComponentIdentities(&scene,identities,error))Fail("Component.Identity",error);
 }
 Plan ValidatePlan(const Json::Value& document, bool checkReferences=true) {
-    Members(document,"Scene",{"Version","Name","RootActive","RootLayer","RootTagID","RootStaticFlags","RootComponents","RootMainCamera","MainCameraID","NextObjectID","Objects","Annotations","EnvironmentLighting"});
+    Members(document,"Scene",{"Version","Name","RootActive","RootLayer","RootTagID","RootStaticFlags","RootComponents","RootMainCamera","MainCameraID","NextObjectID","Objects","Annotations","EnvironmentLighting","Weather"});
     if(document.isMember("Annotations")&&!document["Annotations"].isObject())Fail("Scene.Annotations","expected object");
     if (Unsigned(document["Version"],"Scene.Version")!=GameSproutRuntime::SceneDocumentVersion)
         Fail("Scene.Version","expected current Unity-coordinate scene version 2; recreate or re-export the source document");
     Plan plan;
     if(document.isMember("EnvironmentLighting"))plan.EnvironmentLighting=SceneEnvironmentLightingDocument::Read(document["EnvironmentLighting"]);
+    if(document.isMember("Weather"))plan.Weather=SceneWeatherDocument::Read(document["Weather"]);
     plan.Name=Name(document["Name"],"Scene.Name");
     plan.RootActive=BoolMember(document,"RootActive",true,"Scene");
     if(document.isMember("RootLayer")) {
@@ -880,6 +883,11 @@ public:
             _CandidateID=_Candidate->GetInstanceID();
             if(!_Candidate->SetEnvironmentLighting(_Plan.Values.EnvironmentLighting))
                 Fail("Scene.EnvironmentLighting","Runtime rejected environment lighting");
+            if(_Plan.Values.Weather) {
+                auto* weather=GameSproutRuntime::QueryWeatherRuntime(_Runtime);
+                if(!weather||!weather->SetWeatherSettings(*_Candidate,*_Plan.Values.Weather))
+                    Fail("Scene.Weather","Runtime rejected weather settings");
+            }
             return true;
         } catch(const std::exception& exception) {error=exception.what();}
         catch(...) {error="Scene: unexpected instantiation failure";}

@@ -170,7 +170,15 @@ Renderer::LitUniform Renderer::MakeLitUniform(const RenderView& view,const Prepa
         if(count==MaxDirectionalLights){Diagnostic("Lit uses the four brightest matching directional lights per object");break;}
         const bool sampleShadows=object.ReceiveShadows&&lightIndex==shadowSource._ShadowLightIndex&&shadowSource._ShadowUniform.Info.X>0;
         result.Directions[count]={light.TowardsLight.X,light.TowardsLight.Y,light.TowardsLight.Z,sampleShadows?2.0f:1.0f};
-        result.Radiances[count]=light.Radiance;++count;
+        result.Radiances[count]=light.Radiance;
+        if(_Weather.Enabled&&lightIndex==0) {
+            // Animate illumination without changing the projected direction or
+            // the scene light revision used by the static shadow cache.
+            const float factor=_Weather.Daylight*_Weather.Preset.DaylightMultiplier;
+            auto& radiance=result.Radiances[count];
+            radiance.R*=factor;radiance.G*=factor;radiance.B*=factor;
+        }
+        ++count;
     }
     for(std::size_t slot=0;slot<draw.LocalLightIndices.size();++slot) {
         const auto index=draw.LocalLightIndices[slot];if(!index)break;

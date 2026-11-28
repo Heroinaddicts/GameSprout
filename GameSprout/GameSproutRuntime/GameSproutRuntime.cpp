@@ -17,6 +17,7 @@ Runtime::~Runtime() {
     ResetPhysics(true);
     _ShuttingDown=true;
     _Listeners.clear(); _Commands.clear(); _Events.clear(); _PendingInitializations.clear();
+    _LightningListeners.clear();_LightningEvents.clear();
     _PropertyObservations.clear();
     while (!_Scenes.empty()) DestroyNow(_Scenes.back()->State());
     while (!_ParkedScenes.empty()) {

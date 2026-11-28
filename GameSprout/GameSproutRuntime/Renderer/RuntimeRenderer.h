@@ -1,5 +1,6 @@
 #pragma once
 #include "Api/RuntimeRenderApi.h"
+#include "Api/RuntimeWeatherApi.h"
 #include "RuntimeShaders.h"
 #include "RuntimeRenderResourceLease.h"
 #include "RuntimeFrustum.h"
@@ -473,6 +474,9 @@ private:
     bool DrawGrid(GRHI::IRenderPass& pass,const Mat4& viewProjection,GRHI::TextureFormat format);
     bool DrawSky(GRHI::IRenderPass&,const RenderView&,GRHI::TextureFormat,float aspect,
         const std::vector<DirectionalLight>&,const EnvironmentGPU*);
+    bool DrawWeatherLightning(GRHI::IRenderPass&,const RenderView&,const Mat4&,GRHI::TextureFormat);
+    GRHI::ITexture* WeatherCloudTexture();
+    void PrepareWeatherEnvironment(RenderEnvironment::Uniform&) const;
     bool PrepareDebug(const DebugDrawList* draw,std::vector<DebugBatch>& batches);
     bool DrawDebug(GRHI::IRenderPass& pass,const Mat4& viewProjection,GRHI::TextureFormat format,
                    const std::vector<DebugBatch>& batches,std::vector<GRHI::IBuffer*>& buffers);
@@ -491,6 +495,7 @@ private:
     bool Fail(const std::string& error);
     std::string DeviceError(const std::string& operation) const;
     Runtime& _Runtime;
+    WeatherState _Weather;
     GRHI::IDevice& _Device;
     GRHI::ISurface* _Surface=nullptr;
     GRHI::ITexture* _ColorTarget=nullptr;

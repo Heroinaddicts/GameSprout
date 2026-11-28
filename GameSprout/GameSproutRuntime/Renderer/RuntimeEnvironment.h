@@ -23,8 +23,11 @@ struct Uniform {
     Vector4 ProbePosition; // XYZ capture origin; W signed mip count (negative disables box projection).
     Vector4 IndirectInfo; // Inverse atlas width and height, active volume count.
     std::array<IndirectVolume,MaxBakedIndirectVolumes> IndirectVolumes;
+    Vector4 WeatherLighting{1,1,0,0}; // Diffuse irradiance and prefiltered reflections.
+    Vector4 LightningPosition; // Local flash centre and finite radius in metres.
+    Vector4 LightningRadiance;
 };
-static_assert(sizeof(IndirectVolume)==48 && sizeof(Uniform)==752,
+static_assert(sizeof(IndirectVolume)==48 && sizeof(Uniform)==800,
     "Environment fragment block must match HLSL packing");
 
 inline Vector2 SkyYaw(float degrees) {

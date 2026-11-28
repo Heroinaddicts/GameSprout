@@ -1,5 +1,6 @@
 #include "GameSproutRuntimeExport.h"
 #include "RuntimeRenderApi.h"
+#include "RuntimeWeatherApi.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -237,6 +238,47 @@ int main(int argc,char** argv) {
         Check(scene->SetEnvironmentLighting(environment),"Local-only environment rejected");render();
         Center(*viewport,{0,.5f,0},"A local probe without a global environment was not bound");
         auto* other=runtime->CreateScene("Unconfigured");view.Scene=other;render();Center(*viewport,{},"Atmosphere leaked across scenes");
+
+        auto* weather=QueryWeatherRuntime(*runtime);Check(weather,"Weather API unavailable");
+        EnvironmentLightingSettings weatherEnvironment;
+        weatherEnvironment.Atmosphere.Enabled=true;
+        weatherEnvironment.Atmosphere.FogMaxOpacity=0;
+        Check(other->SetEnvironmentLighting(weatherEnvironment),"Weather sky base rejected");
+        view.Camera.Projection.Projection=CameraProjection::Perspective;
+        camera({},{0,.8f,1});
+        WeatherSettings settings;settings.Enabled=true;
+        settings.Preset.StarIntensity=0;
+        for(auto& layer:settings.Preset.Clouds)layer.Coverage=0;
+        Check(weather->SetWeatherSettings(*other,settings),"Weather settings rejected");
+        render();const auto clearDay=Pixels(*viewport);
+        auto cloud=settings.Preset;
+        cloud.Clouds[0].Coverage=.9f;cloud.Clouds[0].Density=1;
+        Check(weather->TransitionWeather(*other,cloud,0),"First cloud layer rejected");
+        render();const auto firstLayer=Pixels(*viewport);
+        cloud.Clouds[0].Coverage=0;
+        cloud.Clouds[1].Coverage=.9f;cloud.Clouds[1].Density=1;
+        Check(weather->TransitionWeather(*other,cloud,0),"Second cloud layer rejected");
+        render();const auto secondLayer=Pixels(*viewport);
+        Check(firstLayer!=clearDay&&secondLayer!=clearDay&&firstLayer!=secondLayer,
+            "The two cloud layers did not change the sky independently");
+        Check(weather->TransitionWeather(*other,settings.Preset,0)&&weather->SetTimeOfDay(*other,23),
+            "Night sky settings rejected");
+        render();const auto noStars=Pixels(*viewport);
+        auto stars=settings.Preset;stars.StarIntensity=4;stars.StarDensity=1;
+        Check(weather->TransitionWeather(*other,stars,0),"Stars rejected");
+        render();const auto night=Pixels(*viewport);
+        const auto centre=(48*96+48)*4;
+        Check(noStars[centre+2]+20<clearDay[centre+2]&&night!=noStars,
+            "Day/night and star intensity did not change the sky");
+
+        Mesh(*other,"Lightning receiver");
+        provider.Metallic=0;provider.ChangeMaterial();camera({0,0,3},{});
+        render();const auto darkReceiver=Pixels(*viewport);
+        WeatherLightning strike;strike.Position={0,0,1.5f};strike.Height=1;strike.Radius=8;
+        Check(weather->TriggerLightning(*other,strike),"Lightning rejected");
+        render();const auto litReceiver=Pixels(*viewport);
+        Check(litReceiver[centre+2]>darkReceiver[centre+2]+12,"Lightning did not illuminate the surface");
+        Check(viewport->GetStatistics().SceneSnapshotRebuilds==0,"Lightning invalidated the render snapshot");
         delete viewport;viewport=nullptr;delete runtime;runtime=nullptr;
         std::cout<<"PASS atmosphere GPU: fog, gradient/cubemap sky, rotated diffuse lighting, rough and local box reflections, FP16 exposure and tone mapping, depth-tested/2D overlays, scene isolation and instancing\n";return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';delete viewport;delete runtime;return 1;}

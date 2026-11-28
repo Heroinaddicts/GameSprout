@@ -1,6 +1,7 @@
 #pragma once
 #include "GameObject.h"
 #include <deque>
+#include <optional>
 #include <unordered_map>
 
 namespace GameSproutRuntime {
@@ -25,7 +26,7 @@ struct CachedRenderObjectTransform {
     std::uint64_t Revision=0;
 };
 
-class Scene final : public GameObjectBase<IScene> {
+class Scene final : public GameObjectBase<IScene>, public IWeatherScene {
 public:
     Scene(Runtime& runtime, const std::string& name, std::uint64_t id)
         : GameObjectBase<IScene>(runtime,nullptr,name,id) { State().SceneOwner = this; }
@@ -38,6 +39,7 @@ public:
     ICameraComponent* GetMainCamera() const override;
     const EnvironmentLightingSettings& GetEnvironmentLighting() const override { return _EnvironmentLighting; }
     bool SetEnvironmentLighting(const EnvironmentLightingSettings&) override;
+    WeatherSettings GetAuthoredWeatherSettings() const override {return _Weather.Settings;}
     // Runtime-internal snapshot invalidation. Changes are visible before queued
     // listener dispatch, including direct Set* -> Render calls in editor/tests.
     std::uint64_t GetRenderRevision() const {return _RenderRevision;}
@@ -84,6 +86,17 @@ private:
     bool _SimulationEnabled = true;
     bool _ParkedForPlay = false;
     EnvironmentLightingSettings _EnvironmentLighting;
+    struct WeatherSimulation {
+        WeatherSettings Settings;
+        WeatherState Current;
+        double TimeOfDayHours=12;
+        std::array<std::array<double,2>,2> CloudOffsets{};
+        std::optional<WeatherPreset> TransitionTarget;
+        WeatherPreset TransitionSource;
+        double TransitionElapsed=0;
+        float TransitionDuration=0;
+        double LightningAge=0;
+    } _Weather;
     std::uint64_t _RenderRevision=1;
     std::uint64_t _SkinPoseRevision=1;
     std::uint64_t _RenderStructureRevision=1;
