@@ -94,7 +94,9 @@ void Runtime::TickAnimationPhase(std::vector<FrameComponent>& batch,float delta)
     }
 }
 void Runtime::FinishTickNotifications() {
+    const auto throughEnvironmentEvent=_EnvironmentEventSequence;
     DispatchWeatherEvents();
+    DispatchEnvironmentEvents(throughEnvironmentEvent);
     DispatchEvents();
     RefreshObservedScriptProperties();
     DispatchObjectPropertyChanges();
@@ -115,6 +117,7 @@ void Runtime::AdvanceFrameInternal(float deltaSeconds,std::uint32_t fixedStepCou
     struct UpdatingScope {bool& Updating;explicit UpdatingScope(bool& updating):Updating(updating){Updating=true;}~UpdatingScope(){Updating=false;}} updating(_Updating);
     AdvanceShaderClock(deltaSeconds);
     AdvanceWeather(deltaSeconds);
+    AdvanceEnvironment(deltaSeconds);
     std::string error;
     {
         GAMESPROUT_FRAME_SCOPE(Runtime, "simulation/initialization");

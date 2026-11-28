@@ -26,7 +26,7 @@ struct CachedRenderObjectTransform {
     std::uint64_t Revision=0;
 };
 
-class Scene final : public GameObjectBase<IScene>, public IWeatherScene {
+class Scene final : public GameObjectBase<IScene>, public IWeatherScene, public IEnvironmentScene {
 public:
     Scene(Runtime& runtime, const std::string& name, std::uint64_t id)
         : GameObjectBase<IScene>(runtime,nullptr,name,id) { State().SceneOwner = this; }
@@ -40,6 +40,7 @@ public:
     const EnvironmentLightingSettings& GetEnvironmentLighting() const override { return _EnvironmentLighting; }
     bool SetEnvironmentLighting(const EnvironmentLightingSettings&) override;
     WeatherSettings GetAuthoredWeatherSettings() const override {return _Weather.Settings;}
+    EnvironmentSettings GetAuthoredEnvironmentSettings() const override {return _Environment.Settings;}
     // Runtime-internal snapshot invalidation. Changes are visible before queued
     // listener dispatch, including direct Set* -> Render calls in editor/tests.
     std::uint64_t GetRenderRevision() const {return _RenderRevision;}
@@ -87,6 +88,11 @@ private:
     bool _ParkedForPlay = false;
     EnvironmentLightingSettings _EnvironmentLighting;
     struct WeatherSimulation {
+        struct ActiveLightning {
+            EnvironmentLightning State;
+            double Age=0;
+            bool Legacy=false;
+        };
         WeatherSettings Settings;
         WeatherState Current;
         double TimeOfDayHours=12;
@@ -95,8 +101,17 @@ private:
         WeatherPreset TransitionSource;
         double TransitionElapsed=0;
         float TransitionDuration=0;
-        double LightningAge=0;
+        std::vector<ActiveLightning> Lightning;
     } _Weather;
+    struct EnvironmentSimulation {
+        struct Entry {
+            std::size_t Index;
+            bool Curve;
+        };
+        EnvironmentSettings Settings;
+        std::vector<Entry> BlendOrder;
+        double TimeSeconds=0;
+    } _Environment;
     std::uint64_t _RenderRevision=1;
     std::uint64_t _SkinPoseRevision=1;
     std::uint64_t _RenderStructureRevision=1;

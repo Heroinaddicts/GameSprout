@@ -1,5 +1,6 @@
 #pragma once
 #include "Api/RuntimeRenderApi.h"
+#include "Api/RuntimeEnvironmentApi.h"
 #include "Api/RuntimeWeatherApi.h"
 #include "RuntimeShaders.h"
 #include "RuntimeRenderResourceLease.h"
@@ -148,9 +149,10 @@ private:
     struct ShaderPipelineKey {
         std::string Guid;std::uint64_t LocalID=0;
         GRHI::TextureFormat Format=GRHI::TextureFormat::Unknown;
-        bool Negative=false;
+        bool Negative=false,SkyOverlay=false;
         bool operator<(const ShaderPipelineKey& other) const {
-            return std::tie(Guid,LocalID,Format,Negative)<std::tie(other.Guid,other.LocalID,other.Format,other.Negative);
+            return std::tie(Guid,LocalID,Format,Negative,SkyOverlay)<
+                std::tie(other.Guid,other.LocalID,other.Format,other.Negative,other.SkyOverlay);
         }
     };
     struct PipelineKey {
@@ -457,7 +459,8 @@ private:
     ShaderGPU* Shader(const ResourceReference& reference);
     bool PrepareShaderMaterial(Material& material,ShaderGPU& shader);
     bool EnsureShaderVertices(MeshGPU& mesh,const ResourceReference& reference);
-    GRHI::IGraphicsPipeline* ShaderPipeline(const ResourceReference&,ShaderGPU&,GRHI::TextureFormat,bool negative);
+    GRHI::IGraphicsPipeline* ShaderPipeline(const ResourceReference&,ShaderGPU&,GRHI::TextureFormat,bool negative,
+        bool skyOverlay=false);
     bool DrawShaderMaterial(GRHI::IRenderPass&,Material&,ShaderGPU&,MeshGPU&,const ResourceReference&,
         const MeshSection&,const DrawObject&,const Mat4&,GRHI::TextureFormat);
     GRHI::IGraphicsPipeline* Pipeline(const PipelineKey& key);
@@ -474,9 +477,11 @@ private:
     bool DrawGrid(GRHI::IRenderPass& pass,const Mat4& viewProjection,GRHI::TextureFormat format);
     bool DrawSky(GRHI::IRenderPass&,const RenderView&,GRHI::TextureFormat,float aspect,
         const std::vector<DirectionalLight>&,const EnvironmentGPU*);
+    struct SkyVertexParameters {Vector4 Right,Up,Forward,Projection;};
+    void DrawEnvironmentSkyOverlays(GRHI::IRenderPass&,const RenderView&,GRHI::TextureFormat,const SkyVertexParameters&);
     bool DrawWeatherLightning(GRHI::IRenderPass&,const RenderView&,const Mat4&,GRHI::TextureFormat);
     GRHI::ITexture* WeatherCloudTexture();
-    void PrepareWeatherEnvironment(RenderEnvironment::Uniform&) const;
+    void PrepareWeatherView(const RenderView&,RenderEnvironment::Uniform&);
     bool PrepareDebug(const DebugDrawList* draw,std::vector<DebugBatch>& batches);
     bool DrawDebug(GRHI::IRenderPass& pass,const Mat4& viewProjection,GRHI::TextureFormat format,
                    const std::vector<DebugBatch>& batches,std::vector<GRHI::IBuffer*>& buffers);
@@ -496,6 +501,9 @@ private:
     std::string DeviceError(const std::string& operation) const;
     Runtime& _Runtime;
     WeatherState _Weather;
+    EnvironmentSnapshot _Environment;
+    Vector4 _SkyFlash;
+    bool _WeatherSkyEnabled=false,_WeatherLightingEnabled=false,_HasSkyOverlays=false;
     GRHI::IDevice& _Device;
     GRHI::ISurface* _Surface=nullptr;
     GRHI::ITexture* _ColorTarget=nullptr;

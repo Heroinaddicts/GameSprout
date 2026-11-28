@@ -110,8 +110,15 @@ bool Runtime::SetWeatherSettings(IScene& scene,const WeatherSettings& settings) 
     if(!normalized.Enabled) {
         sim.CloudOffsets={};
         sim.Current.CloudOffsets={};
+        std::erase_if(sim.Lightning,[](const auto& lightning){return lightning.Legacy;});
         sim.Current.LightningFlash=0;
         sim.Current.LightningSequence=0;
+        if(!sim.Lightning.empty()) {
+            const auto& latest=sim.Lightning.back().State;
+            sim.Current.Lightning=latest.Strike;
+            sim.Current.LightningFlash=latest.Flash;
+            sim.Current.LightningSequence=latest.Sequence;
+        }
     }
     candidate->InvalidateVisual();
     RecordNodeChange(candidate->State(),SceneNodeEventType::WeatherSettingsChanged,nullptr,0);
@@ -161,19 +168,7 @@ bool Runtime::TransitionWeather(IScene& scene,const WeatherPreset& preset,float 
 
 bool Runtime::TriggerLightning(IScene& scene,const WeatherLightning& strike) {
     auto* candidate=FindWeatherScene(scene);
-    if(!candidate||!candidate->_Weather.Current.Enabled||!IsValidWeatherLightning(strike)||
-       _LightningSequence==std::numeric_limits<std::uint64_t>::max())return false;
-    const auto sequence=_LightningSequence+1;
-    if(!_LightningListeners.empty())
-        _LightningEvents.push_back({scene.GetInstanceID(),{sequence,strike}});
-    _LightningSequence=sequence;
-    auto& sim=candidate->_Weather;
-    sim.Current.Lightning=strike;
-    sim.Current.LightningSequence=sequence;
-    sim.Current.LightningFlash=1;
-    sim.LightningAge=0;
-    candidate->InvalidateVisual();
-    return true;
+    return candidate&&candidate->_Weather.Current.Enabled&&StartWeatherLightning(*candidate,strike,true);
 }
 
 std::uint64_t Runtime::SubscribeLightning(LightningCallback callback) {
@@ -246,25 +241,39 @@ void Runtime::AdvanceSceneWeather(Scene& scene,float deltaSeconds) {
         state.CloudOffsets[index]={static_cast<float>(offset[0]),static_cast<float>(offset[1])};
         changed|=layer.Coverage>0&&layer.Density>0;
     }
-    if(state.LightningFlash>0) {
-        sim.LightningAge+=deltaSeconds;
-        state.LightningFlash=FlashAt(sim.LightningAge,state.Lightning.DurationSeconds);
-        changed=true;
-    }
     if(changed)scene.InvalidateVisual();
+}
+
+void Runtime::AdvanceSceneLightning(Scene& scene,float deltaSeconds) {
+    auto& sim=scene._Weather;
+    if(sim.Lightning.empty())return;
+    for(auto& lightning:sim.Lightning) {
+        lightning.Age+=deltaSeconds;
+        auto& effect=lightning.State;
+        effect.Flash=FlashAt(lightning.Age,effect.Strike.DurationSeconds);
+        if(effect.Sequence==sim.Current.LightningSequence)sim.Current.LightningFlash=effect.Flash;
+    }
+    std::erase_if(sim.Lightning,[](const auto& effect){return effect.State.Flash<=0;});
+    scene.InvalidateVisual();
 }
 
 void Runtime::AdvanceWeather(float deltaSeconds) {
     if(deltaSeconds<=0)return;
-    for(auto* scene:_Scenes)
-        if(scene->_Weather.Current.Enabled&&scene->IsSimulationEnabled())AdvanceSceneWeather(*scene,deltaSeconds);
+    for(auto* scene:_Scenes) {
+        if(!scene->IsSimulationEnabled())continue;
+        if(scene->_Weather.Current.Enabled)AdvanceSceneWeather(*scene,deltaSeconds);
+        AdvanceSceneLightning(*scene,deltaSeconds);
+    }
 }
 
 bool Runtime::AdvanceWeatherPreview(IScene& scene,float deltaSeconds) {
     auto* candidate=FindWeatherScene(scene);
     if(!candidate||!candidate->_Weather.Current.Enabled||_ScriptExecutionEnabled||IsExecuting()||
        _ConstructionDepth||!std::isfinite(deltaSeconds)||deltaSeconds<0)return false;
-    if(deltaSeconds>0)AdvanceSceneWeather(*candidate,deltaSeconds);
+    if(deltaSeconds>0) {
+        AdvanceSceneWeather(*candidate,deltaSeconds);
+        AdvanceSceneLightning(*candidate,deltaSeconds);
+    }
     return true;
 }
 

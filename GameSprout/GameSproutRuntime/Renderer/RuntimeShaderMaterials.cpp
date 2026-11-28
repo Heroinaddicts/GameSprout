@@ -29,6 +29,33 @@ bool PackBlock(const ShaderUniformBlock& block,const MaterialRenderData& materia
     }
     return true;
 }
+bool PackEnvironmentValue(std::uint8_t* target,ShaderValueType type,const EnvironmentValue& value) {
+    if(type==ShaderValueType::Float) {
+        if(const auto* scalar=std::get_if<float>(&value)) {
+            std::memcpy(target,scalar,sizeof(float));
+            return true;
+        }
+    } else if(type==ShaderValueType::Float3) {
+        if(const auto* vector=std::get_if<Vector3>(&value)) {
+            const float data[]{vector->X,vector->Y,vector->Z};
+            std::memcpy(target,data,sizeof(data));
+            return true;
+        }
+    } else if(type==ShaderValueType::Float4) {
+        if(const auto* color=std::get_if<Color>(&value)) {
+            const float data[]{color->R,color->G,color->B,color->A};
+            std::memcpy(target,data,sizeof(data));
+            return true;
+        }
+    } else if(type==ShaderValueType::Int||type==ShaderValueType::UInt) {
+        if(const auto* enabled=std::get_if<bool>(&value)) {
+            const std::uint32_t data=*enabled?1:0;
+            std::memcpy(target,&data,sizeof(data));
+            return true;
+        }
+    }
+    return false;
+}
 float ReadFloat(const std::uint8_t* data) {
     const std::uint32_t bits=std::uint32_t(data[0])|(std::uint32_t(data[1])<<8)|(std::uint32_t(data[2])<<16)|(std::uint32_t(data[3])<<24);
     return std::bit_cast<float>(bits);
@@ -155,5 +182,68 @@ bool Renderer::DrawShaderMaterial(GRHI::IRenderPass& target,Material& material,S
     target.DrawIndexed(section.IndexCount,1,section.FirstIndex);
     _Statistics.RequiresContinuousRendering=_Statistics.RequiresContinuousRendering||animated;
     return true;
+}
+
+void Renderer::DrawEnvironmentSkyOverlays(GRHI::IRenderPass& target,const RenderView& view,
+    GRHI::TextureFormat format,const SkyVertexParameters& vertex) {
+    auto frame=_ShaderFrame;
+    for(const auto& light:_SceneLights)if(light.CullingMask&view.Camera.Projection.CullingMask) {
+        frame.MainLightDirection={light.TowardsLight.X,light.TowardsLight.Y,light.TowardsLight.Z,1};
+        frame.MainLightColor={light.Radiance.R,light.Radiance.G,light.Radiance.B,1};
+        break;
+    }
+    std::vector<std::uint8_t> overrideBytes;
+    for(const auto& effect:_Environment.Effects) {
+        if(effect.Stage!=EnvironmentEffectStage::SkyOverlay||(_PlanarShadowSource&&!effect.Reflections))continue;
+        auto* material=MaterialData(effect.Material);
+        if(!material||!material->Loaded)continue;
+        const auto& shaderReference=material->Data.Shader;
+        if(shaderReference.Guid.empty()) {
+            Diagnostic("Environment sky overlay has no programmable shader: "+effect.Id);
+            continue;
+        }
+        auto* shader=Shader(shaderReference);
+        if(!shader||!PrepareShaderMaterial(*material,*shader))continue;
+        auto* pipeline=ShaderPipeline(shaderReference,*shader,format,false,true);
+        if(!pipeline)continue;
+        target.SetPipeline(pipeline);
+        target.SetVertexUniform(0,&vertex,sizeof(vertex));
+
+        const auto& pixel=shader->Data.Passes.front().Fragment;
+        for(const auto& block:pixel.Uniforms) {
+            if(block.Source==ShaderUniformSource::Frame) {
+                target.SetFragmentUniform(block.Slot,&frame,sizeof(frame));
+                _Statistics.RequiresContinuousRendering=true;
+                continue;
+            }
+            const auto uniform=std::find_if(material->FragmentUniforms.begin(),material->FragmentUniforms.end(),
+                [&](const auto& bound){return bound.Slot==block.Slot;});
+            if(uniform==material->FragmentUniforms.end())continue;
+            overrideBytes.clear();
+            for(const auto& member:block.Members) {
+                const auto value=std::find_if(_Environment.Values.begin(),_Environment.Values.end(),[&](const auto& field) {
+                    return field.Target==effect.Id&&field.Parameter==member.Name;
+                });
+                if(value==_Environment.Values.end())continue;
+                if(overrideBytes.empty())overrideBytes=uniform->Bytes;
+                if(!PackEnvironmentValue(overrideBytes.data()+member.Offset,member.Type,value->Value))
+                    Diagnostic("Environment sky shader uniform type does not match: "+effect.Id+"."+member.Name);
+            }
+            const auto& bytes=overrideBytes.empty()?uniform->Bytes:overrideBytes;
+            target.SetFragmentUniform(block.Slot,bytes.data(),bytes.size());
+        }
+        for(const auto& binding:pixel.Textures) {
+            auto* texture=material->ShaderTextures[binding.Slot];
+            if(const auto* value=FindEnvironmentValue<ResourceReference>(_Environment,effect.Id,binding.Name)) {
+                if(value->Guid.empty())texture=nullptr;
+                else if(!_TexturePrefetchEnabled||!PrefetchTexture(*value,true))texture=Texture(*value);
+            }
+            target.SetFragmentTextureSampler(binding.Slot,texture?texture->Texture:_White,
+                texture?texture->Sampler:_DefaultSampler);
+        }
+        target.Draw(3);
+        ++_Statistics.DrawCalls;
+        ++_Statistics.Triangles;
+    }
 }
 }

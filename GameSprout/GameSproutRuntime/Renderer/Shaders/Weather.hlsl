@@ -1,3 +1,4 @@
+static const int MaxWeatherCloudLayers = 8;
 cbuffer WeatherSkyUniform : register(b0, space3)
 {
     float4 WeatherZenith;
@@ -7,10 +8,10 @@ cbuffer WeatherSkyUniform : register(b0, space3)
     float4 WeatherSunRadiance;
     float4 WeatherSkyCubeParameters;
     float4 WeatherStars; // Inverse yaw XY, intensity, density.
-    float4 WeatherTime;  // Daylight, direct-sun multiplier, flash intensity.
+    float4 WeatherTime;  // Daylight, direct-sun multiplier, flash intensity, cloud count.
     float4 WeatherSkyFlashTint;
-    float4 WeatherClouds[2];
-    float4 WeatherCloudOffsets;
+    float4 WeatherClouds[MaxWeatherCloudLayers];
+    float4 WeatherCloudOffsets[MaxWeatherCloudLayers];
 };
 Texture2D<float4> WeatherCloudMap : register(t0, space2);
 SamplerState WeatherCloudSampler : register(s0, space2);
@@ -64,13 +65,12 @@ float3 EvaluateWeatherSky(float3 ray, float3 daySky)
     // amplify texture-coordinate derivatives to infinity.
     float2 plane = ray.xz / max(0.25, ray.y + 0.42);
     float horizon = smoothstep(-0.026, 0.17, ray.y);
-    [unroll] for (int layer = 1; layer >= 0; --layer)
+    [loop] for (int layer = int(WeatherTime.w) - 1; layer >= 0; --layer)
     {
-        float3 settings = WeatherClouds[layer].xyz;
-        if (settings.x <= 0.0 || settings.y <= 0.0) continue;
-        float2 offset = layer == 0 ? WeatherCloudOffsets.xy : WeatherCloudOffsets.zw;
+        float4 settings = WeatherClouds[layer];
+        float2 offset = WeatherCloudOffsets[layer].xy;
         float4 noise = WeatherCloudMap.Sample(WeatherCloudSampler, plane * settings.z * 0.5 + offset);
-        float sampleValue = layer == 0 ? noise.r : noise.g;
+        float sampleValue = settings.w < 0.5 ? noise.r : noise.g;
         float threshold = 1.0 - settings.x;
         float mask = smoothstep(threshold - 0.085, threshold + 0.07, sampleValue) *
             smoothstep(0.0, 0.10, settings.x) * settings.y * horizon * WeatherCloudTint.a;

@@ -136,8 +136,9 @@ Renderer::ShaderGPU* Renderer::Shader(const ResourceReference& reference) {
     return &entry;
 }
 
-GRHI::IGraphicsPipeline* Renderer::ShaderPipeline(const ResourceReference& reference,ShaderGPU& shader,GRHI::TextureFormat format,bool negative) {
-    ShaderPipelineKey key{reference.Guid,reference.LocalID,format,negative};
+GRHI::IGraphicsPipeline* Renderer::ShaderPipeline(const ResourceReference& reference,ShaderGPU& shader,
+    GRHI::TextureFormat format,bool negative,bool skyOverlay) {
+    ShaderPipelineKey key{reference.Guid,reference.LocalID,format,negative,skyOverlay};
     if(const auto found=_ShaderPipelines.find(key);found!=_ShaderPipelines.end())return found->second;
     const auto& pass=shader.Data.Passes[0];
     const GRHI::VertexBindingDesc binding{0,48};
@@ -151,6 +152,16 @@ GRHI::IGraphicsPipeline* Renderer::ShaderPipeline(const ResourceReference& refer
     description.Winding=negative?GRHI::FrontFace::CounterClockwise:GRHI::FrontFace::Clockwise;
     description.DepthFormat=GRHI::TextureFormat::D32_Float;description.DepthTest=pass.DepthTest;description.DepthWrite=pass.DepthWrite;
     description.DepthCompare=static_cast<GRHI::CompareOp>(pass.DepthCompare);
+    if(skyOverlay) {
+        auto*& vertex=_Shaders[static_cast<unsigned>(PreviewShader::SkyVertex)];
+        if(!vertex)vertex=CreatePreviewShader(_Device,PreviewShader::SkyVertex);
+        if(!vertex){Diagnostic(DeviceError("Create environment overlay sky vertex"));return nullptr;}
+        description.VertexShader=vertex;
+        description.VertexBindings=nullptr;description.VertexBindingCount=0;
+        description.VertexAttributes=nullptr;description.VertexAttributeCount=0;
+        description.Cull=GRHI::CullMode::None;
+        description.DepthTest=description.DepthWrite=false;
+    }
     auto* pipeline=_Device.CreateGraphicsPipeline(description);
     if(!pipeline){Diagnostic(DeviceError("Create user Shader graphics pipeline"));return nullptr;}
     try {_ShaderPipelines.emplace(std::move(key),pipeline);}catch(...){delete pipeline;throw;}

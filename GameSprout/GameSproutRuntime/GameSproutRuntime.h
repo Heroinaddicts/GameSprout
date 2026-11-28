@@ -2,6 +2,7 @@
 #include "Api/GameSproutRuntimeApi.h"
 #include "Api/RuntimePropertyObserver.h"
 #include "Api/RuntimeWeatherApi.h"
+#include "Api/RuntimeEnvironmentApi.h"
 #include "Animation/AnimationResources.h"
 #include "Renderer/RuntimeRenderWorkers.h"
 #include "GRHIApi.h"
@@ -26,9 +27,9 @@ class RuntimePhysicsSystem;
 class RenderResourceCache;
 class RenderResourceLease;
 
-class Runtime final : public IGameSproutRuntime, public IWeatherRuntime {
+class Runtime final : public IGameSproutRuntime, public IWeatherRuntime, public IEnvironmentRuntime {
 public:
-    Runtime() = default;
+    Runtime();
     ~Runtime() override;
     Runtime(const Runtime&) = delete;
     Runtime& operator=(const Runtime&) = delete;
@@ -50,6 +51,22 @@ public:
     std::uint64_t SubscribeLightning(LightningCallback) override;
     void UnsubscribeLightning(std::uint64_t) override;
     bool AdvanceWeatherPreview(IScene&,float deltaSeconds) override;
+    bool RegisterEnvironmentParameter(const EnvironmentParameterDefinition&) override;
+    bool RegisterEnvironmentEffect(const EnvironmentEffectDescriptor&) override;
+    bool UnregisterEnvironmentParameter(const std::string&) override;
+    bool UnregisterEnvironmentEffect(const std::string&) override;
+    std::vector<EnvironmentParameterDefinition> GetEnvironmentParameters() const override;
+    std::vector<EnvironmentEffectDescriptor> GetEnvironmentEffects() const override;
+    bool RegisterEnvironmentEvent(const EnvironmentEventDescriptor&) override;
+    bool UnregisterEnvironmentEvent(const std::string&) override;
+    std::vector<EnvironmentEventDescriptor> GetEnvironmentEvents() const override;
+    bool GetEnvironmentSettings(const IScene&,EnvironmentSettings&) const override;
+    bool SetEnvironmentSettings(IScene&,const EnvironmentSettings&) override;
+    bool ResolveEnvironment(const IScene&,Vector3,EnvironmentSnapshot&) const override;
+    bool EmitEnvironmentEvent(IScene&,const EnvironmentEvent&) override;
+    std::uint64_t SubscribeEnvironmentEvents(EnvironmentEventCallback) override;
+    void UnsubscribeEnvironmentEvents(std::uint64_t) override;
+    bool AdvanceEnvironmentPreview(IScene&,float deltaSeconds) override;
     IGameObject* QueryGameObject(std::uint64_t id) const override;
     bool RegisterObjectPropertyObserver(std::uint64_t,IRuntimePropertyObserver*) override;
     void UnregisterObjectPropertyObserver(std::uint64_t,IRuntimePropertyObserver*) override;
@@ -312,8 +329,15 @@ private:
     void FinishTickNotifications();
     Scene* FindWeatherScene(const IScene&) const;
     static void AdvanceSceneWeather(Scene&,float deltaSeconds);
+    static void AdvanceSceneLightning(Scene&,float deltaSeconds);
     void AdvanceWeather(float deltaSeconds);
     void DispatchWeatherEvents();
+    void AdvanceEnvironment(float deltaSeconds);
+    static void AdvanceSceneEnvironment(Scene&,float deltaSeconds);
+    void InvalidateEnvironmentViews();
+    bool QueueEnvironmentEvent(const Scene&,EnvironmentEvent);
+    void DispatchEnvironmentEvents(std::uint64_t throughSequence);
+    bool StartWeatherLightning(Scene&,const WeatherLightning&,bool legacy);
     void StepPhysics(float deltaSeconds);
     bool InitializePendingComponents(std::string& error,bool allowScripts);
     void NotifyInitializationError(GameObjectState&,IComponent&,const std::string&);
@@ -330,6 +354,20 @@ private:
     std::map<std::uint64_t,LightningListener> _LightningListeners;
     std::deque<LightningRecord> _LightningEvents;
     std::uint64_t _NextLightningListener=0,_LightningSequence=0;
+    std::map<std::string,EnvironmentParameterDefinition,std::less<>> _EnvironmentParameters;
+    std::map<std::string,EnvironmentEffectDescriptor,std::less<>> _EnvironmentEffects;
+    std::map<std::string,EnvironmentEventDescriptor,std::less<>> _EnvironmentEventTypes;
+    struct EnvironmentListener {
+        std::shared_ptr<EnvironmentEventCallback> Callback;
+        std::uint64_t AfterSequence;
+    };
+    struct EnvironmentRecord {
+        std::uint64_t SceneID;
+        EnvironmentEvent Event;
+    };
+    std::map<std::uint64_t,EnvironmentListener> _EnvironmentListeners;
+    std::deque<EnvironmentRecord> _EnvironmentEvents;
+    std::uint64_t _NextEnvironmentListener=0,_EnvironmentEventSequence=0;
     std::map<std::uint64_t,GameObjectState*> _Nodes;
     struct TickCounts {std::size_t Variable=0,Fixed=0,Early=0,Late=0;};
     std::map<std::uint64_t,TickCounts> _TickObjects;

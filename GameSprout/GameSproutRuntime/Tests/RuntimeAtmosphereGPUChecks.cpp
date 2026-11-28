@@ -1,4 +1,5 @@
 #include "GameSproutRuntimeExport.h"
+#include "RuntimeEnvironmentApi.h"
 #include "RuntimeRenderApi.h"
 #include "RuntimeWeatherApi.h"
 #include <algorithm>
@@ -261,6 +262,24 @@ int main(int argc,char** argv) {
         render();const auto secondLayer=Pixels(*viewport);
         Check(firstLayer!=clearDay&&secondLayer!=clearDay&&firstLayer!=secondLayer,
             "The two cloud layers did not change the sky independently");
+        cloud.Clouds[0].Coverage=.42f;
+        cloud.Clouds[1].Coverage=.48f;
+        Check(weather->TransitionWeather(*other,cloud,0),"Legacy skies rejected a two-layer preset");
+        render();const auto twoLayers=Pixels(*viewport);
+        auto* effects=QueryEnvironmentRuntime(*runtime);
+        Check(effects,"Environment API unavailable");
+        EnvironmentSettings additionalCloud;
+        additionalCloud.Effects={{"upper-cloud","GameSprout.CloudLayer"}};
+        EnvironmentLayer cloudLayer;
+        cloudLayer.Id="upper-cloud-settings";
+        cloudLayer.Overrides={{"upper-cloud","Coverage",.84f},{"upper-cloud","Density",.93f},{"upper-cloud","Scale",6.5f}};
+        additionalCloud.Layers.push_back(cloudLayer);
+        Check(effects->SetEnvironmentSettings(*other,additionalCloud),"Third cloud layer rejected");
+        render();
+        Check(Pixels(*viewport)!=twoLayers&&viewport->GetStatistics().DrawCalls==1,
+            "The third cloud layer did not composite with the two legacy layers in one sky draw");
+        Check(effects->SetEnvironmentSettings(*other,{}),"Third cloud layer could not be removed");
+        render();Check(Pixels(*viewport)==twoLayers,"Removing the third layer altered the two legacy layers");
         Check(weather->TransitionWeather(*other,settings.Preset,0)&&weather->SetTimeOfDay(*other,23),
             "Night sky settings rejected");
         render();const auto noStars=Pixels(*viewport);
@@ -279,6 +298,24 @@ int main(int argc,char** argv) {
         render();const auto litReceiver=Pixels(*viewport);
         Check(litReceiver[centre+2]>darkReceiver[centre+2]+12,"Lightning did not illuminate the surface");
         Check(viewport->GetStatistics().SceneSnapshotRebuilds==0,"Lightning invalidated the render snapshot");
+
+        auto* fogScene=runtime->CreateScene("Regional fog without legacy weather");
+        view.Scene=fogScene;
+        Mesh(*fogScene,"Fog receiver");
+        provider.Emission={1,0,0,1};provider.ChangeMaterial();
+        EnvironmentLightingSettings fogLighting;
+        fogLighting.Atmosphere.FogStart=1;fogLighting.Atmosphere.FogEnd=2;fogLighting.Atmosphere.FogMaxOpacity=1;
+        Check(fogScene->SetEnvironmentLighting(fogLighting),"Regional fog base rejected");
+        EnvironmentSettings regionalFog;
+        EnvironmentLayer moat;
+        moat.Id="moat";
+        moat.Region=EnvironmentRegion{{0,0,15},{1,1,1},2};
+        moat.Overrides={{"","Fog.Strength",1.f},{"","Fog.Color",Color{.1f,.4f,.6f,1}}};
+        regionalFog.Layers.push_back(moat);
+        Check(effects->SetEnvironmentSettings(*fogScene,regionalFog),"Regional fog rejected");
+        camera({0,0,20},{});render();Center(*viewport,{1,0,0},"Regional fog affected a view outside the influence box");
+        camera({0,0,17},{});render();Center(*viewport,{.645f,.27f,.35f},"Regional fog did not blend at the box edge");
+        camera({0,0,15},{});render();Center(*viewport,{.1f,.4f,.6f},"Regional fog remained disabled with legacy weather off");
         delete viewport;viewport=nullptr;delete runtime;runtime=nullptr;
         std::cout<<"PASS atmosphere GPU: fog, gradient/cubemap sky, rotated diffuse lighting, rough and local box reflections, FP16 exposure and tone mapping, depth-tested/2D overlays, scene isolation and instancing\n";return 0;
     }catch(const std::exception& failure){std::cerr<<"FAIL "<<failure.what()<<'\n';delete viewport;delete runtime;return 1;}
