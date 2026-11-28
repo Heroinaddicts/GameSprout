@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "06936d9847454f438a5674742f370445",
+  "ImporterType": "Shader",
+  "Path": "Environment/Shaders/CastleRainImpact.shader",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 6,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "CastleRainImpact"
+    }
+  ]
+}

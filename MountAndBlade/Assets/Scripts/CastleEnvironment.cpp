@@ -232,6 +232,7 @@ void CastleEnvironment::LateUpdate(IGameSproutRuntime* runtime, float deltaSecon
     _Sunset.SetWeight(*runtime, strength(DuskPhase));
     SetStormOverlay(*runtime, *scene, 0, rain);
     SetStormOverlay(*runtime, *scene, 1, strength(WindPhase));
+    _RainImpacts.Update(*runtime, *scene, rain, deltaSeconds);
     _Lightning.Update(*runtime, deltaSeconds);
     if (_Phase == LightningPhase && _NextStrike < StrikeTimes.size() &&
         inPhase >= StrikeTimes[_NextStrike]) {
@@ -247,6 +248,7 @@ void CastleEnvironment::Release(IGameSproutRuntime* runtime) {
     if (scene) {
         for (const auto id : _OverlayIDs)
             if (auto* overlay = id ? runtime->QueryGameObject(id) : nullptr) scene->DestroyGameObject(overlay);
+        _RainImpacts.Release(*runtime, *scene);
         _Lightning.Release(*runtime, *scene);
         EnvironmentSettings composition;
         if (environment->GetEnvironmentSettings(*scene, composition)) {

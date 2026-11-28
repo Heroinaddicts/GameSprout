@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CastleLightning.h"
+#include "CastleRainImpacts.h"
 #include "CastleSunset.h"
 #include "RuntimeScriptModule.h"
 #include "RuntimeWeatherApi.h"
@@ -27,6 +28,7 @@ private:
     std::array<std::uint64_t, 2> _OverlayIDs{};
     GameSproutRuntime::WeatherSettings _InitialWeather;
     CastleLightning _Lightning;
+    CastleRainImpacts _RainImpacts;
     CastleSunset _Sunset;
     double _Elapsed = 0;
     std::size_t _Phase = 0;

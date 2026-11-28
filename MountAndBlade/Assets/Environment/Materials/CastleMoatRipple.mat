@@ -1,0 +1,7 @@
+{
+  "Version": 1,
+  "Name": "Castle Moat Ripple",
+  "Shader": {"Guid": "06936d9847454f438a5674742f370445", "LocalID": 1},
+  "WaterMode": 1,
+  "ImpactTint": [0.49, 0.68, 0.80, 0.82]
+}

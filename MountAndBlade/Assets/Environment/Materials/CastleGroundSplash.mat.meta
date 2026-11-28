@@ -1,0 +1,15 @@
+{
+  "Version": 1,
+  "Guid": "70d0619abfca444e9cfe1d72a49548b8",
+  "ImporterType": "Material",
+  "Path": "Environment/Materials/CastleGroundSplash.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {
+      "Type": 5,
+      "SourceKey": "main",
+      "LocalID": 1,
+      "Name": "Castle Ground Splash"
+    }
+  ]
+}

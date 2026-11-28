@@ -1,0 +1,7 @@
+{
+  "Version": 1,
+  "Name": "Castle Ground Splash",
+  "Shader": {"Guid": "06936d9847454f438a5674742f370445", "LocalID": 1},
+  "WaterMode": 0,
+  "ImpactTint": [0.65, 0.79, 0.97, 0.90]
+}

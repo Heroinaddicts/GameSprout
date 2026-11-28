@@ -46,7 +46,7 @@ Script 或 Module 包含 `RuntimeEnvironmentApi.h`，通过 `QueryEnvironmentRun
 
 一次性效果事件通过 `EmitEnvironmentEvent` 发出。以字符串标识类型，可附带类型化字段，也可以注册事件描述供调用时校验。内置 `GameSprout.Lightning` 使用世界位置、半径、持续时间和亮度等字段。旧 `TriggerLightning` 同样会发出这个事件，已有闪电回调继续工作。通过 `SubscribeEnvironmentEvents` 订阅，在 `Release` 里注销。场景时钟和闪电持续时间由 Runtime 更新，Scene、Game 和反射只读取结果。
 
-在 MountAndBlade 打开 `Medieval Castle` 并 Play，会按晴天、雨天、黑夜、白天、闪电、黄昏、狂风天顺序轮播。每段 5 秒，最后 1.4 秒渐变到下一种天气。轮播只修改 Play 中的场景状态。
+在 MountAndBlade 打开 `Medieval Castle` 并 Play，会按晴天、雨天、黑夜、白天、闪电、黄昏、狂风天顺序轮播。每段 5 秒，最后 1.4 秒渐变到下一种天气。雨天在桥面和地面溅起水花，雨滴落入护城河时产生涟漪。闪电段有三次落雷，触地点取自场景碰撞，桥前能看到分叉和接地火花。黄昏的日盘和方向光使用同一个方向。轮播只修改 Play 中的场景状态。
 
 ## 场景局部反射和间接光
 
