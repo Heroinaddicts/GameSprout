@@ -18,6 +18,7 @@ class RenderResourceCache;
 class MeshComponent;
 class SkinnedMeshRendererComponent;
 class Scene;
+class GameObjectState;
 struct RenderObjectChange;
 struct RenderObjectTransform;
 struct CachedRenderObjectTransform;
