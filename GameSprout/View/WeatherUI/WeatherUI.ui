@@ -1,0 +1,1064 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+  <class>WeatherWindow</class>
+  <widget class="QDialog" name="WeatherWindow">
+    <property name="windowTitle">
+      <string>场景天气</string>
+    </property>
+    <layout class="QVBoxLayout" name="weatherLayout">
+      <item>
+        <widget class="QCheckBox" name="enabledCheck">
+          <property name="text">
+            <string>启用场景天气</string>
+          </property>
+        </widget>
+      </item>
+      <item>
+        <widget class="QTabWidget" name="settingsTabs">
+          <widget class="QWidget" name="skyTab">
+            <attribute name="title">
+              <string>昼夜与星空</string>
+            </attribute>
+            <layout class="QFormLayout" name="skyForm">
+              <item row="0" column="0">
+                <widget class="QLabel" name="timeOfDayLabel">
+                  <property name="text">
+                    <string>起始时间（小时）</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="0" column="1">
+                <widget class="QDoubleSpinBox" name="timeOfDay">
+                  <property name="decimals">
+                    <number>2</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>24</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>0.1</double>
+                  </property>
+                  <property name="value">
+                    <double>12</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="1" column="0">
+                <widget class="QLabel" name="dayLengthLabel">
+                  <property name="text">
+                    <string>一天时长（秒）</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="1" column="1">
+                <widget class="QDoubleSpinBox" name="dayLength">
+                  <property name="decimals">
+                    <number>2</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>100000000.0</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>10</double>
+                  </property>
+                  <property name="value">
+                    <double>0</double>
+                  </property>
+                  <property name="toolTip">
+                    <string>设为 0 时保持指定时间</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="2" column="0">
+                <widget class="QLabel" name="starIntensityLabel">
+                  <property name="text">
+                    <string>星光亮度</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="2" column="1">
+                <widget class="QDoubleSpinBox" name="starIntensity">
+                  <property name="decimals">
+                    <number>3</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>16</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>0.1</double>
+                  </property>
+                  <property name="value">
+                    <double>1</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="3" column="0">
+                <widget class="QLabel" name="starDensityLabel">
+                  <property name="text">
+                    <string>星星密度</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="3" column="1">
+                <widget class="QDoubleSpinBox" name="starDensity">
+                  <property name="decimals">
+                    <number>3</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>1</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>0.05</double>
+                  </property>
+                  <property name="value">
+                    <double>0.3</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="4" column="0">
+                <widget class="QLabel" name="starRotationLabel">
+                  <property name="text">
+                    <string>星空方向（度）</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="4" column="1">
+                <widget class="QDoubleSpinBox" name="starRotation">
+                  <property name="decimals">
+                    <number>2</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>360</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>5</double>
+                  </property>
+                  <property name="value">
+                    <double>0</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="5" column="0">
+                <widget class="QLabel" name="dayLightLabel">
+                  <property name="text">
+                    <string>太阳光强度倍率</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="5" column="1">
+                <widget class="QDoubleSpinBox" name="dayLight">
+                  <property name="decimals">
+                    <number>3</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>4</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>0.1</double>
+                  </property>
+                  <property name="value">
+                    <double>1</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="6" column="0">
+                <widget class="QLabel" name="ambientLightLabel">
+                  <property name="text">
+                    <string>环境光强度倍率</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="6" column="1">
+                <widget class="QDoubleSpinBox" name="ambientLight">
+                  <property name="decimals">
+                    <number>3</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>4</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>0.1</double>
+                  </property>
+                  <property name="value">
+                    <double>1</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="7" column="0">
+                <widget class="QLabel" name="fogStrengthLabel">
+                  <property name="text">
+                    <string>距离雾强度倍率</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="7" column="1">
+                <widget class="QDoubleSpinBox" name="fogStrength">
+                  <property name="decimals">
+                    <number>3</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>4</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>0.1</double>
+                  </property>
+                  <property name="value">
+                    <double>1</double>
+                  </property>
+                </widget>
+              </item>
+            </layout>
+          </widget>
+          <widget class="QWidget" name="cloudTab">
+            <attribute name="title">
+              <string>双层云</string>
+            </attribute>
+            <layout class="QVBoxLayout" name="cloudLayout">
+              <item>
+                <layout class="QHBoxLayout" name="layersLayout">
+                  <item>
+                    <widget class="QGroupBox" name="cloudAGroup">
+                      <property name="title">
+                        <string>第 1 层云</string>
+                      </property>
+                      <layout class="QFormLayout" name="cloudAForm">
+                        <item row="0" column="0">
+                          <widget class="QLabel" name="cloudACoverageLabel">
+                            <property name="text">
+                              <string>覆盖率</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="0" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudACoverage">
+                            <property name="decimals">
+                              <number>3</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0</double>
+                            </property>
+                            <property name="maximum">
+                              <double>1</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>0.05</double>
+                            </property>
+                            <property name="value">
+                              <double>0.22</double>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="1" column="0">
+                          <widget class="QLabel" name="cloudADensityLabel">
+                            <property name="text">
+                              <string>密度</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="1" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudADensity">
+                            <property name="decimals">
+                              <number>3</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0</double>
+                            </property>
+                            <property name="maximum">
+                              <double>1</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>0.05</double>
+                            </property>
+                            <property name="value">
+                              <double>0.75</double>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="2" column="0">
+                          <widget class="QLabel" name="cloudAScaleLabel">
+                            <property name="text">
+                              <string>图案频率</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="2" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudAScale">
+                            <property name="decimals">
+                              <number>3</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0.125</double>
+                            </property>
+                            <property name="maximum">
+                              <double>64</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>0.125</double>
+                            </property>
+                            <property name="value">
+                              <double>2</double>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="3" column="0">
+                          <widget class="QLabel" name="cloudAWindDirectionLabel">
+                            <property name="text">
+                              <string>风向（度）</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="3" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudAWindDirection">
+                            <property name="decimals">
+                              <number>2</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0</double>
+                            </property>
+                            <property name="maximum">
+                              <double>360</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>5</double>
+                            </property>
+                            <property name="value">
+                              <double>0</double>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="4" column="0">
+                          <widget class="QLabel" name="cloudAWindSpeedLabel">
+                            <property name="text">
+                              <string>风速（图案周期/秒）</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="4" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudAWindSpeed">
+                            <property name="decimals">
+                              <number>4</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0</double>
+                            </property>
+                            <property name="maximum">
+                              <double>2</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>0.005</double>
+                            </property>
+                            <property name="value">
+                              <double>0.018</double>
+                            </property>
+                          </widget>
+                        </item>
+                      </layout>
+                    </widget>
+                  </item>
+                  <item>
+                    <widget class="QGroupBox" name="cloudBGroup">
+                      <property name="title">
+                        <string>第 2 层云</string>
+                      </property>
+                      <layout class="QFormLayout" name="cloudBForm">
+                        <item row="0" column="0">
+                          <widget class="QLabel" name="cloudBCoverageLabel">
+                            <property name="text">
+                              <string>覆盖率</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="0" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudBCoverage">
+                            <property name="decimals">
+                              <number>3</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0</double>
+                            </property>
+                            <property name="maximum">
+                              <double>1</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>0.05</double>
+                            </property>
+                            <property name="value">
+                              <double>0.12</double>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="1" column="0">
+                          <widget class="QLabel" name="cloudBDensityLabel">
+                            <property name="text">
+                              <string>密度</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="1" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudBDensity">
+                            <property name="decimals">
+                              <number>3</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0</double>
+                            </property>
+                            <property name="maximum">
+                              <double>1</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>0.05</double>
+                            </property>
+                            <property name="value">
+                              <double>0.35</double>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="2" column="0">
+                          <widget class="QLabel" name="cloudBScaleLabel">
+                            <property name="text">
+                              <string>图案频率</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="2" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudBScale">
+                            <property name="decimals">
+                              <number>3</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0.125</double>
+                            </property>
+                            <property name="maximum">
+                              <double>64</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>0.125</double>
+                            </property>
+                            <property name="value">
+                              <double>5</double>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="3" column="0">
+                          <widget class="QLabel" name="cloudBWindDirectionLabel">
+                            <property name="text">
+                              <string>风向（度）</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="3" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudBWindDirection">
+                            <property name="decimals">
+                              <number>2</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0</double>
+                            </property>
+                            <property name="maximum">
+                              <double>360</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>5</double>
+                            </property>
+                            <property name="value">
+                              <double>70</double>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="4" column="0">
+                          <widget class="QLabel" name="cloudBWindSpeedLabel">
+                            <property name="text">
+                              <string>风速（图案周期/秒）</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="4" column="1">
+                          <widget class="QDoubleSpinBox" name="cloudBWindSpeed">
+                            <property name="decimals">
+                              <number>4</number>
+                            </property>
+                            <property name="minimum">
+                              <double>0</double>
+                            </property>
+                            <property name="maximum">
+                              <double>2</double>
+                            </property>
+                            <property name="singleStep">
+                              <double>0.005</double>
+                            </property>
+                            <property name="value">
+                              <double>0.01</double>
+                            </property>
+                          </widget>
+                        </item>
+                      </layout>
+                    </widget>
+                  </item>
+                </layout>
+              </item>
+              <item>
+                <layout class="QHBoxLayout" name="cloudColorLayout">
+                  <item>
+                    <widget class="QLabel" name="cloudColorLabel">
+                      <property name="text">
+                        <string>云层颜色（线性 RGB）</string>
+                      </property>
+                    </widget>
+                  </item>
+                  <item>
+                    <widget class="QDoubleSpinBox" name="cloudRed">
+                      <property name="decimals">
+                        <number>3</number>
+                      </property>
+                      <property name="minimum">
+                        <double>0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>8</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>0.05</double>
+                      </property>
+                      <property name="value">
+                        <double>1</double>
+                      </property>
+                    </widget>
+                  </item>
+                  <item>
+                    <widget class="QDoubleSpinBox" name="cloudGreen">
+                      <property name="decimals">
+                        <number>3</number>
+                      </property>
+                      <property name="minimum">
+                        <double>0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>8</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>0.05</double>
+                      </property>
+                      <property name="value">
+                        <double>1</double>
+                      </property>
+                    </widget>
+                  </item>
+                  <item>
+                    <widget class="QDoubleSpinBox" name="cloudBlue">
+                      <property name="decimals">
+                        <number>3</number>
+                      </property>
+                      <property name="minimum">
+                        <double>0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>8</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>0.05</double>
+                      </property>
+                      <property name="value">
+                        <double>1</double>
+                      </property>
+                    </widget>
+                  </item>
+                </layout>
+              </item>
+            </layout>
+          </widget>
+          <widget class="QWidget" name="lightningTab">
+            <attribute name="title">
+              <string>闪电</string>
+            </attribute>
+            <layout class="QFormLayout" name="lightningForm">
+              <item row="0" column="0">
+                <widget class="QLabel" name="strikePositionLabel">
+                  <property name="text">
+                    <string>落点 XYZ（米）</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="0" column="1">
+                <layout class="QHBoxLayout" name="strikePositionLayout">
+                  <item>
+                    <widget class="QDoubleSpinBox" name="strikeX">
+                      <property name="decimals">
+                        <number>2</number>
+                      </property>
+                      <property name="minimum">
+                        <double>-10000000.0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>10000000.0</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>1</double>
+                      </property>
+                      <property name="value">
+                        <double>0</double>
+                      </property>
+                    </widget>
+                  </item>
+                  <item>
+                    <widget class="QDoubleSpinBox" name="strikeY">
+                      <property name="decimals">
+                        <number>2</number>
+                      </property>
+                      <property name="minimum">
+                        <double>-10000000.0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>10000000.0</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>1</double>
+                      </property>
+                      <property name="value">
+                        <double>0</double>
+                      </property>
+                    </widget>
+                  </item>
+                  <item>
+                    <widget class="QDoubleSpinBox" name="strikeZ">
+                      <property name="decimals">
+                        <number>2</number>
+                      </property>
+                      <property name="minimum">
+                        <double>-10000000.0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>10000000.0</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>1</double>
+                      </property>
+                      <property name="value">
+                        <double>0</double>
+                      </property>
+                    </widget>
+                  </item>
+                </layout>
+              </item>
+              <item row="1" column="0">
+                <widget class="QLabel" name="strikeHeightLabel">
+                  <property name="text">
+                    <string>电弧高度（米）</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="1" column="1">
+                <widget class="QDoubleSpinBox" name="strikeHeight">
+                  <property name="decimals">
+                    <number>2</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0.1</double>
+                  </property>
+                  <property name="maximum">
+                    <double>100000.0</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>5</double>
+                  </property>
+                  <property name="value">
+                    <double>80</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="2" column="0">
+                <widget class="QLabel" name="strikeIntensityLabel">
+                  <property name="text">
+                    <string>峰值亮度</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="2" column="1">
+                <widget class="QDoubleSpinBox" name="strikeIntensity">
+                  <property name="decimals">
+                    <number>2</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>64</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>0.5</double>
+                  </property>
+                  <property name="value">
+                    <double>6</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="3" column="0">
+                <widget class="QLabel" name="strikeRadiusLabel">
+                  <property name="text">
+                    <string>照明范围（米）</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="3" column="1">
+                <widget class="QDoubleSpinBox" name="strikeRadius">
+                  <property name="decimals">
+                    <number>2</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0.1</double>
+                  </property>
+                  <property name="maximum">
+                    <double>100000.0</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>5</double>
+                  </property>
+                  <property name="value">
+                    <double>100</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="4" column="0">
+                <widget class="QLabel" name="strikeDurationLabel">
+                  <property name="text">
+                    <string>持续时间（秒）</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="4" column="1">
+                <widget class="QDoubleSpinBox" name="strikeDuration">
+                  <property name="decimals">
+                    <number>3</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0.02</double>
+                  </property>
+                  <property name="maximum">
+                    <double>10</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>0.05</double>
+                  </property>
+                  <property name="value">
+                    <double>0.45</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="5" column="0">
+                <widget class="QLabel" name="strikeSeedLabel">
+                  <property name="text">
+                    <string>电弧形状种子</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="5" column="1">
+                <widget class="QDoubleSpinBox" name="strikeSeed">
+                  <property name="decimals">
+                    <number>0</number>
+                  </property>
+                  <property name="minimum">
+                    <double>0</double>
+                  </property>
+                  <property name="maximum">
+                    <double>4294967295</double>
+                  </property>
+                  <property name="singleStep">
+                    <double>1</double>
+                  </property>
+                  <property name="value">
+                    <double>0</double>
+                  </property>
+                </widget>
+              </item>
+              <item row="6" column="0">
+                <widget class="QLabel" name="strikeColorLabel">
+                  <property name="text">
+                    <string>闪电颜色（线性 RGB）</string>
+                  </property>
+                </widget>
+              </item>
+              <item row="6" column="1">
+                <layout class="QHBoxLayout" name="strikeColorLayout">
+                  <item>
+                    <widget class="QDoubleSpinBox" name="strikeRed">
+                      <property name="decimals">
+                        <number>3</number>
+                      </property>
+                      <property name="minimum">
+                        <double>0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>8</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>0.05</double>
+                      </property>
+                      <property name="value">
+                        <double>0.67</double>
+                      </property>
+                    </widget>
+                  </item>
+                  <item>
+                    <widget class="QDoubleSpinBox" name="strikeGreen">
+                      <property name="decimals">
+                        <number>3</number>
+                      </property>
+                      <property name="minimum">
+                        <double>0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>8</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>0.05</double>
+                      </property>
+                      <property name="value">
+                        <double>0.79</double>
+                      </property>
+                    </widget>
+                  </item>
+                  <item>
+                    <widget class="QDoubleSpinBox" name="strikeBlue">
+                      <property name="decimals">
+                        <number>3</number>
+                      </property>
+                      <property name="minimum">
+                        <double>0</double>
+                      </property>
+                      <property name="maximum">
+                        <double>8</double>
+                      </property>
+                      <property name="singleStep">
+                        <double>0.05</double>
+                      </property>
+                      <property name="value">
+                        <double>1</double>
+                      </property>
+                    </widget>
+                  </item>
+                </layout>
+              </item>
+            </layout>
+          </widget>
+        </widget>
+      </item>
+      <item>
+        <layout class="QHBoxLayout" name="authoringButtons">
+          <item>
+            <widget class="QPushButton" name="applyButton">
+              <property name="text">
+                <string>应用天气设置</string>
+              </property>
+              <property name="autoDefault">
+                <bool>false</bool>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QPushButton" name="importButton">
+              <property name="text">
+                <string>导入预设</string>
+              </property>
+              <property name="autoDefault">
+                <bool>false</bool>
+              </property>
+            </widget>
+          </item>
+          <item>
+            <widget class="QPushButton" name="exportButton">
+              <property name="text">
+                <string>导出预设</string>
+              </property>
+              <property name="autoDefault">
+                <bool>false</bool>
+              </property>
+            </widget>
+          </item>
+        </layout>
+      </item>
+      <item>
+        <widget class="QGroupBox" name="previewGroup">
+          <property name="title">
+            <string>天气预览</string>
+          </property>
+          <layout class="QGridLayout" name="previewLayout">
+            <item row="0" column="0">
+              <widget class="QComboBox" name="lookCombo">
+                <item>
+                  <property name="text">
+                    <string>晴天</string>
+                  </property>
+                </item>
+                <item>
+                  <property name="text">
+                    <string>多云</string>
+                  </property>
+                </item>
+                <item>
+                  <property name="text">
+                    <string>阴天</string>
+                  </property>
+                </item>
+              </widget>
+            </item>
+            <item row="0" column="1">
+              <widget class="QPushButton" name="applyLookButton">
+                <property name="text">
+                  <string>应用预设</string>
+                </property>
+                <property name="autoDefault">
+                  <bool>false</bool>
+                </property>
+              </widget>
+            </item>
+            <item row="0" column="2">
+              <widget class="QDoubleSpinBox" name="transitionSeconds">
+                <property name="decimals">
+                  <number>2</number>
+                </property>
+                <property name="minimum">
+                  <double>0</double>
+                </property>
+                <property name="maximum">
+                  <double>60</double>
+                </property>
+                <property name="singleStep">
+                  <double>0.5</double>
+                </property>
+                <property name="value">
+                  <double>3</double>
+                </property>
+                <property name="toolTip">
+                  <string>预设过渡时长</string>
+                </property>
+                <property name="suffix">
+                  <string> 秒</string>
+                </property>
+              </widget>
+            </item>
+            <item row="0" column="3">
+              <widget class="QPushButton" name="previewLookButton">
+                <property name="text">
+                  <string>预览过渡</string>
+                </property>
+                <property name="autoDefault">
+                  <bool>false</bool>
+                </property>
+              </widget>
+            </item>
+            <item row="1" column="0">
+              <widget class="QDoubleSpinBox" name="previewHour">
+                <property name="decimals">
+                  <number>2</number>
+                </property>
+                <property name="minimum">
+                  <double>0</double>
+                </property>
+                <property name="maximum">
+                  <double>24</double>
+                </property>
+                <property name="singleStep">
+                  <double>0.5</double>
+                </property>
+                <property name="value">
+                  <double>12</double>
+                </property>
+                <property name="toolTip">
+                  <string>预览时间</string>
+                </property>
+                <property name="suffix">
+                  <string> 时</string>
+                </property>
+              </widget>
+            </item>
+            <item row="1" column="1">
+              <widget class="QPushButton" name="previewTimeButton">
+                <property name="text">
+                  <string>预览时间</string>
+                </property>
+                <property name="autoDefault">
+                  <bool>false</bool>
+                </property>
+              </widget>
+            </item>
+            <item row="1" column="2">
+              <widget class="QPushButton" name="previewPlayButton">
+                <property name="text">
+                  <string>播放天气</string>
+                </property>
+                <property name="checkable">
+                  <bool>true</bool>
+                </property>
+                <property name="autoDefault">
+                  <bool>false</bool>
+                </property>
+              </widget>
+            </item>
+            <item row="1" column="3">
+              <widget class="QPushButton" name="lightningButton">
+                <property name="text">
+                  <string>触发闪电</string>
+                </property>
+                <property name="autoDefault">
+                  <bool>false</bool>
+                </property>
+              </widget>
+            </item>
+            <item row="2" column="3">
+              <widget class="QPushButton" name="resetPreviewButton">
+                <property name="text">
+                  <string>恢复场景天气</string>
+                </property>
+                <property name="autoDefault">
+                  <bool>false</bool>
+                </property>
+              </widget>
+            </item>
+          </layout>
+        </widget>
+      </item>
+      <item>
+        <widget class="QLabel" name="errorLabel">
+          <property name="wordWrap">
+            <bool>true</bool>
+          </property>
+        </widget>
+      </item>
+    </layout>
+    <action name="windowAction">
+      <property name="text">
+        <string>窗口</string>
+      </property>
+    </action>
+    <action name="weatherAction">
+      <property name="text">
+        <string>场景天气</string>
+      </property>
+    </action>
+  </widget>
+  <resources />
+  <connections />
+</ui>

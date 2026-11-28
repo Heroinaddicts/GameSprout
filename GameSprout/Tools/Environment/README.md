@@ -13,6 +13,25 @@ python3 GameSprout/Tools/Environment/BakeEnvironment.py Day.exr "/path/to/projec
 
 Runtime 通过 `IScene::GetEnvironmentLighting()` 和 `SetEnvironmentLighting()` 访问配置。使用资源的 GUID 和 LocalID 赋值给 `SkyEnvironment`。运行时载入预处理产物，按资源版本缓存 GPU 纹理。在同一设备与资源提供者上的多个视口复用资源。调整旋转和亮度无需重新烘制或上传。每个 HDR 视口按当前尺寸分配线性场景色，最后合成到视口的显示目标。
 
+## 场景天气
+
+在 **窗口 → 场景天气** 启用天气。可设置起始小时、完整昼夜的秒数、星空亮度与密度、双层云和闪电。昼夜秒数为 0 时固定时间。应用设置后，场景保存天气参数。通过 `.weather` 导入和导出可以在场景之间复用预设。时间预览、天气过渡预览和手动闪电使用临时状态。
+
+Script 和 Module 包含 `RuntimeWeatherApi.h`，从 Runtime 查询天气接口。
+
+```cpp
+if (auto* weather = GameSproutRuntime::QueryWeatherRuntime(*runtime)) {
+    GameSproutRuntime::WeatherSettings settings;
+    if (weather->GetWeatherSettings(*scene, settings)) {
+        settings.Enabled = true;
+        weather->SetWeatherSettings(*scene, settings);
+        weather->SetTimeOfDay(*scene, 22.0f);
+    }
+}
+```
+
+`TransitionWeather` 在指定秒数内混合预设，`GetWeatherState` 返回当前天气快照。`TriggerLightning` 使用世界坐标和半径，`SubscribeLightning` 每次触发收到一条事件。订阅在 Script 或 Module 的 `Release` 中注销。Scene、Game 和水面倒影共用同一场景的天气状态。
+
 ## 场景局部反射和间接光
 
 在主场景的编辑模式打开 **窗口 → 局部光照与反射**。窗口保存的配置属于场景，通过 `IScene::GetEnvironmentLighting()` / `SetEnvironmentLighting()` 也可访问。
