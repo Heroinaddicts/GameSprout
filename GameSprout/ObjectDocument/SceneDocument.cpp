@@ -5,6 +5,7 @@
 #include "SceneLightingDocument.h"
 #include "SceneEnvironmentLightingDocument.h"
 #include "SceneWeatherDocument.h"
+#include "SceneEnvironmentDocument.h"
 #include "SceneRendererShadows.h"
 #include "SceneCanvasScaleNames.h"
 #include "PrefabDocument.h"
@@ -370,6 +371,7 @@ struct Node {
 struct Plan {
     GameSproutRuntime::EnvironmentLightingSettings EnvironmentLighting;
     std::optional<GameSproutRuntime::WeatherSettings> Weather;
+    std::optional<GameSproutRuntime::EnvironmentSettings> Environment;
     std::string Name;
     bool RootActive=true;
     std::uint8_t RootLayer=0;
@@ -496,13 +498,14 @@ void PublishComponentIdentities(GameSproutRuntime::IScene& scene,const SceneDocu
     if(!runtime.SetSceneComponentIdentities(&scene,identities,error))Fail("Component.Identity",error);
 }
 Plan ValidatePlan(const Json::Value& document, bool checkReferences=true) {
-    Members(document,"Scene",{"Version","Name","RootActive","RootLayer","RootTagID","RootStaticFlags","RootComponents","RootMainCamera","MainCameraID","NextObjectID","Objects","Annotations","EnvironmentLighting","Weather"});
+    Members(document,"Scene",{"Version","Name","RootActive","RootLayer","RootTagID","RootStaticFlags","RootComponents","RootMainCamera","MainCameraID","NextObjectID","Objects","Annotations","EnvironmentLighting","Weather","Environment"});
     if(document.isMember("Annotations")&&!document["Annotations"].isObject())Fail("Scene.Annotations","expected object");
     if (Unsigned(document["Version"],"Scene.Version")!=GameSproutRuntime::SceneDocumentVersion)
         Fail("Scene.Version","expected current Unity-coordinate scene version 2; recreate or re-export the source document");
     Plan plan;
     if(document.isMember("EnvironmentLighting"))plan.EnvironmentLighting=SceneEnvironmentLightingDocument::Read(document["EnvironmentLighting"]);
     if(document.isMember("Weather"))plan.Weather=SceneWeatherDocument::Read(document["Weather"]);
+    if(document.isMember("Environment"))plan.Environment=SceneEnvironmentDocument::Read(document["Environment"]);
     plan.Name=Name(document["Name"],"Scene.Name");
     plan.RootActive=BoolMember(document,"RootActive",true,"Scene");
     if(document.isMember("RootLayer")) {
@@ -887,6 +890,11 @@ public:
                 auto* weather=GameSproutRuntime::QueryWeatherRuntime(_Runtime);
                 if(!weather||!weather->SetWeatherSettings(*_Candidate,*_Plan.Values.Weather))
                     Fail("Scene.Weather","Runtime rejected weather settings");
+            }
+            if(_Plan.Values.Environment) {
+                auto* environment=GameSproutRuntime::QueryEnvironmentRuntime(_Runtime);
+                if(!environment||!environment->SetEnvironmentSettings(*_Candidate,*_Plan.Values.Environment))
+                    Fail("Scene.Environment","Runtime rejected environment settings");
             }
             return true;
         } catch(const std::exception& exception) {error=exception.what();}

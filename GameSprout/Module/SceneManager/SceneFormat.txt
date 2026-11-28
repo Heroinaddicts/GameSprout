@@ -119,6 +119,15 @@ WindDirectionDegrees、WindSpeed，以及星空、云颜色、雾和环境光倍
 天气字段随完整 Scene 和增量 Play 作者快照保存。实时昼夜时间、天气过渡和正在播放的雷闪属于运行状态。
 窗口 → 场景天气支持编辑和临时预览。应用设置提交一条可撤销事务，预览不写入场景。
 天气预设文件的扩展名为 .weather，根对象保存 Version=1 和 Weather。导入将预设值应用到当前场景。
+顶层 Environment 可省略，Version 固定为 1。Effects 保存各效果的 Id、Type；Layers 保存 Id、
+Priority、Weight、可选 Region 和 Overrides。Region 由世界坐标的 Center、HalfSize 和米制
+BlendDistance 描述。Overrides 以 Target（全局字段省略或留空）、Parameter 和 Value 指定字段。
+Curves 每项独立保存 Id、Target、Parameter、Priority、Weight、Loop 和由 Seconds、Value 构成
+的递增 Keys。Value 支持有限数值、布尔、三维向量数组、线性 RGBA 数组或 Guid/LocalID 资源引用。
+Environment 与 Weather 可同时存在，Environment 只覆盖作者指定的字段。两者随场景保存和 Play
+副本传递。事件、运行时曲线时钟及已解析的视口效果不写入文档。Prefab 不携带 Environment。
+窗口 → 环境组合为场景编写这些数据。应用是一条撤销记录；参数目录从 Runtime 的公共接口读取。
+项目在 Play 中注册的自定义参数和效果可以按 ID 编辑，保存时保留未注册的配置。
 编辑器应用组合层创建并销毁 Runtime，经 EditorApi 的 const _Runtime 指针统一注入；Module 和 View 只借用。
 RuntimeHost 仅管理资源提供者连接、时钟和唯一每帧 Update，不创建或 delete Runtime。
 SceneManager 管理 .scene 文档、活动场景、稳定文件 ID、保存基线和场景编辑事务，不拥有 Runtime、GPU 或动画时钟。

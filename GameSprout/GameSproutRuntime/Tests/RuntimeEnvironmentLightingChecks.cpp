@@ -1,6 +1,7 @@
 #include "GameSproutRuntimeExport.h"
 #include "SceneDocument.h"
 #include "PrefabDocument.h"
+#include "RuntimeEnvironmentApi.h"
 #include "RuntimeWeatherApi.h"
 #include <iostream>
 #include <limits>
@@ -154,20 +155,44 @@ int main(int argc,char** argv) {
         Check(weather->SetTimeOfDay(*loaded,8),"Cannot preview independent scene time");
         auto preview=weatherSettings.Preset;preview.Clouds[0].Coverage=1;
         Check(weather->TransitionWeather(*loaded,preview,0),"Cannot preview independent weather preset");
+        using namespace GameSproutRuntime;
+        auto* compositionRuntime=QueryEnvironmentRuntime(*runtime);
+        const auto* omittedComposition=QueryEnvironmentScene(*omitted);
+        Check(compositionRuntime&&omittedComposition&&omittedComposition->GetAuthoredEnvironmentSettings()==EnvironmentSettings{}&&
+            !document.isMember("Environment"),"Old scenes must retain an empty composition");
+        EnvironmentSettings composition;
+        composition.Effects={{"Aurora","Project.Aurora"}};
+        composition.Layers={{"Moat",{{"","Fog.Start",12.f},
+            {"Aurora","Noise",ResourceReference{"1234567890abcdef1234567890abcdef",std::numeric_limits<std::uint64_t>::max()}}},
+            2,.5f,EnvironmentRegion{{2,3,4},{40,3,5},10}}};
+        composition.Curves={{"AuroraIntensity","Aurora","Intensity",{{0,.1f},{2,1.f}},true,4,1.f}};
+        Check(compositionRuntime->SetEnvironmentSettings(*loaded,composition)&&compositionRuntime->AdvanceEnvironmentPreview(*loaded,1.f),
+            "Cannot configure or preview scene composition");
         Json::Value weatherDocument,properties;
         Check(SceneDocument::Serialize(*loaded,loadedIDs,weatherDocument,error),error);
         Check(SceneDocument::SerializeProperties(*loaded,loadedIDs,properties,error)&&
             SceneDocument::ValidateProperties(properties,true,error)&&properties["Weather"]==weatherDocument["Weather"],
             "Incremental scene snapshot lost authored weather: "+error);
+        Check(weatherDocument.isMember("Environment")&&properties["Environment"]==weatherDocument["Environment"],
+            "Incremental scene snapshot lost environment composition");
         GameSproutRuntime::IScene* weatherScene=nullptr;
         Check(SceneDocument::Instantiate(weatherDocument,*runtime,weatherScene,error),error);
         GameSproutRuntime::WeatherSettings roundTrip;
         Check(weather->GetWeatherSettings(*weatherScene,roundTrip)&&roundTrip==weatherSettings,
             "Scene failed to round trip authored weather or persisted transient preview state");
+        EnvironmentSnapshot resolved;
+        const auto* restoredComposition=QueryEnvironmentScene(*weatherScene);
+        Check(restoredComposition&&restoredComposition->GetAuthoredEnvironmentSettings()==composition&&
+            compositionRuntime->ResolveEnvironment(*weatherScene,{},resolved)&&resolved.TimeSeconds==0,
+            "Composition lost unregistered project data or persisted the transient curve clock");
         bad=weatherDocument;bad["Weather"]["Preset"]["Clouds"][1]["Density"]=2;reject(bad);
         bad=weatherDocument;bad["Weather"]["Lightning"]["Seed"]=Json::UInt64(1ull<<32);reject(bad);
+        bad=weatherDocument;bad["Environment"]["Version"]=2;reject(bad);
+        bad=weatherDocument;bad["Environment"]["Layers"][0]["Overrides"][1]["Value"]["Guid"]="0";reject(bad);
         prefab["Weather"]=weatherDocument["Weather"];
         Check(!PrefabDocument::Validate(prefab,error),"Prefab accepted scene weather");
+        prefab.removeMember("Weather");prefab["Environment"]=weatherDocument["Environment"];
+        Check(!PrefabDocument::Validate(prefab,error),"Prefab accepted scene composition");
         Check(runtime->DestroyScene(weatherScene),"Cannot release weather fixture");
         Check(runtime->DestroyScene(omitted)&&runtime->DestroyScene(loaded)&&runtime->DestroyScene(other)&&runtime->DestroyScene(scene),"Cannot release environment fixtures");
         delete runtime;std::cout<<"PASS environment and weather scene isolation, validation, persistence and Prefab exclusion\n";return 0;

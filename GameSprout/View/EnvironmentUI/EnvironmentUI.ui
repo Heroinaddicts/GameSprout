@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>EnvironmentWindow</class>
+ <widget class="QDialog" name="EnvironmentWindow">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>940</width><height>495</height></rect></property>
+  <property name="windowTitle"><string>环境组合</string></property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item><widget class="QLabel" name="sceneState"><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QTabWidget" name="tabs">
+    <widget class="QWidget" name="layersPage">
+     <attribute name="title"><string>层</string></attribute>
+     <layout class="QVBoxLayout" name="layersLayout">
+      <item><widget class="QLabel" name="layersHelp"><property name="text"><string>区域坐标使用世界空间。中心、半尺寸和混合距离全留空时，层作用于整个场景。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QTableWidget" name="layersTable">
+       <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+       <property name="alternatingRowColors"><bool>true</bool></property>
+       <attribute name="horizontalHeaderStretchLastSection"><bool>true</bool></attribute>
+       <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+       <column><property name="text"><string>层 ID</string></property></column>
+       <column><property name="text"><string>优先级</string></property></column>
+       <column><property name="text"><string>权重</string></property></column>
+       <column><property name="text"><string>区域中心 [x,y,z]</string></property></column>
+       <column><property name="text"><string>区域半尺寸 [x,y,z]</string></property></column>
+       <column><property name="text"><string>混合距离（米）</string></property></column>
+      </widget></item>
+      <item><layout class="QHBoxLayout" name="layersButtons">
+       <item><widget class="QPushButton" name="layersAdd"><property name="text"><string>添加</string></property></widget></item>
+       <item><widget class="QPushButton" name="layersRemove"><property name="text"><string>删除选中行</string></property></widget></item>
+       <item><spacer name="layersSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      </layout></item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="overridesPage">
+     <attribute name="title"><string>字段覆盖</string></attribute>
+     <layout class="QVBoxLayout" name="overridesLayout">
+      <item><widget class="QLabel" name="overridesHelp"><property name="text"><string>按层 ID 添加字段。目标留空表示全局参数。值支持数值、true/false、[x,y,z]、[r,g,b,a] 或资源引用。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QTableWidget" name="overridesTable">
+       <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+       <property name="alternatingRowColors"><bool>true</bool></property>
+       <attribute name="horizontalHeaderStretchLastSection"><bool>true</bool></attribute>
+       <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+       <column><property name="text"><string>层 ID</string></property></column>
+       <column><property name="text"><string>目标效果 ID</string></property></column>
+       <column><property name="text"><string>参数 ID</string></property></column>
+       <column><property name="text"><string>值</string></property></column>
+      </widget></item>
+      <item><layout class="QHBoxLayout" name="overridesButtons">
+       <item><widget class="QPushButton" name="overridesAdd"><property name="text"><string>添加</string></property></widget></item>
+       <item><widget class="QPushButton" name="overridesRemove"><property name="text"><string>删除选中行</string></property></widget></item>
+       <item><spacer name="overridesSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      </layout></item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="curvesPage">
+     <attribute name="title"><string>曲线</string></attribute>
+     <layout class="QVBoxLayout" name="curvesLayout">
+      <item><widget class="QLabel" name="curvesHelp"><property name="text"><string>每条曲线独立绑定一个字段。目标留空表示全局参数。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QTableWidget" name="curvesTable">
+       <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+       <property name="alternatingRowColors"><bool>true</bool></property>
+       <attribute name="horizontalHeaderStretchLastSection"><bool>true</bool></attribute>
+       <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+       <column><property name="text"><string>曲线 ID</string></property></column>
+       <column><property name="text"><string>目标效果 ID</string></property></column>
+       <column><property name="text"><string>参数 ID</string></property></column>
+       <column><property name="text"><string>循环 true/false</string></property></column>
+       <column><property name="text"><string>优先级</string></property></column>
+       <column><property name="text"><string>权重</string></property></column>
+      </widget></item>
+      <item><layout class="QHBoxLayout" name="curvesButtons">
+       <item><widget class="QPushButton" name="curvesAdd"><property name="text"><string>添加</string></property></widget></item>
+       <item><widget class="QPushButton" name="curvesRemove"><property name="text"><string>删除选中行</string></property></widget></item>
+       <item><spacer name="curvesSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      </layout></item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="keysPage">
+     <attribute name="title"><string>关键帧</string></attribute>
+     <layout class="QVBoxLayout" name="keysLayout">
+      <item><widget class="QLabel" name="keysHelp"><property name="text"><string>同一曲线内的时间必须递增，单位为秒，值的类型应与参数一致。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QTableWidget" name="keysTable">
+       <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+       <property name="alternatingRowColors"><bool>true</bool></property>
+       <attribute name="horizontalHeaderStretchLastSection"><bool>true</bool></attribute>
+       <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+       <column><property name="text"><string>曲线 ID</string></property></column>
+       <column><property name="text"><string>时间（秒）</string></property></column>
+       <column><property name="text"><string>值</string></property></column>
+      </widget></item>
+      <item><layout class="QHBoxLayout" name="keysButtons">
+       <item><widget class="QPushButton" name="keysAdd"><property name="text"><string>添加</string></property></widget></item>
+       <item><widget class="QPushButton" name="keysRemove"><property name="text"><string>删除选中行</string></property></widget></item>
+       <item><spacer name="keysSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      </layout></item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="effectsPage">
+     <attribute name="title"><string>效果实例</string></attribute>
+     <layout class="QVBoxLayout" name="effectsLayout">
+      <item><widget class="QLabel" name="effectsHelp"><property name="text"><string>实例 ID 用于绑定覆盖和曲线。效果类型由 Runtime 内置或项目代码注册。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QTableWidget" name="effectsTable">
+       <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+       <property name="alternatingRowColors"><bool>true</bool></property>
+       <attribute name="horizontalHeaderStretchLastSection"><bool>true</bool></attribute>
+       <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+       <column><property name="text"><string>实例 ID</string></property></column>
+       <column><property name="text"><string>效果类型</string></property></column>
+      </widget></item>
+      <item><layout class="QHBoxLayout" name="effectsButtons">
+       <item><widget class="QPushButton" name="effectsAdd"><property name="text"><string>添加</string></property></widget></item>
+       <item><widget class="QPushButton" name="effectsRemove"><property name="text"><string>删除选中行</string></property></widget></item>
+       <item><spacer name="effectsSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      </layout></item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="catalogPage">
+     <attribute name="title"><string>参数目录</string></attribute>
+     <layout class="QVBoxLayout" name="catalogLayout">
+      <item><widget class="QLabel" name="catalogHelp"><property name="text"><string>目录显示已注册的全局字段、效果参数和事件载荷。项目代码注册的类型可按 ID 填写。</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QTableWidget" name="catalogTable">
+       <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+       <property name="alternatingRowColors"><bool>true</bool></property>
+       <attribute name="horizontalHeaderStretchLastSection"><bool>true</bool></attribute>
+       <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+       <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+       <column><property name="text"><string>效果或事件（空为全局）</string></property></column>
+       <column><property name="text"><string>参数 ID</string></property></column>
+       <column><property name="text"><string>默认值</string></property></column>
+      </widget></item>
+      <item><layout class="QHBoxLayout" name="catalogButtons">
+       <item><widget class="QPushButton" name="catalogRefresh"><property name="text"><string>刷新目录</string></property></widget></item>
+       <item><spacer name="catalogSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      </layout></item>
+     </layout>
+    </widget>
+   </widget></item>
+   <item><widget class="QLabel" name="statusLabel"><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><layout class="QHBoxLayout" name="actionsLayout">
+    <item><spacer name="actionsSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+    <item><widget class="QPushButton" name="reloadButton"><property name="text"><string>还原未应用编辑</string></property></widget></item>
+    <item><widget class="QPushButton" name="applyButton"><property name="text"><string>应用到当前场景</string></property></widget></item>
+   </layout></item>
+  </layout>
+  <action name="windowAction"><property name="text"><string>窗口</string></property></action>
+  <action name="environmentAction"><property name="text"><string>环境组合</string></property></action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

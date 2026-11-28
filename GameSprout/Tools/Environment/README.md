@@ -32,6 +32,22 @@ if (auto* weather = GameSproutRuntime::QueryWeatherRuntime(*runtime)) {
 
 `TransitionWeather` 在指定秒数内混合预设，`GetWeatherState` 返回当前天气快照。`TriggerLightning` 使用世界坐标和半径，`SubscribeLightning` 每次触发收到一条事件。订阅在 Script 或 Module 的 `Release` 中注销。Scene、Game 和水面倒影共用同一场景的天气状态。
 
+## 环境组合
+
+在 **窗口 → 环境组合** 编辑效果实例、配置层、字段覆盖和曲线。每个效果实例有独立 ID，同一种效果可以添加多次。字段的目标填实例 ID，留空表示场景全局参数。参数目录列出当前 Runtime 注册的字段和默认值。游戏模块在 Play 时注册自定义效果，启动后可以在目录里查看，也可在编辑状态按已知 ID 配置。点「应用」将整组改动作为一条场景撤销记录，下次保存时写入 `.scene` 文件。
+
+- 每个层只修改声明的字段。优先级从低到高应用，权重在 0 到 1 之间。可用世界坐标的中心、半尺寸和渐变距离让层只在指定区域内参与混合。雾从每个视口的相机位置取样。如果场景大气关闭，用 `Fog.Strength` 启用局部雾，再用 `Fog.Start`、`Fog.End` 和 `Fog.Color` 配置距离和颜色。
+- 每条曲线绑定一个字段，按场景时钟独立求值。关键帧以秒为单位，按时间递增排列，循环曲线以最后一个关键帧时间为周期。曲线也可设置优先级、权重。
+- 旧「场景天气」配置和 `IWeatherRuntime` 接口可以继续使用。旧昼夜、星空和双层云提供基础值，组合只覆盖指定参数。使用 `GameSprout.DayNight` 和 `GameSprout.Starfield` 配置昼夜亮度与星空，使用 `GameSprout.CloudLayer` 添加独立云层。每层云可分别配置 `Coverage`、`Density`、`Scale`、`WindDirectionDegrees` 和 `WindSpeed`。每个视口在同一次天空绘制中最多处理八个可见云层，包含旧天气中启用的云层。
+
+Script 或 Module 包含 `RuntimeEnvironmentApi.h`，通过 `QueryEnvironmentRuntime(*runtime)` 获取接口。`RegisterEnvironmentParameter` 注册可供配置层、曲线和项目逻辑共用的全局字段。类型支持浮点、布尔、三维向量、颜色和资源引用，插值可选线性、最短角度和阶跃。`ResolveEnvironment` 在指定世界位置求值，`FindEnvironmentValue<T>` 读取解析结果。注册后的参数由项目逻辑或效果消费。
+
+`RegisterEnvironmentEffect` 注册自定义天空叠加效果，描述包含类型 ID、材质引用、字段定义和是否绘入平面倒影。Runtime 通过全屏顶点着色器提供 `TEXCOORD0` 世界方向，同名参数写入项目材质；Fragment Shader 可使用 `GameSproutFrame` 读取时间等帧数据。参考主城堡使用的 `MountAndBlade/Assets/Scripts/CastleEnvironment.cpp` 和 `CastleAurora.shader`。参数或效果的所有者应在 `Release` 中注销注册项。
+
+一次性效果事件通过 `EmitEnvironmentEvent` 发出。以字符串标识类型，可附带类型化字段，也可以注册事件描述供调用时校验。内置 `GameSprout.Lightning` 使用世界位置、半径、持续时间和亮度等字段。旧 `TriggerLightning` 同样会发出这个事件，已有闪电回调继续工作。通过 `SubscribeEnvironmentEvents` 订阅，在 `Release` 里注销。场景时钟和闪电持续时间由 Runtime 更新，Scene、Game 和反射只读取结果。
+
+在 MountAndBlade 打开 `Medieval Castle` 并 Play 会加载项目的极光效果。看向西方，极光在运行约 8 秒后开始出现。第三层云和护城河局部雾来自同一个场景的组合配置。
+
 ## 场景局部反射和间接光
 
 在主场景的编辑模式打开 **窗口 → 局部光照与反射**。窗口保存的配置属于场景，通过 `IScene::GetEnvironmentLighting()` / `SetEnvironmentLighting()` 也可访问。
