@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Guid": "0442560a892446c08d24531ddd371fe7",
+  "ImporterType": "Material",
+  "Path": "Environment/Materials/CastleSunset.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {"Type": 5, "SourceKey": "main", "LocalID": 1, "Name": "Castle Sunset"}
+  ]
+}

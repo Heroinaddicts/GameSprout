@@ -41,6 +41,7 @@ constexpr std::array Phases{
 constexpr std::size_t RainPhase = 1;
 constexpr std::size_t NightPhase = 2;
 constexpr std::size_t LightningPhase = 4;
+constexpr std::size_t DuskPhase = 5;
 constexpr std::size_t WindPhase = 6;
 constexpr std::array StrikeTimes{.54, 1.95, 3.16};
 constexpr std::array StormMaterials{"082e26b6151045aab15516ae996754c0", "1adcf216e8d84fb19f4498272dd52379"};
@@ -113,6 +114,7 @@ bool CastleEnvironment::Initialize(IGameSproutRuntime* runtime) {
     };
     _Registered = environment->RegisterEnvironmentEffect(aurora);
     if (!_Registered) GS_ERROR(runtime, "Could not register the castle aurora effect");
+    _Sunset.Register(*environment);
     return true;
 }
 
@@ -131,6 +133,7 @@ void CastleEnvironment::LaunchFinished(IGameSproutRuntime* runtime) {
         _SceneID = scene->GetInstanceID();
         weather->SetTimeOfDay(*scene, Phases.front().Hour);
         weather->TransitionWeather(*scene, MakePreset(_InitialWeather.Preset, 0), 0.f);
+        _Sunset.Bind(*runtime, *scene);
         InstallCurves(*runtime, *scene);
         GS_TRACE(runtime, "主城堡天气 %s（5 秒）", Phases.front().Name);
         return;
@@ -141,6 +144,9 @@ void CastleEnvironment::InstallCurves(IGameSproutRuntime& runtime, IScene& scene
     auto* environment = QueryEnvironmentRuntime(runtime);
     EnvironmentSettings composition;
     if (!environment->GetEnvironmentSettings(scene, composition)) return;
+    composition.Effects.push_back({CastleSunset::EffectID, CastleSunset::EffectType});
+    composition.Curves.push_back(MakeCurve(CastleSunset::EffectID, CastleSunset::WeightParameter, 25,
+        [](std::size_t index) { return index == DuskPhase ? 1.f : 0.f; }));
     const auto hasEffect = [&composition](std::string_view id) {
         return std::any_of(composition.Effects.begin(), composition.Effects.end(),
             [id](const auto& effect) { return effect.Id == id; });
@@ -223,6 +229,7 @@ void CastleEnvironment::LateUpdate(IGameSproutRuntime* runtime, float deltaSecon
         return std::lerp(_Phase == target ? 1.f : 0.f, next == target ? 1.f : 0.f, weight);
     };
     const auto rain = strength(RainPhase);
+    _Sunset.SetWeight(*runtime, strength(DuskPhase));
     SetStormOverlay(*runtime, *scene, 0, rain);
     SetStormOverlay(*runtime, *scene, 1, strength(WindPhase));
     _Lightning.Update(*runtime, deltaSeconds);
@@ -236,6 +243,7 @@ void CastleEnvironment::LateUpdate(IGameSproutRuntime* runtime, float deltaSecon
 void CastleEnvironment::Release(IGameSproutRuntime* runtime) {
     auto* environment = QueryEnvironmentRuntime(*runtime);
     auto* scene = _SceneID ? dynamic_cast<IScene*>(runtime->QueryGameObject(_SceneID)) : nullptr;
+    _Sunset.Release(*runtime, scene);
     if (scene) {
         for (const auto id : _OverlayIDs)
             if (auto* overlay = id ? runtime->QueryGameObject(id) : nullptr) scene->DestroyGameObject(overlay);
@@ -243,6 +251,7 @@ void CastleEnvironment::Release(IGameSproutRuntime* runtime) {
         EnvironmentSettings composition;
         if (environment->GetEnvironmentSettings(*scene, composition)) {
             std::erase_if(composition.Curves, [](const auto& curve) { return curve.Id.starts_with(CurvePrefix); });
+            std::erase_if(composition.Effects, [](const auto& effect) { return effect.Id == CastleSunset::EffectID; });
             environment->SetEnvironmentSettings(*scene, composition);
         }
         auto* weather = QueryWeatherRuntime(*runtime);

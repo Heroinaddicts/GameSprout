@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Guid": "5217cb65dc60486984b95d652a6b4d46",
+  "ImporterType": "Shader",
+  "Path": "Environment/Shaders/CastleSunset.shader",
+  "ImportSettings": {},
+  "SubAssets": [
+    {"Type": 6, "SourceKey": "main", "LocalID": 1, "Name": "CastleSunset"}
+  ]
+}

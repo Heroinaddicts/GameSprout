@@ -1,0 +1,7 @@
+{
+  "Version": 1,
+  "Name": "Castle Sunset",
+  "Shader": {"Guid": "5217cb65dc60486984b95d652a6b4d46", "LocalID": 1},
+  "SunsetWeight": 0,
+  "SunsetDirection": [-0.930, 0.174, 0.324, 0]
+}
