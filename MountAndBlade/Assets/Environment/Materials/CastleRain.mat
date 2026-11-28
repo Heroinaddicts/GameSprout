@@ -1,0 +1,8 @@
+{
+  "Version": 1,
+  "Name": "Castle Rain",
+  "Shader": {"Guid": "fa9d7b6699e84d34b0696f9a754f575b", "LocalID": 1},
+  "SortingPriority": 50,
+  "GustMode": 0,
+  "StreakTint": [0.52, 0.68, 0.84, 0.55]
+}

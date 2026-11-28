@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Guid": "fa9d7b6699e84d34b0696f9a754f575b",
+  "ImporterType": "Shader",
+  "Path": "Environment/Shaders/CastleStorm.shader",
+  "ImportSettings": {},
+  "SubAssets": [
+    {"Type": 6, "SourceKey": "main", "LocalID": 1, "Name": "CastleStorm"}
+  ]
+}

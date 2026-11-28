@@ -9,12 +9,14 @@
     "Name": "MountAndBlade/Castle Aurora",
     "Properties": [
         {"Name": "AuroraIntensity", "DisplayName": "极光强度", "Type": "Float", "Default": 0},
+        {"Name": "WeatherVisibility", "DisplayName": "天气可见度", "Type": "Float", "Default": 1},
         {"Name": "AuroraTint", "DisplayName": "极光色调", "Type": "Color", "Default": [0.08, 0.78, 0.46, 1]}
     ]
 } */
 
 cbuffer AuroraMaterial : register(b0, space3) {
     float AuroraIntensity;
+    float WeatherVisibility;
     float4 AuroraTint;
 };
 
@@ -54,5 +56,5 @@ float4 PSMain(SkySample input) : SV_Target0 {
     float alpha = saturate(west * (curtain * strands + ribbon) * max(AuroraIntensity, 0.0)) * AuroraTint.a;
     float palette = smoothstep(0.03, 0.21, height);
     float3 radiance = lerp(AuroraTint.rgb, float3(0.38, 0.15, 0.83), palette);
-    return float4(radiance, saturate(alpha));
+    return float4(radiance, saturate(alpha * WeatherVisibility));
 }

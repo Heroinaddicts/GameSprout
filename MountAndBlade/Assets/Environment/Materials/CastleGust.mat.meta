@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Guid": "1adcf216e8d84fb19f4498272dd52379",
+  "ImporterType": "Material",
+  "Path": "Environment/Materials/CastleGust.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {"Type": 5, "SourceKey": "main", "LocalID": 1, "Name": "Castle Gust"}
+  ]
+}

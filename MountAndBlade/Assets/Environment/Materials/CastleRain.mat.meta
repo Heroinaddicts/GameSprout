@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Guid": "082e26b6151045aab15516ae996754c0",
+  "ImporterType": "Material",
+  "Path": "Environment/Materials/CastleRain.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {"Type": 5, "SourceKey": "main", "LocalID": 1, "Name": "Castle Rain"}
+  ]
+}

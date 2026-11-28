@@ -1,0 +1,8 @@
+{
+  "Version": 1,
+  "Name": "Castle Gust",
+  "Shader": {"Guid": "fa9d7b6699e84d34b0696f9a754f575b", "LocalID": 1},
+  "SortingPriority": 50,
+  "GustMode": 1,
+  "StreakTint": [0.78, 0.73, 0.56, 0.36]
+}
