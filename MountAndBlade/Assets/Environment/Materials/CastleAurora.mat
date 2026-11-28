@@ -1,0 +1,7 @@
+{
+  "Version": 1,
+  "Name": "Castle Aurora",
+  "Shader": {"Guid": "4ca4988ad5894bc782169765fe8a8a01", "LocalID": 1},
+  "AuroraIntensity": 0,
+  "AuroraTint": [0.08, 0.78, 0.46, 1]
+}

@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Guid": "7bc1d8284d2048b196e43d459902db02",
+  "ImporterType": "Material",
+  "Path": "Environment/Materials/CastleAurora.mat",
+  "ImportSettings": {},
+  "SubAssets": [
+    {"Type": 5, "SourceKey": "main", "LocalID": 1, "Name": "Castle Aurora"}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "Version": 1,
+  "Guid": "4ca4988ad5894bc782169765fe8a8a01",
+  "ImporterType": "Shader",
+  "Path": "Environment/Shaders/CastleAurora.shader",
+  "ImportSettings": {},
+  "SubAssets": [
+    {"Type": 6, "SourceKey": "main", "LocalID": 1, "Name": "CastleAurora"}
+  ]
+}

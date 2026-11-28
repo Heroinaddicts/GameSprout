@@ -1,4 +1,50 @@
 {
+    "Environment" : {
+        "Version": 1,
+        "Effects": [
+            {"Id": "Castle.Aurora", "Type": "MountAndBlade.Aurora"},
+            {"Id": "Castle.HighCloud", "Type": "GameSprout.CloudLayer"}
+        ],
+        "Layers": [
+            {
+                "Id": "Castle.HighCloudSettings",
+                "Overrides": [
+                    {"Target": "Castle.HighCloud", "Parameter": "Coverage", "Value": 0.24},
+                    {"Target": "Castle.HighCloud", "Parameter": "Density", "Value": 0.56},
+                    {"Target": "Castle.HighCloud", "Parameter": "Scale", "Value": 8},
+                    {"Target": "Castle.HighCloud", "Parameter": "WindDirectionDegrees", "Value": 120},
+                    {"Target": "Castle.HighCloud", "Parameter": "WindSpeed", "Value": 0.04}
+                ]
+            },
+            {
+                "Id": "Castle.MoatFog",
+                "Priority": 20,
+                "Region": {"Center": [27, 3, -10], "HalfSize": [22, 14, 22], "BlendDistance": 7},
+                "Overrides": [
+                    {"Parameter": "Fog.Start", "Value": 12},
+                    {"Parameter": "Fog.End", "Value": 92},
+                    {"Parameter": "Fog.Strength", "Value": 1.4},
+                    {"Parameter": "Fog.Color", "Value": [0.30, 0.43, 0.56, 1]}
+                ]
+            }
+        ],
+        "Curves": [
+            {
+                "Id": "Castle.AuroraCycle",
+                "Target": "Castle.Aurora",
+                "Parameter": "AuroraIntensity",
+                "Loop": true,
+                "Keys": [
+                    {"Seconds": 0, "Value": 0},
+                    {"Seconds": 8, "Value": 0},
+                    {"Seconds": 16, "Value": 0.82},
+                    {"Seconds": 67, "Value": 0.65},
+                    {"Seconds": 75, "Value": 0},
+                    {"Seconds": 120, "Value": 0}
+                ]
+            }
+        ]
+    },
     "EnvironmentLighting" :
     {
         "AmbientColor" :
@@ -55333,5 +55379,65 @@
     "RootLayer" : 0,
     "RootStaticFlags" : 0,
     "RootTagID" : 0,
-    "Version" : 2
+    "Version" : 2,
+    "Weather" :
+    {
+        "DayLengthSeconds" : 120.0,
+        "Enabled" : true,
+        "Lightning" :
+        {
+            "DurationSeconds" : 0.44999998807907104,
+            "Height" : 80.0,
+            "Intensity" : 6.0,
+            "Position" :
+            [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "Radius" : 100.0,
+            "Seed" : 0,
+            "Tint" :
+            [
+                0.67000001668930054,
+                0.79000002145767212,
+                1.0,
+                1.0
+            ]
+        },
+        "Preset" :
+        {
+            "AmbientMultiplier" : 1.0,
+            "CloudColor" :
+            [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ],
+            "Clouds" :
+            [
+                {
+                    "Coverage" : 0.46000000834465027,
+                    "Density" : 0.75,
+                    "Scale" : 2.0,
+                    "WindDirectionDegrees" : 0.0,
+                    "WindSpeed" : 0.017999999225139618
+                },
+                {
+                    "Coverage" : 0.25999999046325684,
+                    "Density" : 0.34999999403953552,
+                    "Scale" : 5.0,
+                    "WindDirectionDegrees" : 70.0,
+                    "WindSpeed" : 0.0099999997764825821
+                }
+            ],
+            "DaylightMultiplier" : 1.2000000476837158,
+            "FogStrength" : 1.0,
+            "StarDensity" : 0.30000001192092896,
+            "StarIntensity" : 1.0,
+            "StarRotationDegrees" : 0.0
+        },
+        "TimeOfDayHours" : 16.0
+    }
 }
